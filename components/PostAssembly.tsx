@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useProjects } from '../context/ProjectContext';
-import { Project } from '../types';
+import { Project, Batch } from '../types';
 
 const PostAssembly: React.FC = () => {
-    const { projects, moveBatchToStep, workflowConfig, currentUser } = useProjects();
+    const { projects, batches, moveBatchToStep, workflowConfig, currentUser } = useProjects();
 
     // Define Post-Assembly Columns (Stage 8) based on IDs
     const POST_ASSEMBLY_STEP_IDS = ['8.1', '8.2', '8.3', '8.4', '8.5'];
@@ -17,11 +17,17 @@ const PostAssembly: React.FC = () => {
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
     const [projectToStart, setProjectToStart] = useState('');
 
+    // Helper to get main batch for a project (assuming single active flow or prioritizing first)
+    const getProjectBatch = (projectId: string): Batch | undefined => {
+        return batches.find(b => b.projectId === projectId);
+    };
+
     // Filter projects eligible for Post-Assembly (Stage 7.1 or 7.2)
-    // We check if the current step of the project corresponds to Stage 7
     const eligibleProjects = projects.filter(p => {
-        const step = workflowConfig[p.currentStepId];
-        // Ensure step exists and is in stage 7. Using IDs 7.1 and 7.2 as requested.
+        const batch = getProjectBatch(p.id);
+        if (!batch) return false;
+
+        const step = workflowConfig[batch.currentStepId];
         return step && (step.id === '7.1' || step.id === '7.2');
     });
 
@@ -30,8 +36,7 @@ const PostAssembly: React.FC = () => {
 
         const project = projects.find(p => p.id === projectToStart);
         if (project) {
-            // Move main batch to 8.1
-            const mainBatch = project.batches[0];
+            const mainBatch = getProjectBatch(project.id);
             if (mainBatch) {
                 await moveBatchToStep(mainBatch.id, '8.1');
             }
@@ -47,18 +52,17 @@ const PostAssembly: React.FC = () => {
 
     const handleAdvanceStep = async () => {
         if (!selectedProject) return;
-        const currentStep = selectedProject.currentStepId;
+        const batch = getProjectBatch(selectedProject.id);
+        if (!batch) return;
+
+        const currentStep = batch.currentStepId;
         const currentIndex = POST_ASSEMBLY_STEP_IDS.indexOf(currentStep);
 
         if (currentIndex !== -1 && currentIndex < POST_ASSEMBLY_STEP_IDS.length - 1) {
             const nextStep = POST_ASSEMBLY_STEP_IDS[currentIndex + 1];
-            const mainBatch = selectedProject.batches[0];
-            if (mainBatch) {
-                await moveBatchToStep(mainBatch.id, nextStep);
-                setIsDetailsOpen(false);
-            }
+            await moveBatchToStep(batch.id, nextStep);
+            setIsDetailsOpen(false);
         } else if (currentIndex === POST_ASSEMBLY_STEP_IDS.length - 1) {
-            // Option to finish? For now just close.
             setIsDetailsOpen(false);
         }
     };
@@ -109,7 +113,9 @@ const PostAssembly: React.FC = () => {
 
                         // Filter logic
                         const columnProjects = projects.filter(p => {
-                            if (p.currentStepId !== stepId) return false;
+                            const batch = getProjectBatch(p.id);
+                            if (!batch || batch.currentStepId !== stepId) return false;
+
                             const matchClient = p.client.name.toLowerCase().includes(filterClient.toLowerCase());
                             return matchClient;
                         });
@@ -125,6 +131,10 @@ const PostAssembly: React.FC = () => {
 
                                 <div className="flex-1 bg-slate-100/30 dark:bg-[#15202b]/50 rounded-xl p-2 border border-slate-200/50 dark:border-slate-800 overflow-y-auto custom-scrollbar flex flex-col gap-3">
                                     {columnProjects.map(project => {
+                                        const batch = getProjectBatch(project.id);
+                                        // Should be present otherwise logic above fails, but safe check
+                                        if (!batch) return null;
+
                                         return (
                                             <div
                                                 key={project.id}
@@ -132,12 +142,13 @@ const PostAssembly: React.FC = () => {
                                                 className="bg-white dark:bg-[#1e2936] p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 group hover:shadow-md transition-all cursor-pointer relative overflow-hidden"
                                             >
                                                 <h4 className="font-bold text-slate-800 dark:text-white mb-1 truncate">{project.client.name}</h4>
-                                                <p className="text-xs text-slate-500 mb-2 truncate">{project.title}</p>
+                                                {/* Project has no title, use client name or maybe batch name? Using client name as main header. */}
+                                                <p className="text-xs text-slate-500 mb-2 truncate">Protocolo: {project.id.slice(-6).toUpperCase()}</p>
 
                                                 <div className="flex items-center gap-1 mb-2">
                                                     <span className="material-symbols-outlined text-xs text-slate-400">calendar_today</span>
                                                     <span className="text-xs text-slate-500">
-                                                        {new Date(project.updatedAt).toLocaleDateString()}
+                                                        {new Date(batch.lastUpdated || project.created_at).toLocaleDateString()}
                                                     </span>
                                                 </div>
                                             </div>
@@ -173,9 +184,13 @@ const PostAssembly: React.FC = () => {
                                 className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm"
                             >
                                 <option value="">Selecione...</option>
-                                {eligibleProjects.map(p => (
-                                    <option key={p.id} value={p.id}>{p.client.name} - {p.title} ({p.currentStepId})</option>
-                                ))}
+                                {eligibleProjects.map(p => {
+                                    const batch = getProjectBatch(p.id);
+                                    const stage = batch?.currentStepId || '?';
+                                    return (
+                                        <option key={p.id} value={p.id}>{p.client.name} ({stage})</option>
+                                    );
+                                })}
                             </select>
                             {eligibleProjects.length === 0 && (
                                 <p className="text-xs text-amber-500 mt-2">Nenhum projeto encontrado nas etapas 7.1 ou 7.2.</p>
@@ -210,7 +225,10 @@ const PostAssembly: React.FC = () => {
                             <div>
                                 <h2 className="text-xl font-bold text-slate-900 dark:text-white">{selectedProject.client.name}</h2>
                                 <p className="text-sm text-slate-500">Etapa Atual: <span className="font-bold text-emerald-600">{
-                                    workflowConfig[selectedProject.currentStepId]?.label || selectedProject.currentStepId
+                                    (() => {
+                                        const batch = getProjectBatch(selectedProject.id);
+                                        return batch ? (workflowConfig[batch.currentStepId]?.label || batch.currentStepId) : 'N/A';
+                                    })()
                                 }</span></p>
                             </div>
                             <button onClick={() => setIsDetailsOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full">
@@ -228,7 +246,12 @@ const PostAssembly: React.FC = () => {
                                 Avançar para Próxima Etapa
                             </button>
                             <p className="text-xs text-slate-500 mt-2 text-center">
-                                Move o projeto de <strong>{selectedProject.currentStepId}</strong> para a próxima etapa do fluxo de pós-montagem.
+                                Move o projeto de <strong>{
+                                    (() => {
+                                        const batch = getProjectBatch(selectedProject.id);
+                                        return batch?.currentStepId || '';
+                                    })()
+                                }</strong> para a próxima etapa do fluxo de pós-montagem.
                             </p>
                         </div>
                     </div>
