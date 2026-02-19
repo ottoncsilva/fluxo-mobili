@@ -8,12 +8,16 @@ import Settings from './components/Settings';
 import ProjectDetails from './components/ProjectDetails';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
+import Agenda from './components/Agenda';
 import SuperAdminDashboard from './components/SuperAdminDashboard';
 import { ProjectProvider, useProjects } from './context/ProjectContext';
+import { NotificationProvider, useNotifications } from './context/NotificationContext';
 
 const AppContent: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.DASHBOARD);
   const { currentProjectId, setCurrentProjectId, currentUser, logout, permissions, companySettings } = useProjects();
+  const { unreadCount, notifications, markAllAsRead } = useNotifications();
+  const [showNotifications, setShowNotifications] = useState(false);
 
   // Handle custom navigation event
   useEffect(() => {
@@ -72,6 +76,7 @@ const AppContent: React.FC = () => {
       case ViewState.ASSISTANCE: return <TechnicalAssistance />;
       case ViewState.CLIENT_LIST: return <ClientList />;
       case ViewState.SETTINGS: return <Settings />;
+      case ViewState.AGENDA: return <Agenda />;
       default: return <Dashboard />;
     }
   };
@@ -85,6 +90,7 @@ const AppContent: React.FC = () => {
       case ViewState.CLIENT_REGISTRATION: return "Novo Cadastro";
       case ViewState.CLIENT_LIST: return "Carteira de Clientes";
       case ViewState.SETTINGS: return "Configurações";
+      case ViewState.AGENDA: return "Minha Agenda";
       case ViewState.ASSISTANCE: return "Assistência";
       default: return "FluxoERP";
     }
@@ -97,6 +103,7 @@ const AppContent: React.FC = () => {
   } else {
     if (canAccess(ViewState.DASHBOARD)) navItems.push({ icon: 'dashboard', view: ViewState.DASHBOARD, label: 'Início' });
     if (canAccess(ViewState.CLIENT_LIST)) navItems.push({ icon: 'groups', view: ViewState.CLIENT_LIST, label: 'Clientes' });
+    navItems.push({ icon: 'calendar_month', view: ViewState.AGENDA, label: 'Agenda' });
     if (canAccess(ViewState.KANBAN)) navItems.push({ icon: 'view_kanban', view: ViewState.KANBAN, label: 'Kanban' });
     navItems.push({ icon: 'handyman', view: ViewState.ASSISTANCE, label: 'Assistência' });
     if (canAccess(ViewState.SETTINGS)) navItems.push({ icon: 'settings', view: ViewState.SETTINGS, label: 'Config' });
@@ -167,6 +174,54 @@ const AppContent: React.FC = () => {
               </span>
             </div>
             <div className="hidden md:block h-8 w-px bg-slate-200 dark:border-slate-700"></div>
+
+            {/* Notifications */}
+            <div className="relative">
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="relative p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white transition-colors"
+              >
+                <span className="material-symbols-outlined">notifications</span>
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 size-2.5 bg-rose-500 rounded-full border-2 border-white dark:border-[#1a2632]"></span>
+                )}
+              </button>
+
+              {/* Notification Dropdown */}
+              {showNotifications && (
+                <div className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-[#1e293b] rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden z-50 animate-fade-in origin-top-right">
+                  <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                    <h3 className="font-bold text-slate-800 dark:text-white">Notificações</h3>
+                    {unreadCount > 0 && (
+                      <button onClick={markAllAsRead} className="text-xs text-sky-600 hover:text-sky-700 font-medium">
+                        Marcar todas lidas
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-64 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="p-6 text-center text-slate-500 text-sm">
+                        Nenhuma notificação.
+                      </div>
+                    ) : (
+                      notifications.map(n => (
+                        <div key={n.id} className={`p-4 border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${!n.read ? 'bg-sky-50/50 dark:bg-sky-900/10' : ''}`}>
+                          <div className="flex gap-3">
+                            <div className={`mt-1 size-2 rounded-full shrink-0 ${!n.read ? 'bg-sky-500' : 'bg-slate-300'}`}></div>
+                            <div>
+                              <p className="text-sm font-medium text-slate-800 dark:text-white">{n.title}</p>
+                              <p className="text-xs text-slate-500 mt-1 line-clamp-2">{n.message}</p>
+                              <p className="text-[10px] text-slate-400 mt-2">{new Date(n.date).toLocaleDateString()} {new Date(n.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="flex items-center gap-2 md:gap-3">
               <div className="size-8 md:size-9 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600 overflow-hidden">
                 {currentUser.avatar ? <img src={currentUser.avatar} alt="Avatar" className="w-full h-full object-cover" /> : currentUser.name.charAt(0)}
@@ -238,7 +293,9 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <ProjectProvider>
-      <AppContent />
+      <NotificationProvider>
+        <AppContent />
+      </NotificationProvider>
     </ProjectProvider>
   );
 };

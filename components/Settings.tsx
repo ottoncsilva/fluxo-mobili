@@ -249,15 +249,18 @@ const Settings: React.FC = () => {
         setNewAssistLabel('');
     }
 
-    // Group steps by stage for display
+    // Group steps by stage for display (Respecting workflowOrder)
     const stepsByStage = useMemo(() => {
         const grouped: Record<number, any[]> = {};
-        Object.values(workflowConfig).forEach(step => {
-            if (!grouped[step.stage]) grouped[step.stage] = [];
-            grouped[step.stage].push(step);
+        workflowOrder.forEach(stepId => {
+            const step = workflowConfig[stepId];
+            if (step) {
+                if (!grouped[step.stage]) grouped[step.stage] = [];
+                grouped[step.stage].push(step);
+            }
         });
         return grouped;
-    }, [workflowConfig]);
+    }, [workflowConfig, workflowOrder]);
 
     const activeRolePerms = permissions.find(p => p.role === selectedRoleForPerms);
 

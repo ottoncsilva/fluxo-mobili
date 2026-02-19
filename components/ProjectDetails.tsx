@@ -322,7 +322,6 @@ const ProjectDetails: React.FC<ProjectDetailsProps> = ({ onBack }) => {
                             <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-800">
                                 <tr>
                                     <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Nome do Ambiente</th>
-                                    <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Status</th>
                                     <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Valor Atual (R$)</th>
                                     <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Versão</th>
                                 </tr>
@@ -331,21 +330,7 @@ const ProjectDetails: React.FC<ProjectDetailsProps> = ({ onBack }) => {
                                 {project.environments.map(env => (
                                     <tr key={env.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                                         <td className="px-6 py-4 font-bold text-slate-800 dark:text-white">{env.name}</td>
-                                        <td className="px-6 py-4">
-                                            <select
-                                                value={env.status}
-                                                onChange={(e) => updateEnvironmentDetails(project.id, env.id, { status: e.target.value as any })}
-                                                disabled={!canEditClient}
-                                                className={`px-2 py-1 rounded text-xs font-bold border-none cursor-pointer focus:ring-2 focus:ring-primary/50 disabled:opacity-50
-                                            ${env.status === 'Completed' ? 'bg-green-100 text-green-700' :
-                                                        env.status === 'PostAssembly' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}
-                                            >
-                                                <option value="Pending">Pendente</option>
-                                                <option value="InBatch">Em Produção</option>
-                                                <option value="PostAssembly">Pós-Montagem</option>
-                                                <option value="Completed">Concluído</option>
-                                            </select>
-                                        </td>
+
                                         <td className="px-6 py-4">
                                             <input
                                                 type="number"
@@ -816,7 +801,7 @@ const ProjectDetails: React.FC<ProjectDetailsProps> = ({ onBack }) => {
                                             >
                                                 <option value="">Selecione...</option>
                                                 {allUsers
-                                                    .filter(u => u.storeId === currentUser?.storeId)
+                                                    .filter(u => u.storeId === currentUser?.storeId && u.role === 'Vendedor')
                                                     .map(u => (
                                                         <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
                                                     ))}

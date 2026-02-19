@@ -130,7 +130,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onComplete }) => {
                                 className="text-sm font-bold text-slate-800 dark:text-white bg-transparent border-none focus:ring-0 cursor-pointer text-right pr-8"
                             >
                                 {allUsers
-                                    .filter(u => u.storeId === currentUser?.storeId)
+                                    .filter(u => u.storeId === currentUser?.storeId && u.role === 'Vendedor')
                                     .map(u => (
                                         <option key={u.id} value={u.id}>{u.name}</option>
                                     ))}
