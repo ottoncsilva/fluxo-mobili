@@ -16,7 +16,7 @@ const Settings: React.FC = () => {
 
     const { appointmentTypes, addAppointmentType, updateAppointmentType, deleteAppointmentType, agendaUsers, toggleAgendaUser } = useAgenda();
 
-    const [activeTab, setActiveTab] = useState<'COMPANY' | 'USERS' | 'PERMISSIONS' | 'ORIGINS' | 'AGENDA' | 'APPEARANCE' | 'ASSISTANCE'>('COMPANY');
+    const [activeTab, setActiveTab] = useState<'COMPANY' | 'USERS' | 'PERMISSIONS' | 'ORIGINS' | 'AGENDA' | 'APPEARANCE' | 'ASSISTANCE' | 'WORKFLOW'>('COMPANY');
 
     // Dark Mode State
     const [theme, setTheme] = useState<'light' | 'dark' | 'auto'>(() => {
@@ -323,6 +323,13 @@ const Settings: React.FC = () => {
                         className={`pb-4 px-2 font-bold text-sm transition-colors border-b-2 whitespace-nowrap ${activeTab === 'PERMISSIONS' ? 'border-primary text-primary' : 'border-transparent text-slate-500'}`}
                     >
                         Cargos e Permissões
+                    </button>
+
+                    <button
+                        onClick={() => setActiveTab('WORKFLOW')}
+                        className={`pb-4 px-2 font-bold text-sm transition-colors border-b-2 whitespace-nowrap ${activeTab === 'WORKFLOW' ? 'border-primary text-primary' : 'border-transparent text-slate-500'}`}
+                    >
+                        Fluxo Principal
                     </button>
 
                     <button
@@ -718,6 +725,68 @@ const Settings: React.FC = () => {
                     </div>
                 )}
 
+                {/* WORKFLOW TAB */}
+                {activeTab === 'WORKFLOW' && (
+                    <div className="space-y-6 animate-fade-in">
+                        <div className="bg-white dark:bg-[#1a2632] p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+                            <div className="flex justify-between items-center mb-6">
+                                <div>
+                                    <h3 className="font-bold text-slate-800 dark:text-white">Fluxo Principal de Produção</h3>
+                                    <p className="text-sm text-slate-500">Defina as etapas, prazos (SLA em dias úteis) e responsáveis.</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3">
+                                {workflowOrder.map((stepId) => {
+                                    const step = workflowConfig[stepId];
+                                    if (!step) return null;
+                                    return (
+                                        <div key={step.id} className="grid grid-cols-12 gap-4 items-center p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-800">
+                                            <div className="col-span-1">
+                                                <span className="font-mono text-xs font-bold text-slate-400 bg-slate-200 dark:bg-slate-700 px-2 py-1 rounded">{step.id}</span>
+                                            </div>
+                                            <div className="col-span-4">
+                                                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Nome da Etapa</label>
+                                                <input
+                                                    type="text"
+                                                    value={step.label}
+                                                    onChange={(e) => updateWorkflowStep(step.id, { label: e.target.value })}
+                                                    className="w-full text-sm font-bold bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded transition-colors focus:ring-primary"
+                                                />
+                                            </div>
+                                            <div className="col-span-3">
+                                                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Responsável</label>
+                                                <select
+                                                    value={step.ownerRole}
+                                                    onChange={(e) => updateWorkflowStep(step.id, { ownerRole: e.target.value as Role })}
+                                                    className="w-full text-sm bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded transition-colors focus:ring-primary"
+                                                >
+                                                    {permissions.map(p => (
+                                                        <option key={p.role} value={p.role}>{p.role}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="col-span-2">
+                                                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">SLA (Dias Úteis)</label>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    value={step.sla}
+                                                    onChange={(e) => updateWorkflowStep(step.id, { sla: parseInt(e.target.value) || 0 })}
+                                                    className="w-full text-sm font-bold bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded transition-colors focus:ring-primary"
+                                                />
+                                            </div>
+                                            <div className="col-span-2 flex justify-end">
+                                                {/* Actions if needed, e.g., view details */}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* ORIGINS TAB */}
                 {activeTab === 'ORIGINS' && (
                     <div className="space-y-6 animate-fade-in">
@@ -834,11 +903,29 @@ const Settings: React.FC = () => {
 
                             <div className="space-y-2">
                                 {assistanceWorkflow.map((step) => (
-                                    <div key={step.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-800">
-                                        <div className="flex items-center gap-3">
+                                    <div key={step.id} className="grid grid-cols-12 gap-4 items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-800">
+                                        <div className="col-span-2">
                                             <span className="font-mono text-xs font-bold text-slate-400 bg-slate-200 dark:bg-slate-700 px-2 py-1 rounded">{step.id}</span>
-                                            <span className="font-bold text-slate-700 dark:text-slate-200">{step.label}</span>
-                                            <span className="text-xs text-slate-500">SLA: {step.sla} dias</span>
+                                        </div>
+                                        <div className="col-span-6">
+                                            <input
+                                                type="text"
+                                                value={step.label}
+                                                onChange={(e) => updateAssistanceStep(step.id, { label: e.target.value })}
+                                                className="w-full text-sm font-bold bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded transition-colors focus:ring-primary"
+                                            />
+                                        </div>
+                                        <div className="col-span-4">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs text-slate-500 whitespace-nowrap">SLA (Dias):</span>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    value={step.sla}
+                                                    onChange={(e) => updateAssistanceStep(step.id, { sla: parseInt(e.target.value) || 0 })}
+                                                    className="w-full text-sm font-bold bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded transition-colors focus:ring-primary"
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                 ))}

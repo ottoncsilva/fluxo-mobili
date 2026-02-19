@@ -37,7 +37,7 @@ const KanbanBoard: React.FC = () => {
     const [showCompleted, setShowCompleted] = useState(false);
     const [showLost, setShowLost] = useState(false);
 
-    const { batches, projects, workflowConfig, setCurrentProjectId, canUserViewStage, splitBatch, advanceBatch, moveBatchToStep, canUserAdvanceStep } = useProjects();
+    const { batches, projects, workflowConfig, workflowOrder, setCurrentProjectId, canUserViewStage, splitBatch, advanceBatch, moveBatchToStep, canUserAdvanceStep } = useProjects();
 
     // Filter Columns based on User Permissions and Toggles
     const visibleUiColumns = useMemo(() => {
@@ -262,8 +262,11 @@ const KanbanBoard: React.FC = () => {
             return [workflowConfig['9.1']].filter(Boolean);
         }
 
-        return Object.values(workflowConfig).filter(step => step.stage === selectedColumnId);
-    }, [selectedColumnId, workflowConfig]);
+        // Use workflowOrder to ensure correct sequence (e.g. 2.9 before 2.10)
+        return workflowOrder
+            .map(stepId => workflowConfig[stepId])
+            .filter(step => step && step.stage === selectedColumnId);
+    }, [selectedColumnId, workflowConfig, workflowOrder]);
 
     // State for mobile sidebar drawer
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -344,28 +347,31 @@ const KanbanBoard: React.FC = () => {
                             <span className="material-symbols-outlined text-lg">filter_list</span>
                             Filtros
                         </button>
-                        <div className="h-4 w-px bg-slate-300 dark:bg-slate-600"></div>
+                        <div className="hidden h-4 w-px bg-slate-300 dark:bg-slate-600"></div>
 
                         {/* Visibility Toggles */}
-                        <label className="flex items-center gap-1 md:gap-2 cursor-pointer select-none">
-                            <input
-                                type="checkbox"
-                                checked={showCompleted}
-                                onChange={e => setShowCompleted(e.target.checked)}
-                                className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-4 h-4"
-                            />
-                            <span className="text-[10px] md:text-xs font-bold text-slate-600 dark:text-slate-300">Concluídos</span>
-                        </label>
+                        {/* Visibility Toggles */}
+                        <div className="flex items-center gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={!showCompleted}
+                                    onChange={e => setShowCompleted(!e.target.checked)}
+                                    className="rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-slate-600"
+                                />
+                                <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Ocultar Concluídos</span>
+                            </label>
 
-                        <label className="flex items-center gap-1 md:gap-2 cursor-pointer select-none">
-                            <input
-                                type="checkbox"
-                                checked={showLost}
-                                onChange={e => setShowLost(e.target.checked)}
-                                className="rounded border-slate-300 text-slate-600 focus:ring-slate-500 w-4 h-4"
-                            />
-                            <span className="text-[10px] md:text-xs font-bold text-slate-600 dark:text-slate-300">Perdidos</span>
-                        </label>
+                            <label className="flex items-center gap-2 cursor-pointer select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={!showLost}
+                                    onChange={e => setShowLost(!e.target.checked)}
+                                    className="rounded text-slate-600 focus:ring-slate-500 border-slate-300 dark:border-slate-600"
+                                />
+                                <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Ocultar Perdidos</span>
+                            </label>
+                        </div>
                     </div>
 
                     <div className="flex items-center gap-2 md:gap-4">
