@@ -8,7 +8,8 @@ export enum ViewState {
   ASSISTANCE = 'ASSISTANCE',
   SETTINGS = 'SETTINGS',
   AGENDA = 'AGENDA',
-  SUPER_ADMIN = 'SUPER_ADMIN', // New View
+  SUPER_ADMIN = 'SUPER_ADMIN',
+  POST_ASSEMBLY = 'POST_ASSEMBLY', // New View
 }
 
 export type Role = 'Admin' | 'Proprietario' | 'Gerente' | 'Vendedor' | 'Projetista' | 'Medidor' | 'Coordenador de Montagem' | 'Montador' | 'Logistica' | 'Liberador' | 'Financeiro' | 'Industria' | 'SuperAdmin';
@@ -102,6 +103,16 @@ export interface Environment {
   version?: number;
 }
 
+export interface StoreConfig {
+  storeId: string;
+  workflowConfig: Record<string, WorkflowStep>;
+  workflowOrder: string[];
+  assistanceWorkflow: AssistanceWorkflowStep[];
+  origins: string[];
+  permissions: PermissionConfig[];
+  updatedAt: string;
+}
+
 export interface Client {
   id: string;
   storeId: string;
@@ -109,10 +120,10 @@ export interface Client {
   phone: string;
   email: string;
   address: string;
-  // New fields
   condominium?: string;
   cpf?: string;
   rg?: string;
+  cod_efinance?: string; // New field: 5 numeric digits
 
   status: 'Ativo' | 'Perdido' | 'Concluido';
 
@@ -148,6 +159,20 @@ export interface Client {
   competitors_search?: string;
 }
 
+export interface PostAssemblyEvaluation {
+  rating: number; // 1-5
+  feedback: string;
+  checklist: {
+    clean_environment: boolean;
+    scraps_removed: boolean;
+    manual_delivered: boolean;
+    client_satisfied: boolean;
+    final_photos_taken: boolean;
+  };
+  completedAt: string;
+  evaluatorId: string;
+}
+
 export interface Project {
   id: string;
   storeId: string;
@@ -157,6 +182,8 @@ export interface Project {
   created_at: string;
   environments: Environment[];
   notes: Note[];
+  postAssembly?: PostAssemblyEvaluation;
+
   factoryOrders: FactoryOrder[];
   total_estimated_value?: number;
 }

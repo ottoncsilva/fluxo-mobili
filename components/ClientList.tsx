@@ -3,7 +3,7 @@ import { useProjects } from '../context/ProjectContext';
 import { ViewState } from '../types';
 
 const ClientList: React.FC = () => {
-  const { projects, batches, workflowConfig, setCurrentProjectId } = useProjects();
+  const { projects, batches, workflowConfig, setCurrentProjectId, currentUser, deleteProject } = useProjects();
   const [filter, setFilter] = useState<'Todos' | 'Ativos' | 'EmAndamento' | 'Concluidos' | 'Perdidos'>('Todos');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -177,12 +177,29 @@ const ClientList: React.FC = () => {
                       R$ {totalValue.toLocaleString()}
                     </td>
                     <td className="px-6 py-4">
-                      <button
-                        onClick={() => setCurrentProjectId(project.id)}
-                        className="text-primary font-bold text-sm hover:underline flex items-center gap-1"
-                      >
-                        Ver Detalhes <span className="material-symbols-outlined text-sm">arrow_forward</span>
-                      </button>
+                      <div className="flex items-center gap-4">
+                        <button
+                          onClick={() => setCurrentProjectId(project.id)}
+                          className="text-primary font-bold text-sm hover:underline flex items-center gap-1"
+                        >
+                          Ver Detalhes <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                        </button>
+
+                        {(currentUser?.role === 'Admin' || currentUser?.role === 'SuperAdmin') && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm(`Tem certeza que deseja excluir o cliente ${project.client.name}? Esta ação não pode ser desfeita.`)) {
+                                deleteProject(project.id);
+                              }
+                            }}
+                            className="text-slate-400 hover:text-red-600 transition-colors"
+                            title="Excluir Cliente"
+                          >
+                            <span className="material-symbols-outlined text-sm">delete</span>
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

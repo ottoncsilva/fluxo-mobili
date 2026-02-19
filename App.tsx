@@ -4,6 +4,7 @@ import KanbanBoard from './components/KanbanBoard';
 import RegistrationForm from './components/RegistrationForm';
 import TechnicalAssistance from './components/TechnicalAssistance';
 import ClientList from './components/ClientList';
+import PostAssembly from './components/PostAssembly';
 import Settings from './components/Settings';
 import ProjectDetails from './components/ProjectDetails';
 import Login from './components/Login';
@@ -75,6 +76,7 @@ const AppContent: React.FC = () => {
       case ViewState.KANBAN: return <KanbanBoard />;
       case ViewState.CLIENT_REGISTRATION: return <RegistrationForm onComplete={handleBackToClientList} />;
       case ViewState.ASSISTANCE: return <TechnicalAssistance />;
+      case ViewState.POST_ASSEMBLY: return <PostAssembly />;
       case ViewState.CLIENT_LIST: return <ClientList />;
       case ViewState.SETTINGS: return <Settings />;
       case ViewState.AGENDA: return <Agenda />;
@@ -93,6 +95,7 @@ const AppContent: React.FC = () => {
       case ViewState.SETTINGS: return "Configurações";
       case ViewState.AGENDA: return "Minha Agenda";
       case ViewState.ASSISTANCE: return "Assistência";
+      case ViewState.POST_ASSEMBLY: return "Pós-Montagem";
       default: return "FluxoERP";
     }
   };
@@ -106,6 +109,7 @@ const AppContent: React.FC = () => {
     navItems.push({ icon: 'calendar_month', view: ViewState.AGENDA, label: 'Agenda' });
     if (canAccess(ViewState.CLIENT_LIST)) navItems.push({ icon: 'groups', view: ViewState.CLIENT_LIST, label: 'Clientes' });
     navItems.push({ icon: 'handyman', view: ViewState.ASSISTANCE, label: 'Assistência' });
+    navItems.push({ icon: 'checklist', view: ViewState.POST_ASSEMBLY, label: 'Pós-Obra' });
     if (canAccess(ViewState.SETTINGS)) navItems.push({ icon: 'settings', view: ViewState.SETTINGS, label: 'Config' });
   }
 

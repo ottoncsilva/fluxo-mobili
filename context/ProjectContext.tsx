@@ -1,60 +1,58 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo } from 'react';
-import { Project, Batch, WorkflowStep, Environment, Client, User, Role, Note, FactoryOrder, PermissionConfig, AssistanceTicket, CompanySettings, AssistanceWorkflowStep, Store } from '../types';
+import { Project, Batch, WorkflowStep, Environment, Client, User, Role, Note, FactoryOrder, PermissionConfig, AssistanceTicket, CompanySettings, AssistanceWorkflowStep, Store, StoreConfig, PostAssemblyEvaluation } from '../types';
 import { db } from '../firebase'; // Import Firebase DB
-import { collection, onSnapshot, addDoc, setDoc, doc, updateDoc, query, where, getDoc, Firestore } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, setDoc, doc, updateDoc, deleteDoc, query, where, getDoc, Firestore } from "firebase/firestore";
 
 // Updated Workflow Config
 const INITIAL_WORKFLOW_CONFIG: Record<string, WorkflowStep> = {
     // 1 - Pré-Venda
     '1.1': { id: '1.1', label: 'Briefing e Qualificação', ownerRole: 'Vendedor', sla: 1, stage: 1 },
-    '1.2': { id: '1.2', label: 'Visita Showroom', ownerRole: 'Vendedor', sla: 5, stage: 1 },
-    '1.3': { id: '1.3', label: 'Follow Up (Pré-Venda)', ownerRole: 'Vendedor', sla: 10, stage: 1 },
+    '1.2': { id: '1.2', label: 'Visita Showroom', ownerRole: 'Vendedor', sla: 1, stage: 1 },
+    '1.3': { id: '1.3', label: 'Follow Up (Pré-Venda)', ownerRole: 'Vendedor', sla: 3, stage: 1 },
 
     // 2 - Venda
-    '2.1': { id: '2.1', label: 'Projetar Ambientes', ownerRole: 'Projetista', sla: 1, stage: 2 },
-    '2.2': { id: '2.2', label: 'Projetar Mobiliário', ownerRole: 'Projetista', sla: 4, stage: 2 },
-    '2.3': { id: '2.3', label: 'Orçamento', ownerRole: 'Projetista', sla: 0, stage: 2 },
-    '2.4': { id: '2.4', label: 'Renderização e Apresentação', ownerRole: 'Projetista', sla: 1, stage: 2 },
+    '2.1': { id: '2.1', label: 'Projetar Ambientes', ownerRole: 'Projetista', sla: 2, stage: 2 },
+    '2.2': { id: '2.2', label: 'Projetar Mobiliário', ownerRole: 'Projetista', sla: 5, stage: 2 },
+    '2.3': { id: '2.3', label: 'Orçamento', ownerRole: 'Projetista', sla: 1, stage: 2 },
+    '2.4': { id: '2.4', label: 'Montagem da Apresentação', ownerRole: 'Projetista', sla: 1, stage: 2 },
     '2.5': { id: '2.5', label: 'Reunião Primeira Apresentação', ownerRole: 'Vendedor', sla: 0, stage: 2 },
-    '2.6': { id: '2.6', label: 'Ajuste de Proposta', ownerRole: 'Projetista', sla: 3, stage: 2 },
+    '2.6': { id: '2.6', label: 'Ajuste de Proposta', ownerRole: 'Projetista', sla: 2, stage: 2 },
     '2.7': { id: '2.7', label: 'Follow Up (Venda)', ownerRole: 'Vendedor', sla: 3, stage: 2 },
     '2.8': { id: '2.8', label: 'Reunião de Fechamento', ownerRole: 'Vendedor', sla: 0, stage: 2 },
-    '2.9': { id: '2.9', label: 'Detalhamento de Contrato', ownerRole: 'Vendedor', sla: 1, stage: 2 },
-    '2.10': { id: '2.10', label: 'Aprovação Detalhamento Contrato', ownerRole: 'Vendedor', sla: 2, stage: 2 },
+    '2.9': { id: '2.9', label: 'Contrato e Detalhamento', ownerRole: 'Vendedor', sla: 1, stage: 2 },
+    '2.10': { id: '2.10', label: 'Aprovação Detalhamento Contrato', ownerRole: 'Vendedor', sla: 1, stage: 2 },
 
     // 3 - Medição
-    '3.1': { id: '3.1', label: 'Avaliação para Medição', ownerRole: 'Medidor', sla: 0, stage: 3 },
-    '3.2': { id: '3.2', label: 'Medição', ownerRole: 'Medidor', sla: 1, stage: 3 },
+    '3.1': { id: '3.1', label: 'Avaliação para Medição', ownerRole: 'Medidor', sla: 1, stage: 3 },
+    '3.2': { id: '3.2', label: 'Medição', ownerRole: 'Medidor', sla: 2, stage: 3 },
 
     // 4 - Executivo
     '4.1': { id: '4.1', label: 'Construção dos Ambientes', ownerRole: 'Liberador', sla: 1, stage: 4 },
-    '4.2': { id: '4.2', label: 'Reunião Alinhamento c/ Vendas', ownerRole: 'Liberador', sla: 1, stage: 4 },
-    '4.3': { id: '4.3', label: 'Construção do Mobiliário', ownerRole: 'Liberador', sla: 4, stage: 4 },
-    '4.4': { id: '4.4', label: 'Aprovação Financeira', ownerRole: 'Financeiro', sla: 2, stage: 4 },
-    '4.5': { id: '4.5', label: 'Detalhamento Executivo', ownerRole: 'Liberador', sla: 3, stage: 4 },
-    '4.6': { id: '4.6', label: 'Aprovação do Executivo', ownerRole: 'Vendedor', sla: 2, stage: 4 },
-    '4.7': { id: '4.7', label: 'Correção', ownerRole: 'Liberador', sla: 1, stage: 4 },
-    '4.8': { id: '4.8', label: 'Aprov. Executivo (Final)', ownerRole: 'Liberador', sla: 0, stage: 4 },
+    '4.2': { id: '4.2', label: 'Construção do Mobiliário', ownerRole: 'Liberador', sla: 5, stage: 4 },
+    '4.3': { id: '4.3', label: 'Aprovação Financeira', ownerRole: 'Financeiro', sla: 2, stage: 4 },
+    '4.4': { id: '4.4', label: 'Detalhamento Executivo', ownerRole: 'Liberador', sla: 5, stage: 4 },
+    '4.5': { id: '4.5', label: 'Aprovação do Executivo', ownerRole: 'Vendedor', sla: 2, stage: 4 },
+    '4.6': { id: '4.6', label: 'Correção', ownerRole: 'Liberador', sla: 2, stage: 4 },
 
     // 5 - Fabricação
-    '5.1': { id: '5.1', label: 'Implantação', ownerRole: 'Financeiro', sla: 1, stage: 5 },
-    '5.2': { id: '5.2', label: 'Fabricação', ownerRole: 'Industria', sla: 26, stage: 5 },
+    '5.1': { id: '5.1', label: 'Implantação', ownerRole: 'Financeiro', sla: 2, stage: 5 },
+    '5.2': { id: '5.2', label: 'Fabricação', ownerRole: 'Industria', sla: 25, stage: 5 },
 
     // 6 - Entrega
-    '6.1': { id: '6.1', label: 'Verificação pré-montagem', ownerRole: 'Coordenador de Montagem', sla: 2, stage: 6 },
-    '6.2': { id: '6.2', label: 'Agendar Transporte', ownerRole: 'Coordenador de Montagem', sla: 0, stage: 6 },
-    '6.3': { id: '6.3', label: 'Transporte e Entrega', ownerRole: 'Logistica', sla: 5, stage: 6 },
+    '6.1': { id: '6.1', label: 'Verificação Pré-Montagem', ownerRole: 'Coordenador de Montagem', sla: 2, stage: 6 },
+    '6.2': { id: '6.2', label: 'Transporte', ownerRole: 'Logistica', sla: 2, stage: 6 },
+    '6.3': { id: '6.3', label: 'Entrega', ownerRole: 'Logistica', sla: 1, stage: 6 },
 
     // 7 - Montagem
-    '7.1': { id: '7.1', label: 'Montagem', ownerRole: 'Montador', sla: 3, stage: 7 },
-    '7.2': { id: '7.2', label: 'Checklist Finalização Montagem', ownerRole: 'Coordenador de Montagem', sla: 1, stage: 7 },
+    '7.1': { id: '7.1', label: 'Montagem', ownerRole: 'Montador', sla: 5, stage: 7 },
+    '7.2': { id: '7.2', label: 'Vistoria Montagem', ownerRole: 'Coordenador de Montagem', sla: 1, stage: 7 },
 
     // 8 - Pós Montagem
     '8.1': { id: '8.1', label: 'Solicitação de Peças', ownerRole: 'Liberador', sla: 2, stage: 8 },
-    '8.2': { id: '8.2', label: 'Fabricação (Reposição)', ownerRole: 'Industria', sla: 15, stage: 8 },
-    '8.3': { id: '8.3', label: 'Transporte e Entrega (Reposição)', ownerRole: 'Logistica', sla: 5, stage: 8 },
-    '8.4': { id: '8.4', label: 'Pós Montagem', ownerRole: 'Montador', sla: 7, stage: 8 },
-    '8.5': { id: '8.5', label: 'Checklist Finalização Pós', ownerRole: 'Montador', sla: 1, stage: 8 },
+    '8.2': { id: '8.2', label: 'Fabricação Pós Montagem', ownerRole: 'Industria', sla: 10, stage: 8 },
+    '8.3': { id: '8.3', label: 'Transporte Pós Montagem', ownerRole: 'Logistica', sla: 5, stage: 8 },
+    '8.4': { id: '8.4', label: 'Pós Montagem', ownerRole: 'Montador', sla: 5, stage: 8 },
+    '8.5': { id: '8.5', label: 'Vistoria Pós Montagem', ownerRole: 'Coordenador de Montagem', sla: 1, stage: 8 },
 
     // 9 - Conclusão
     '9.0': { id: '9.0', label: 'Projeto Entregue', ownerRole: 'Gerente', sla: 0, stage: 9 },
@@ -65,7 +63,7 @@ const INITIAL_WORKFLOW_ORDER = [
     '1.1', '1.2', '1.3',
     '2.1', '2.2', '2.3', '2.4', '2.5', '2.6', '2.7', '2.8', '2.9', '2.10',
     '3.1', '3.2',
-    '4.1', '4.2', '4.3', '4.4', '4.5', '4.6', '4.7', '4.8',
+    '4.1', '4.2', '4.3', '4.4', '4.5', '4.6',
     '5.1', '5.2',
     '6.1', '6.2', '6.3',
     '7.1', '7.2',
@@ -209,7 +207,7 @@ const DEFAULT_PERMISSIONS: PermissionConfig[] = [
         canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: false, canEditProject: true,
         canChangeSeller: false,
         viewableStages: [1, 2, 4],
-        actionableSteps: ['1.1', '1.2', '1.3', '2.5', '2.7', '2.8', '2.9', '2.10', '4.6']
+        actionableSteps: ['1.1', '1.2', '1.3', '2.5', '2.7', '2.8', '2.9', '2.10', '4.5']
     },
     {
         role: 'Projetista',
@@ -229,28 +227,28 @@ const DEFAULT_PERMISSIONS: PermissionConfig[] = [
         role: 'Coordenador de Montagem',
         canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: false, canEditProject: true,
         canChangeSeller: false,
-        viewableStages: [5, 6, 7, 8],
-        actionableSteps: ['6.1', '6.2', '7.2']
+        viewableStages: [6, 7, 8],
+        actionableSteps: ['6.1', '7.2', '8.5']
     },
     {
         role: 'Montador',
         canViewDashboard: true, canViewKanban: false, canViewClients: false, canViewSettings: false, canEditProject: false,
         canChangeSeller: false,
         viewableStages: [7, 8],
-        actionableSteps: ['7.1', '8.4', '8.5']
+        actionableSteps: ['7.1', '8.4']
     },
     {
         role: 'Logistica',
         canViewDashboard: true, canViewKanban: true, canViewClients: false, canViewSettings: false, canEditProject: false,
         canChangeSeller: false,
-        viewableStages: [5, 6, 8],
-        actionableSteps: ['6.3', '8.3']
+        viewableStages: [6, 8],
+        actionableSteps: ['6.2', '6.3', '8.3']
     },
     {
         role: 'Medidor',
         canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: false, canEditProject: false,
         canChangeSeller: false,
-        viewableStages: [2, 3, 4],
+        viewableStages: [3],
         actionableSteps: ['3.1', '3.2']
     },
     {
@@ -264,15 +262,15 @@ const DEFAULT_PERMISSIONS: PermissionConfig[] = [
         role: 'Liberador',
         canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: false, canEditProject: true,
         canChangeSeller: false,
-        viewableStages: [3, 4, 8, 9],
-        actionableSteps: ['4.1', '4.2', '4.3', '4.5', '4.7', '4.9', '8.1']
+        viewableStages: [4, 8, 9],
+        actionableSteps: ['4.1', '4.2', '4.4', '4.6', '8.1']
     },
     {
         role: 'Financeiro',
         canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: false, canEditProject: false,
         canChangeSeller: false,
         viewableStages: [4, 5],
-        actionableSteps: ['4.4', '4.8', '5.1']
+        actionableSteps: ['4.3', '5.1']
     },
     {
         role: 'Industria',
@@ -327,6 +325,7 @@ interface ProjectContextType {
     saveStoreConfig: () => Promise<boolean>;
 
     addProject: (client: Client, environments: Environment[]) => void;
+    deleteProject: (projectId: string) => Promise<void>;
     advanceBatch: (batchId: string) => void;
     moveBatchToStep: (batchId: string, targetStepId: string) => void;
     markProjectAsLost: (projectId: string, reason: string) => void;
@@ -343,6 +342,7 @@ interface ProjectContextType {
     updateProjectITPP: (projectId: string, updates: Partial<Client>) => void;
     updateProjectSeller: (projectId: string, sellerId: string, sellerName: string) => void;
     requestFactoryPart: (projectId: string, envId: string, description: string) => void;
+    updateProjectPostAssembly: (projectId: string, evaluation: PostAssemblyEvaluation) => void;
 
     addAssistanceTicket: (ticket: Omit<AssistanceTicket, 'id' | 'createdAt' | 'updatedAt' | 'storeId'>) => void;
     updateAssistanceTicket: (ticket: AssistanceTicket) => void;
@@ -501,39 +501,52 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         return stores.find(s => s.id === currentUser.storeId) || null;
     }, [currentUser, stores]);
 
-    // Load store-specific config from Firestore on login (one-time read)
+    // --- Persistence Logic ---
+
+    // Save Configuration to Firebase
+    const saveStoreConfig = async () => {
+        if (!currentStore) return false;
+        try {
+            const configRef = doc(db, 'store_configs', currentStore.id);
+            await setDoc(configRef, {
+                storeId: currentStore.id,
+                workflowConfig,
+                workflowOrder,
+                assistanceWorkflow,
+                origins,
+                permissions,
+                updatedAt: new Date().toISOString()
+            }, { merge: true });
+            return true;
+        } catch (error) {
+            console.error("Error saving config:", error);
+            return false;
+        }
+    };
+
+    // Load Configuration from Firebase (Real-time listener)
     useEffect(() => {
-        if (!currentUser || !useCloud || !db || currentUser.role === 'SuperAdmin') return;
-        const loadStoreConfig = async () => {
-            try {
-                const configDoc = await getDoc(doc(db as Firestore, "storeConfigs", currentUser.storeId));
-                if (configDoc.exists()) {
-                    const data = configDoc.data();
-                    if (data.workflowConfig && Object.keys(data.workflowConfig).length > 0) {
-                        setWorkflowConfig(data.workflowConfig);
-                    }
-                    if (data.workflowOrder && data.workflowOrder.length > 0) {
-                        setWorkflowOrder(data.workflowOrder);
-                    }
-                    if (data.permissions && data.permissions.length > 0) {
-                        setPermissions(data.permissions);
-                    }
-                    if (data.origins && data.origins.length > 0) {
-                        setOrigins(data.origins);
-                    }
-                    if (data.assistanceWorkflow && data.assistanceWorkflow.length > 0) {
-                        setAssistanceWorkflow(data.assistanceWorkflow);
-                    }
-                    console.log('[StoreConfig] Loaded config for store:', currentUser.storeId);
-                } else {
-                    console.log('[StoreConfig] No config found, using defaults for store:', currentUser.storeId);
+        if (!currentStore) return;
+
+        const configRef = doc(db, 'store_configs', currentStore.id);
+        const unsubscribe = onSnapshot(configRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data() as StoreConfig;
+                // Only update if data exists, otherwise keep defaults (or initial load)
+                if (data.workflowConfig) setWorkflowConfig(data.workflowConfig);
+                if (data.workflowOrder) setWorkflowOrder(data.workflowOrder);
+                if (data.assistanceWorkflow) setAssistanceWorkflow(data.assistanceWorkflow);
+                if (data.origins) setOrigins(data.origins);
+                if (data.permissions) {
+                    setPermissions(data.permissions);
                 }
-            } catch (e) {
-                console.error('[StoreConfig] Error loading config:', e);
+            } else {
+                console.log("No remote config found, using defaults.");
             }
-        };
-        loadStoreConfig();
-    }, [currentUser?.storeId]);
+        });
+
+        return () => unsubscribe();
+    }, [currentStore?.id]);
 
     // Reset configs to defaults on logout
     useEffect(() => {
@@ -546,26 +559,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         }
     }, [currentUser]);
 
-    // Save ALL config to Firestore (called explicitly by user clicking Save)
-    const saveStoreConfig = async (): Promise<boolean> => {
-        if (!currentUser || !useCloud || !db) return false;
-        try {
-            const fullConfig = {
-                workflowConfig,
-                workflowOrder,
-                permissions,
-                origins,
-                assistanceWorkflow
-            };
-            // setDoc WITHOUT merge = full document replacement (correctly deletes removed keys)
-            await setDoc(doc(db, "storeConfigs", currentUser.storeId), fullConfig);
-            console.log('[StoreConfig] Saved config for store:', currentUser.storeId);
-            return true;
-        } catch (e: any) {
-            console.error('[StoreConfig] Error saving config:', e);
-            return false;
-        }
-    };
+
 
     const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
     const [assistanceTickets, setAssistanceTickets] = useState<AssistanceTicket[]>([]);
@@ -850,34 +844,74 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     const addProject = (client: Client, environments: Environment[]) => {
         if (!currentUser) return;
+
         const newProject: Project = {
             id: `p-${Date.now()}`,
             storeId: currentUser.storeId,
-            client: { ...client, status: 'Ativo', storeId: currentUser.storeId },
-            sellerId: currentUser.id, // Save Seller ID
+            client: { ...client, storeId: currentUser.storeId },
+            sellerId: currentUser.id,
             sellerName: currentUser.name || 'Vendedor',
             created_at: new Date().toISOString(),
-            environments,
+            environments: environments.map(e => ({ ...e, id: `env-${Date.now()}-${Math.random().toString(36).substr(2, 9)}` })),
             notes: [{ id: `n-${Date.now()}`, storeId: currentUser.storeId, content: 'Projeto iniciado.', authorId: 'sys', authorName: 'Sistema', createdAt: new Date().toISOString(), type: 'SYSTEM' }],
             factoryOrders: []
         };
+
+        // Create initial batch
         const newBatch: Batch = {
             id: `b-${Date.now()}`,
             storeId: currentUser.storeId,
             projectId: newProject.id,
-            name: 'Projeto Completo',
-            currentStepId: workflowOrder[0] || '1.1', // Dynamic Start
-            environmentIds: environments.map(e => e.id),
+            name: 'Projeto Geral',
+            currentStepId: workflowOrder[0] || '1.1',
+            environmentIds: newProject.environments.map(e => e.id),
             createdAt: new Date().toISOString(),
             lastUpdated: new Date().toISOString(),
         };
 
-        if (useCloud) {
-            persist("projects", newProject.id, newProject);
-            persist("batches", newBatch.id, newBatch);
+        if (useCloud && db) {
+            // Firestore Add
+            setDoc(doc(db, "projects", newProject.id), newProject);
+            setDoc(doc(db, "batches", newBatch.id), newBatch);
         } else {
             setAllProjects(prev => [...prev, newProject]);
             setAllBatches(prev => [...prev, newBatch]);
+        }
+
+        // Initial Note
+        // Note is already adding in newProject.notes array, so we don't strictly need to call addNote again unless we want it separate. 
+        // But addNote logic also handles persistence.
+        // Actually, addNote appends to existing notes. Since we just created the project, it might be cleaner to just include it in initial state.
+        // However, addNote also handles local state update efficiently if needed.
+        // Let's stick to the generated code which uses `addNote` in previous version, but here I included it in `newProject.notes`.
+        // So I'll SKIP calling addNote again to avoid duplicate notes.
+    };
+
+    const deleteProject = async (projectId: string) => {
+        if (!currentUser) return;
+
+        // 1. Delete associated batches
+        const projectBatches = allBatches.filter(b => b.projectId === projectId);
+
+        if (useCloud && db) {
+            try {
+                // Delete Project
+                await deleteDoc(doc(db, "projects", projectId));
+
+                // Delete Batches
+                for (const batch of projectBatches) {
+                    await deleteDoc(doc(db, "batches", batch.id));
+                }
+
+                console.log(`Project ${projectId} and associated data deleted.`);
+            } catch (error) {
+                console.error("Error deleting project:", error);
+                alert("Erro ao excluir projeto via nuvem.");
+            }
+        } else {
+            // Local State Deletion
+            setAllProjects(prev => prev.filter(p => p.id !== projectId));
+            setAllBatches(prev => prev.filter(b => b.projectId !== projectId));
         }
     };
 
@@ -1163,6 +1197,15 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         addNote(projectId, `Peça solicitada para fábrica: ${description}`, currentUser?.id || 'sys');
     };
 
+    const updateProjectPostAssembly = (projectId: string, evaluation: PostAssemblyEvaluation) => {
+        if (useCloud) {
+            persist("projects", projectId, { postAssembly: evaluation });
+        } else {
+            setAllProjects(prev => prev.map(p => p.id === projectId ? { ...p, postAssembly: evaluation } : p));
+        }
+        addNote(projectId, `Avaliação Pós-Montagem registrada. Nota: ${evaluation.rating}/5`, currentUser?.id || 'sys');
+    };
+
     // Assistance
     const addAssistanceTicket = (ticketData: Omit<AssistanceTicket, 'id' | 'createdAt' | 'updatedAt' | 'storeId'>) => {
         if (!currentUser) return;
@@ -1218,7 +1261,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             addWorkflowStep, updateWorkflowStep, deleteWorkflowStep, reorderWorkflowSteps,
             addAssistanceStep, updateAssistanceStep, deleteAssistanceStep, reorderAssistanceSteps,
 
-            addProject, advanceBatch, moveBatchToStep, markProjectAsLost, reactivateProject, isLastStep, splitBatch, getProjectById, addNote, updateWorkflowSla, setCurrentProjectId, updateEnvironmentStatus, requestFactoryPart,
+            addProject, deleteProject, advanceBatch, moveBatchToStep, markProjectAsLost, reactivateProject, isLastStep, splitBatch, getProjectById, addNote, updateWorkflowSla, setCurrentProjectId, updateEnvironmentStatus, requestFactoryPart,
             updateEnvironmentDetails, updateClientData, updateProjectITPP, updateProjectSeller,
             addAssistanceTicket, updateAssistanceTicket,
             canUserAdvanceStep, canUserViewStage, canUserEditAssistance,
