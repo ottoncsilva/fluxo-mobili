@@ -325,8 +325,8 @@ const Settings: React.FC = () => {
                     </button>
                 </div>
 
-                {/* ORIGINS TAB */}
-                {activeTab === 'ORIGINS' && (
+                {/* AGENDA TAB */}
+                {activeTab === 'AGENDA' && (
                     <div className="space-y-8 animate-fade-in">
                         <div className="bg-white dark:bg-[#1a2632] p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
                             <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-6">Tipos de Compromisso</h3>
@@ -395,26 +395,17 @@ const Settings: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="bg-white dark:bg-[#1a2632] p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
-                            <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-6">Usuários com Agenda</h3>
-                            <p className="text-sm text-slate-500 mb-4">Selecione quais usuários devem possuir uma agenda ativa no sistema.</p>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                {users.map(user => (
-                                    <label key={user.id} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${agendaUsers.includes(user.id) ? 'bg-primary/5 border-primary' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-800'}`}>
-                                        <input
-                                            type="checkbox"
-                                            checked={agendaUsers.includes(user.id)}
-                                            onChange={() => toggleAgendaUser(user.id)}
-                                            className="rounded border-slate-300 text-primary focus:ring-primary"
-                                        />
-                                        <div>
-                                            <span className="font-bold text-slate-700 dark:text-slate-200 block text-sm">{user.name}</span>
-                                            <span className="text-xs text-slate-400">{user.role}</span>
-                                        </div>
-                                    </label>
-                                ))}
-                            </div>
+                        {/* Save Button for Agenda */}
+                        <div className="mt-6 flex items-center gap-4">
+                            <button
+                                onClick={handleSaveConfig}
+                                disabled={saving}
+                                className="bg-green-600 text-white font-bold py-3 px-8 rounded-lg text-sm hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 shadow-lg"
+                            >
+                                <span className="material-symbols-outlined text-sm">save</span>
+                                {saving ? 'Salvando...' : 'Salvar Alterações'}
+                            </button>
+                            {saveMessage && <span className="text-sm font-medium">{saveMessage}</span>}
                         </div>
                     </div>
                 )}

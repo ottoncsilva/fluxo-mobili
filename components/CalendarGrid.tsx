@@ -62,11 +62,23 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
     return (
         <div className="flex flex-col h-full bg-white dark:bg-[#1a2632] rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 animate-fade-in overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800">
-                <div className="flex items-center gap-4">
-                    <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent capitalize">
-                        {format(date, 'MMMM yyyy', { locale: ptBR })}
-                    </h2>
+            <div className="flex items-center gap-4 p-4 border-b border-slate-200 dark:border-slate-800">
+                <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5">
+                    {['month', 'week', 'day'].map((v) => (
+                        <button
+                            key={v}
+                            onClick={() => onViewChange(v as any)}
+                            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all capitalize ${view === v
+                                ? 'bg-white dark:bg-slate-700 text-primary shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'
+                                }`}
+                        >
+                            {v === 'month' ? 'Mês' : v === 'week' ? 'Semana' : 'Dia'}
+                        </button>
+                    ))}
+                </div>
+
+                <div className="flex items-center gap-4 flex-1 justify-between">
                     <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5">
                         <button onClick={() => onDateChange(subMonths(date, 1))} className="p-1 hover:bg-white dark:hover:bg-slate-700 rounded-md shadow-sm transition-all">
                             <span className="material-symbols-outlined text-sm">chevron_left</span>
@@ -78,22 +90,10 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                             <span className="material-symbols-outlined text-sm">chevron_right</span>
                         </button>
                     </div>
-                </div>
 
-                <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5">
-                    {['month', 'week', 'day'].map((v) => (
-                        <button
-                            key={v}
-                            onClick={() => onViewChange(v as any)}
-                            disabled={v !== 'month'} // Todo: Implement Week/Day
-                            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all capitalize ${view === v
-                                ? 'bg-white dark:bg-slate-700 text-primary shadow-sm'
-                                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 opacity-50 cursor-not-allowed'
-                                }`}
-                        >
-                            {v === 'month' ? 'Mês' : v === 'week' ? 'Semana' : 'Dia'}
-                        </button>
-                    ))}
+                    <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent capitalize">
+                        {format(date, 'MMMM yyyy', { locale: ptBR })}
+                    </h2>
                 </div>
             </div>
 

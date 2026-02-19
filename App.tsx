@@ -97,15 +97,14 @@ const AppContent: React.FC = () => {
     }
   };
 
-  // Build nav items based on permissions
   const navItems: { icon: string; view: ViewState; label: string }[] = [];
   if (currentUser.role === 'SuperAdmin') {
     navItems.push({ icon: 'domain', view: ViewState.SUPER_ADMIN, label: 'Lojas' });
   } else {
     if (canAccess(ViewState.DASHBOARD)) navItems.push({ icon: 'dashboard', view: ViewState.DASHBOARD, label: 'Início' });
-    if (canAccess(ViewState.CLIENT_LIST)) navItems.push({ icon: 'groups', view: ViewState.CLIENT_LIST, label: 'Clientes' });
-    navItems.push({ icon: 'calendar_month', view: ViewState.AGENDA, label: 'Agenda' });
     if (canAccess(ViewState.KANBAN)) navItems.push({ icon: 'view_kanban', view: ViewState.KANBAN, label: 'Kanban' });
+    navItems.push({ icon: 'calendar_month', view: ViewState.AGENDA, label: 'Agenda' });
+    if (canAccess(ViewState.CLIENT_LIST)) navItems.push({ icon: 'groups', view: ViewState.CLIENT_LIST, label: 'Clientes' });
     navItems.push({ icon: 'handyman', view: ViewState.ASSISTANCE, label: 'Assistência' });
     if (canAccess(ViewState.SETTINGS)) navItems.push({ icon: 'settings', view: ViewState.SETTINGS, label: 'Config' });
   }
@@ -115,15 +114,7 @@ const AppContent: React.FC = () => {
 
       {/* === Desktop Sidebar (hidden on mobile) === */}
       <aside className="hidden md:flex w-20 bg-white dark:bg-[#1a2632] border-r border-slate-200 dark:border-slate-800 flex-col items-center py-6 z-30 shrink-0">
-        <div className={`size-10 rounded-xl flex items-center justify-center text-white font-bold text-xl mb-8 shadow-lg overflow-hidden ${currentUser.role === 'SuperAdmin' ? 'bg-purple-600 shadow-purple-500/20' : 'bg-primary shadow-primary/20'}`}>
-          {currentUser.role === 'SuperAdmin' ? (
-            <span className="material-symbols-outlined">admin_panel_settings</span>
-          ) : companySettings.logoUrl ? (
-            <img src={companySettings.logoUrl} alt="Logo" className="w-full h-full object-cover" />
-          ) : (
-            companySettings.name.charAt(0)
-          )}
-        </div>
+        <div className="mb-4"></div> {/* Spacer instead of logo */}
 
         <nav className="flex flex-col gap-6 w-full px-4">
           {navItems.map(item => (
@@ -151,15 +142,6 @@ const AppContent: React.FC = () => {
         {/* Header */}
         <header className="h-14 md:h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1a2632] flex items-center justify-between px-4 md:px-6 shrink-0 z-20">
           <div className="flex items-center gap-3">
-            <div className={`md:hidden size-8 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow overflow-hidden ${currentUser.role === 'SuperAdmin' ? 'bg-purple-600' : 'bg-primary'}`}>
-              {currentUser.role === 'SuperAdmin' ? (
-                <span className="material-symbols-outlined text-lg">admin_panel_settings</span>
-              ) : companySettings.logoUrl ? (
-                <img src={companySettings.logoUrl} alt="Logo" className="w-full h-full object-cover" />
-              ) : (
-                companySettings.name.charAt(0)
-              )}
-            </div>
             <h1 className="text-lg md:text-xl font-bold text-slate-800 dark:text-white">
               {getTitle()}
             </h1>

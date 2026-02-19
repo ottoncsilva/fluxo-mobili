@@ -3,6 +3,7 @@ import { KanbanColumn, Batch } from '../types';
 import { useProjects } from '../context/ProjectContext';
 import AuditDrawer from './AuditDrawer';
 import LotModal from './LotModal';
+import SplitBatchModal from './SplitBatchModal';
 
 // Define UI Columns. 
 // IDs 1-8 match the 'stage' property in workflowConfig.
@@ -23,6 +24,8 @@ const UI_COLUMNS = [
 const KanbanBoard: React.FC = () => {
     const [isAuditOpen, setIsAuditOpen] = useState(false);
     const [isLotModalOpen, setIsLotModalOpen] = useState(false);
+    const [splitModalBatch, setSplitModalBatch] = useState<Batch | null>(null);
+    const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
     const [selectedColumnId, setSelectedColumnId] = useState<number | null>(4);
     const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
     const [subStepFilter, setSubStepFilter] = useState<string | null>(null);
@@ -31,7 +34,7 @@ const KanbanBoard: React.FC = () => {
     const [showCompleted, setShowCompleted] = useState(false);
     const [showLost, setShowLost] = useState(false);
 
-    const { batches, projects, workflowConfig, setCurrentProjectId, canUserViewStage } = useProjects();
+    const { batches, projects, workflowConfig, setCurrentProjectId, canUserViewStage, splitBatch, advanceBatch } = useProjects();
 
     // Filter Columns based on User Permissions and Toggles
     const visibleUiColumns = useMemo(() => {
@@ -141,6 +144,42 @@ const KanbanBoard: React.FC = () => {
         setCurrentProjectId(projectId);
     };
 
+    const handleSplitClick = (e: React.MouseEvent, batch: Batch) => {
+        e.stopPropagation();
+        setSplitModalBatch(batch);
+        setIsSplitModalOpen(true);
+    };
+
+    const handleSplitConfirmed = async (selectedIds: string[]) => {
+        if (!splitModalBatch) return;
+
+        // Logic:
+        // 1. If ALL environments selected -> simple advance of the original batch
+        // 2. If PARTIAL environments selected -> splitBatch (create new) -> advanceBatch (new)
+
+        // We need to know the Total environments in this batch to compare
+        // But SplitBatchModal passes us the IDs to move.
+        // We can check batch.environmentIds length vs selectedIds.length
+
+        if (selectedIds.length === splitModalBatch.environmentIds.length) {
+            // Move Everything
+            await advanceBatch(splitModalBatch.id);
+        } else {
+            // Move Partial
+            // Logic: splitBatch creates a new batch with selectedIds at CURRENT step.
+            // We then verify the new ID and advance it.
+            const newBatchId = splitBatch(splitModalBatch.id, selectedIds);
+            if (newBatchId) {
+                // Determine next step? advanceBatch handles it.
+                // Does advanceBatch work synchronously locally? Yes.
+                // If cloud, it might be async.
+                await advanceBatch(newBatchId);
+            }
+        }
+        setIsSplitModalOpen(false);
+        setSplitModalBatch(null);
+    };
+
     // Get Substeps for the Sidebar
     const activeSubSteps = useMemo(() => {
         if (!selectedColumnId) return [];
@@ -165,6 +204,13 @@ const KanbanBoard: React.FC = () => {
             {isMobileSidebarOpen && (
                 <div className="md:hidden fixed inset-0 z-30 bg-black/40" onClick={() => setIsMobileSidebarOpen(false)} />
             )}
+
+            <SplitBatchModal
+                isOpen={isSplitModalOpen}
+                onClose={() => setIsSplitModalOpen(false)}
+                batch={splitModalBatch}
+                onSplitConfirmed={handleSplitConfirmed}
+            />
 
             {/* Contextual Sidebar (Left of Board) - hidden on mobile by default, drawer on mobile */}
             <div className={`
@@ -277,14 +323,14 @@ const KanbanBoard: React.FC = () => {
                                         column.id === 91 ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700' : 'border-transparent'}
                 `}>
                                     <h3 className={`font-bold ${column.id === 90 ? 'text-emerald-700 dark:text-emerald-400' :
-                                            column.id === 91 ? 'text-slate-600 dark:text-slate-400' :
-                                                selectedColumnId === column.id ? 'text-primary' : 'text-slate-700 dark:text-slate-200'
+                                        column.id === 91 ? 'text-slate-600 dark:text-slate-400' :
+                                            selectedColumnId === column.id ? 'text-primary' : 'text-slate-700 dark:text-slate-200'
                                         }`}>
                                         {column.title}
                                     </h3>
                                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${column.id === 90 ? 'bg-emerald-200 dark:bg-emerald-800 text-emerald-800 dark:text-emerald-200' :
-                                            column.id === 91 ? 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300' :
-                                                'bg-slate-200 dark:bg-slate-700 text-slate-400'
+                                        column.id === 91 ? 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300' :
+                                            'bg-slate-200 dark:bg-slate-700 text-slate-400'
                                         }`}>{column.cards.length}</span>
                                 </div>
 
@@ -316,7 +362,7 @@ const KanbanBoard: React.FC = () => {
                                                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">OK</span>
                                                 ) : (
                                                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${card.daysDiff < 0 ? 'bg-rose-100 text-rose-700' :
-                                                            card.daysDiff < 2 ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'
+                                                        card.daysDiff < 2 ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'
                                                         }`}>
                                                         {card.daysDiff > 0 ? `+${card.daysDiff} dias` : `${card.daysDiff} dias`}
                                                     </span>
@@ -352,6 +398,22 @@ const KanbanBoard: React.FC = () => {
                                                     </div>
                                                 )}
                                             </div>
+
+                                            {/* 5. Split/Advance Button for Specific Stages */}
+                                            {(column.id === 3 || column.id === 4 || column.id === 5) && (
+                                                <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700 flex justify-end">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            const batch = batches.find(b => b.id === card.id);
+                                                            if (batch) handleSplitClick(e, batch);
+                                                        }}
+                                                        className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors shadow-sm"
+                                                    >
+                                                        <span className="material-symbols-outlined text-[12px]">call_split</span>
+                                                        Dividir / Avançar
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     ))}
                                 </div>

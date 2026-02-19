@@ -318,7 +318,7 @@ interface ProjectContextType {
     markProjectAsLost: (projectId: string, reason: string) => void;
     reactivateProject: (projectId: string) => void;
     isLastStep: (stepId: string) => boolean;
-    splitBatch: (originalBatchId: string, selectedEnvironmentIds: string[]) => void;
+    splitBatch: (originalBatchId: string, selectedEnvironmentIds: string[], targetStepId?: string) => string | undefined;
     getProjectById: (id: string) => Project | undefined;
     addNote: (projectId: string, content: string, authorId: string) => void;
     updateWorkflowSla: (stepId: string, days: number) => void;
@@ -1000,19 +1000,19 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         addNote(projectId, `Projeto reativado manualmente. Reiniciado para etapa 1.1`, currentUser?.id || 'sys');
     };
 
-    const splitBatch = (originalBatchId: string, selectedEnvironmentIds: string[]) => {
-        const originalBatch = allBatches.find(b => b.id === originalBatchId);
+    const splitBatch = (originalBatchId: string, selectedEnvironmentIds: string[], targetStepId?: string) => {
+        const originalBatch = batches.find(b => b.id === originalBatchId); // ensure using state 'batches' not 'allBatches' if that was the var name
         if (!originalBatch || !currentUser) return;
 
-        // Logic: Look for the first step of Stage 4 (Executivo) dynamically
-        const stage4StepId = workflowOrder.find(id => workflowConfig[id]?.stage === 4) || '4.1';
+        // Determine destination step: provided target OR current step (split in place)
+        const destinationStepId = targetStepId || originalBatch.currentStepId;
 
         const newBatch: Batch = {
             id: `b-${Date.now()}`,
             storeId: currentUser.storeId,
             projectId: originalBatch.projectId,
-            name: `Lote - ${new Date().toLocaleDateString()}`,
-            currentStepId: stage4StepId,
+            name: `${originalBatch.name} (Parcial)`,
+            currentStepId: destinationStepId,
             environmentIds: selectedEnvironmentIds,
             createdAt: new Date().toISOString(),
             lastUpdated: new Date().toISOString(),
@@ -1023,15 +1023,24 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             lastUpdated: new Date().toISOString()
         };
 
-        if (useCloud) {
-            persist("batches", newBatch.id, newBatch);
-            persist("batches", originalBatch.id, originalBatchUpdate);
+        if (useCloud && db) { // Ensure db check
+            // Create new batch
+            setDoc(doc(db, "batches", newBatch.id), newBatch);
+            // Update old batch
+            updateDoc(doc(db, "batches", originalBatch.id), originalBatchUpdate);
         } else {
             const updatedOriginalBatch = { ...originalBatch, ...originalBatchUpdate };
-            setAllBatches(prev => [...prev.filter(b => b.id !== originalBatchId), newBatch, updatedOriginalBatch].filter(b => b.environmentIds.length > 0));
+            setAllBatches(prev => [
+                ...prev.filter(b => b.id !== originalBatchId),
+                newBatch,
+                updatedOriginalBatch
+            ].filter(b => b.environmentIds.length > 0));
         }
 
-        addNote(originalBatch.projectId, `Lote separado criado na etapa Executivo com ${selectedEnvironmentIds.length} ambientes.`, currentUser?.id || 'sys');
+        // Add Note
+        addNote(originalBatch.projectId, `Lote parcial criado na etapa ${destinationStepId} com ${selectedEnvironmentIds.length} ambientes.`, currentUser?.id || 'sys');
+
+        return newBatch.id;
     };
 
     const updateWorkflowSla = (stepId: string, days: number) => {
