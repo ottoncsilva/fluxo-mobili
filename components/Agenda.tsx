@@ -1,243 +1,149 @@
-import React, { useState, useEffect, useMemo } from 'react';
+
+import React, { useState } from 'react';
+import { useAgenda, Appointment } from '../context/AgendaContext';
+import CalendarGrid from './CalendarGrid';
+import TaskSidebar from './TaskSidebar';
+import AppointmentModal from './AppointmentModal';
 import { useProjects } from '../context/ProjectContext';
 
-interface Appointment {
-    id: string;
-    title: string;
-    type: 'Visita a Cliente' | 'Reunião de Apresentação' | 'Reunião de Fechamento' | 'Outro';
-    clientId: string;
-    clientName: string;
-    date: string; // ISO String
-    notes?: string;
-}
-
 const Agenda: React.FC = () => {
-    const { projects } = useProjects();
-    const [appointments, setAppointments] = useState<Appointment[]>([]);
+    const { appointments, appointmentTypes } = useAgenda();
+    const { currentUser, users } = useProjects();
+
+    const [currentDate, setCurrentDate] = useState(new Date());
+    const [view, setView] = useState<'month' | 'week' | 'day'>('month');
+
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+    const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
+    const [initialTask, setInitialTask] = useState<{ id: string; title: string; clientName: string; projectId: string } | null>(null);
 
-    // Form State
-    const [formData, setFormData] = useState<Partial<Appointment>>({
-        type: 'Visita a Cliente',
-        date: new Date().toISOString().slice(0, 16) // Default to now, format YYYY-MM-DDTHH:mm
-    });
+    // User Filtering State
+    // Default to current user's ID
+    const [selectedUserId, setSelectedUserId] = useState<string>(currentUser?.id || '');
 
-    // Load from LocalStorage
-    useEffect(() => {
-        const saved = localStorage.getItem('fluxo_agenda');
-        if (saved) {
-            try {
-                setAppointments(JSON.parse(saved));
-            } catch (e) {
-                console.error("Failed to parse agenda", e);
-            }
+    // Permission Check
+    const canViewOthers = ['Admin', 'Proprietario', 'Gerente', 'SuperAdmin'].includes(currentUser?.role || '');
+
+    // Filter appointments
+    const filteredAppointments = useMemo(() => {
+        let filtered = appointments;
+
+        // If selecting a specific user (and has permission or it's themselves)
+        if (selectedUserId && selectedUserId !== 'ALL') {
+            filtered = filtered.filter(a => a.userId === selectedUserId);
+        } else if (selectedUserId === 'ALL' && canViewOthers) {
+            // Show all (maybe filter by storeId if needed, but AgendaContext usually loads store-specific data?) 
+            // Currently AgendaContext loads from LocalStorage which is shared. 
+            // In a real app, backend would filter by store.
+            // For now, assume 'appointments' contains all visible appointments.
+        } else {
+            // Fallback: only show own
+            filtered = filtered.filter(a => a.userId === currentUser?.id);
         }
-    }, []);
 
-    // Save to LocalStorage
-    const saveAppointments = (newAppointments: Appointment[]) => {
-        setAppointments(newAppointments);
-        localStorage.setItem('fluxo_agenda', JSON.stringify(newAppointments));
+        return filtered;
+    }, [appointments, selectedUserId, canViewOthers, currentUser]);
+
+    // Initial check for functionality
+    // If user doesn't have agenda enabled, maybe show a warning?
+    // But for now we assume functionality is available if they can access the route.
+
+    const handleSelectSlot = (date: Date) => {
+        setSelectedDate(date);
+        setEditingAppointment(null);
+        setInitialTask(null);
+        setIsModalOpen(true);
     };
 
-    const handleCreate = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!formData.title || !formData.date || !formData.clientId) return;
+    const handleSelectAppointment = (apt: Appointment) => {
+        setEditingAppointment(apt);
+        setInitialTask(null);
+        setSelectedDate(undefined);
+        setIsModalOpen(true);
+    };
 
-        const client = projects.find(p => p.client.id === formData.clientId)?.client;
+    const handleTaskSchedule = (task: { id: string; title: string; clientName: string; projectId: string }) => {
+        setInitialTask(task);
+        setEditingAppointment(null);
+        setSelectedDate(new Date()); // Default to today/now for task scheduling
+        setIsModalOpen(true);
+    };
 
-        const newAppointment: Appointment = {
-            id: crypto.randomUUID(),
-            title: formData.title,
-            type: formData.type as any,
-            clientId: formData.clientId,
-            clientName: client?.name || 'Cliente Desconhecido',
-            date: formData.date,
-            notes: formData.notes
-        };
-
-        saveAppointments([...appointments, newAppointment]);
+    const handleCloseModal = () => {
         setIsModalOpen(false);
-        setFormData({ type: 'Visita a Cliente', date: new Date().toISOString().slice(0, 16) });
+        setEditingAppointment(null);
+        setInitialTask(null);
+        setSelectedDate(undefined);
     };
-
-    const handleDelete = (id: string) => {
-        if (confirm('Tem certeza que deseja remover este compromisso?')) {
-            saveAppointments(appointments.filter(a => a.id !== id));
-        }
-    };
-
-    // Group by Date for display
-    const groupedAppointments = useMemo(() => {
-        const grouped: Record<string, Appointment[]> = {};
-        const sorted = [...appointments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-        sorted.forEach(app => {
-            const dateKey = new Date(app.date).toLocaleDateString();
-            if (!grouped[dateKey]) grouped[dateKey] = [];
-            grouped[dateKey].push(app);
-        });
-
-        return grouped;
-    }, [appointments]);
-
-    // Active Clients for Dropdown
-    const activeClients = useMemo(() => {
-        return projects
-            .filter(p => p.client.status === 'Ativo')
-            .map(p => ({ id: p.client.id, name: p.client.name }));
-    }, [projects]);
 
     return (
-        <div className="flex flex-col h-full bg-slate-50 dark:bg-[#101922] p-6 overflow-y-auto">
-            <div className="flex justify-between items-center mb-8">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Agenda</h1>
-                    <p className="text-slate-500">Seus compromissos e visitas.</p>
-                </div>
-                <button
-                    onClick={() => setIsModalOpen(true)}
-                    className="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-                >
-                    <span className="material-symbols-outlined">add</span>
-                    Novo Compromisso
-                </button>
-            </div>
-
-            <div className="space-y-6">
-                {Object.entries(groupedAppointments).length === 0 && (
-                    <div className="text-center py-20 opacity-50">
-                        <span className="material-symbols-outlined text-6xl mb-4">event_busy</span>
-                        <p>Nenhum compromisso agendado.</p>
+        <div className="flex h-full bg-slate-50 dark:bg-[#101922] relative overflow-hidden">
+            {/* Main Content Area */}
+            <div className="flex-1 flex flex-col min-w-0 p-4 overflow-hidden">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Agenda</h1>
+                        <p className="text-sm text-slate-500">Gerencie seus compromissos e tarefas.</p>
                     </div>
-                )}
 
-                {Object.entries(groupedAppointments).map(([date, apps]) => (
-                    <div key={date}>
-                        <h3 className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-3 sticky top-0 bg-slate-50 dark:bg-[#101922] py-2 z-10 border-b border-slate-200 dark:border-slate-800">
-                            {date}
-                        </h3>
-                        <div className="space-y-3">
-                            {apps.map(app => (
-                                <div key={app.id} className="bg-white dark:bg-[#1a2632] p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex justify-between items-center shadow-sm hover:shadow-md transition-shadow">
-                                    <div className="flex items-center gap-4">
-                                        <div className={`size-12 rounded-full flex items-center justify-center shrink-0 
-                        ${app.type === 'Visita a Cliente' ? 'bg-blue-100 text-blue-600' :
-                                                app.type === 'Reunião de Fechamento' ? 'bg-emerald-100 text-emerald-600' :
-                                                    'bg-amber-100 text-amber-600'}`}>
-                                            <span className="material-symbols-outlined">
-                                                {app.type === 'Visita a Cliente' ? 'directions_car' :
-                                                    app.type === 'Reunião de Fechamento' ? 'handshake' : 'groups'}
-                                            </span>
-                                        </div>
-                                        <div>
-                                            <h4 className="font-bold text-slate-800 dark:text-white">{app.title}</h4>
-                                            <div className="flex items-center gap-2 text-sm text-slate-500">
-                                                <span className="material-symbols-outlined text-[16px]">schedule</span>
-                                                {new Date(app.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                <span className="mx-1">•</span>
-                                                <span className="material-symbols-outlined text-[16px]">person</span>
-                                                {app.clientName}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <button
-                                        onClick={() => handleDelete(app.id)}
-                                        className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-full text-slate-400 hover:text-rose-500 transition-colors"
-                                        title="Remover"
-                                    >
-                                        <span className="material-symbols-outlined">delete</span>
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            {/* Modal */}
-            {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white dark:bg-[#1e293b] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
-                        <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                            <h3 className="text-xl font-bold text-slate-800 dark:text-white">Novo Compromisso</h3>
-                            <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                                <span className="material-symbols-outlined">close</span>
-                            </button>
-                        </div>
-
-                        <form onSubmit={handleCreate} className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Título</label>
-                                <input
-                                    type="text"
-                                    required
-                                    placeholder="Ex: Apresentação Inicial"
-                                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-800 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none"
-                                    value={formData.title || ''}
-                                    onChange={e => setFormData({ ...formData, title: e.target.value })}
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tipo</label>
-                                <select
-                                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-800 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none"
-                                    value={formData.type}
-                                    onChange={e => setFormData({ ...formData, type: e.target.value as any })}
-                                >
-                                    <option>Visita a Cliente</option>
-                                    <option>Reunião de Apresentação</option>
-                                    <option>Reunião de Fechamento</option>
-                                    <option>Outro</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Cliente</label>
-                                <select
-                                    required
-                                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-800 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none"
-                                    value={formData.clientId || ''}
-                                    onChange={e => setFormData({ ...formData, clientId: e.target.value })}
-                                >
-                                    <option value="">Selecione um cliente...</option>
-                                    {activeClients.map(c => (
-                                        <option key={c.id} value={c.id}>{c.name}</option>
+                    <div className="flex items-center gap-2">
+                        {canViewOthers && (
+                            <select
+                                value={selectedUserId}
+                                onChange={e => setSelectedUserId(e.target.value)}
+                                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                            >
+                                <option value={currentUser?.id}>Minha Agenda</option>
+                                <option value="ALL">Ver Todos</option>
+                                <optgroup label="Outros Usuários">
+                                    {users.filter(u => u.id !== currentUser?.id).map(u => (
+                                        <option key={u.id} value={u.id}>{u.name}</option>
                                     ))}
-                                </select>
-                            </div>
+                                </optgroup>
+                            </select>
+                        )}
 
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data e Hora</label>
-                                <input
-                                    type="datetime-local"
-                                    required
-                                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-800 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none"
-                                    value={formData.date}
-                                    onChange={e => setFormData({ ...formData, date: e.target.value })}
-                                />
-                            </div>
-
-                            <div className="pt-4 flex justify-end gap-3">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsModalOpen(false)}
-                                    className="px-4 py-2 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 rounded-lg transition-colors"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors font-medium"
-                                >
-                                    Agendar
-                                </button>
-                            </div>
-                        </form>
+                        <button
+                            onClick={() => {
+                                setSelectedDate(new Date());
+                                setEditingAppointment(null);
+                                setInitialTask(null);
+                                setIsModalOpen(true);
+                            }}
+                            className="bg-primary hover:bg-primary-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors font-bold shadow-sm whitespace-nowrap"
+                        >
+                            <span className="material-symbols-outlined">add</span>
+                            Novo Agendamento
+                        </button>
                     </div>
                 </div>
-            )}
+
+                <div className="flex-1 min-h-0">
+                    <CalendarGrid
+                        date={currentDate}
+                        view={view}
+                        appointments={filteredAppointments}
+                        types={appointmentTypes}
+                        onDateChange={setCurrentDate}
+                        onViewChange={setView}
+                        onSelectSlot={handleSelectSlot}
+                        onSelectAppointment={handleSelectAppointment}
+                    />
+                </div>
+            </div>
+
+            {/* Task Sidebar */}
+            <TaskSidebar onSchedule={handleTaskSchedule} />
+
+            {/* Appointment Modal */}
+            <AppointmentModal
+                isOpen={isModalOpen}
+                onClose={handleCloseModal}
+                initialDate={selectedDate}
+                initialTask={initialTask}
+                editingAppointment={editingAppointment}
+            />
         </div>
     );
 };

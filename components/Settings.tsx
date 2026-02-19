@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useProjects } from '../context/ProjectContext';
+import { useAgenda } from '../context/AgendaContext';
 import { Role, User, PermissionConfig, AssistanceStatus, WorkflowStep, AssistanceWorkflowStep } from '../types';
 
 const Settings: React.FC = () => {
@@ -13,7 +14,9 @@ const Settings: React.FC = () => {
         saveStoreConfig
     } = useProjects();
 
-    const [activeTab, setActiveTab] = useState<'COMPANY' | 'USERS' | 'PERMISSIONS' | 'SLA' | 'SLA_ASSISTANCE' | 'ORIGINS'>('COMPANY');
+    const { appointmentTypes, addAppointmentType, updateAppointmentType, deleteAppointmentType, agendaUsers, toggleAgendaUser } = useAgenda();
+
+    const [activeTab, setActiveTab] = useState<'COMPANY' | 'USERS' | 'PERMISSIONS' | 'SLA' | 'SLA_ASSISTANCE' | 'ORIGINS' | 'AGENDA'>('COMPANY');
 
     // User Management Modal State
     const [isUserModalOpen, setIsUserModalOpen] = useState(false);
@@ -48,6 +51,11 @@ const Settings: React.FC = () => {
 
     // Origin State
     const [newOrigin, setNewOrigin] = useState('');
+
+    // Agenda Settings State
+    const [newApptType, setNewApptType] = useState('');
+    const [newApptColor, setNewApptColor] = useState('#3b82f6');
+    const [newApptReqClient, setNewApptReqClient] = useState(false);
 
     // Save State
     const [saving, setSaving] = useState(false);
@@ -309,7 +317,107 @@ const Settings: React.FC = () => {
                     >
                         Origem do Cliente
                     </button>
+                    <button
+                        onClick={() => setActiveTab('AGENDA')}
+                        className={`pb-4 px-2 font-bold text-sm transition-colors border-b-2 whitespace-nowrap ${activeTab === 'AGENDA' ? 'border-primary text-primary' : 'border-transparent text-slate-500'}`}
+                    >
+                        Agenda
+                    </button>
                 </div>
+
+                {/* ORIGINS TAB */}
+                {activeTab === 'ORIGINS' && (
+                    <div className="space-y-8 animate-fade-in">
+                        <div className="bg-white dark:bg-[#1a2632] p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+                            <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-6">Tipos de Compromisso</h3>
+
+                            <div className="flex flex-col md:flex-row gap-4 items-end mb-6">
+                                <div className="flex-1 w-full">
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Nome do Tipo</label>
+                                    <input
+                                        type="text"
+                                        value={newApptType}
+                                        onChange={e => setNewApptType(e.target.value)}
+                                        placeholder="Ex: Visita Técnica"
+                                        className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Cor</label>
+                                    <input
+                                        type="color"
+                                        value={newApptColor}
+                                        onChange={e => setNewApptColor(e.target.value)}
+                                        className="h-10 w-20 rounded-lg cursor-pointer"
+                                    />
+                                </div>
+                                <div className="pb-3 px-2">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={newApptReqClient}
+                                            onChange={e => setNewApptReqClient(e.target.checked)}
+                                            className="rounded border-slate-300 text-primary focus:ring-primary"
+                                        />
+                                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Exige Cliente?</span>
+                                    </label>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        if (newApptType) {
+                                            addAppointmentType({ name: newApptType, color: newApptColor, requireClient: newApptReqClient });
+                                            setNewApptType('');
+                                            setNewApptColor('#3b82f6');
+                                            setNewApptReqClient(false);
+                                        }
+                                    }}
+                                    className="bg-primary text-white font-bold h-10 px-4 rounded-lg text-sm hover:bg-primary-600 w-full md:w-auto"
+                                >
+                                    Adicionar
+                                </button>
+                            </div>
+
+                            <div className="space-y-3">
+                                {appointmentTypes.map(type => (
+                                    <div key={type.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-800">
+                                        <div className="flex items-center gap-3">
+                                            <div className="size-4 rounded-full" style={{ backgroundColor: type.color }}></div>
+                                            <div>
+                                                <span className="font-bold text-slate-700 dark:text-slate-200 block">{type.name}</span>
+                                                <span className="text-xs text-slate-400">{type.requireClient ? 'Exige Cliente' : 'Livre'}</span>
+                                            </div>
+                                        </div>
+                                        <button onClick={() => deleteAppointmentType(type.id)} className="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition-colors" title="Excluir">
+                                            <span className="material-symbols-outlined text-lg">delete</span>
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="bg-white dark:bg-[#1a2632] p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+                            <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-6">Usuários com Agenda</h3>
+                            <p className="text-sm text-slate-500 mb-4">Selecione quais usuários devem possuir uma agenda ativa no sistema.</p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {users.map(user => (
+                                    <label key={user.id} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${agendaUsers.includes(user.id) ? 'bg-primary/5 border-primary' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-800'}`}>
+                                        <input
+                                            type="checkbox"
+                                            checked={agendaUsers.includes(user.id)}
+                                            onChange={() => toggleAgendaUser(user.id)}
+                                            className="rounded border-slate-300 text-primary focus:ring-primary"
+                                        />
+                                        <div>
+                                            <span className="font-bold text-slate-700 dark:text-slate-200 block text-sm">{user.name}</span>
+                                            <span className="text-xs text-slate-400">{user.role}</span>
+                                        </div>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* COMPANY TAB */}
                 {activeTab === 'COMPANY' && (

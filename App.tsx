@@ -12,6 +12,7 @@ import Agenda from './components/Agenda';
 import SuperAdminDashboard from './components/SuperAdminDashboard';
 import { ProjectProvider, useProjects } from './context/ProjectContext';
 import { NotificationProvider, useNotifications } from './context/NotificationContext';
+import { AgendaProvider } from './context/AgendaContext';
 
 const AppContent: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.DASHBOARD);
@@ -294,7 +295,9 @@ const App: React.FC = () => {
   return (
     <ProjectProvider>
       <NotificationProvider>
-        <AppContent />
+        <AgendaProvider>
+          <AppContent />
+        </AgendaProvider>
       </NotificationProvider>
     </ProjectProvider>
   );

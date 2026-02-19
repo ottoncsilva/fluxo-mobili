@@ -7,7 +7,60 @@ import { useProjects } from '../context/ProjectContext';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
-export const DashboardCharts: React.FC = () => {
+
+export const DashboardKPIs: React.FC = () => {
+    const { batches, projects } = useProjects();
+
+    const kpiData = useMemo(() => {
+        let activeProjects = 0;
+        batches.forEach(b => {
+            if (b.currentStepId !== '9.0' && b.currentStepId !== '9.1') {
+                activeProjects++;
+            }
+        });
+
+        const totalSales = projects.reduce((acc, p) => {
+            const isWon = p.client.status === 'Concluido';
+            const projectBatch = batches.find(b => b.projectId === p.id);
+            const isDelivered = projectBatch?.currentStepId === '9.0';
+            if (isWon || isDelivered) {
+                return acc + (p.total_estimated_value || 0);
+            }
+            return acc;
+        }, 0);
+
+        const totalProjects = projects.length;
+        const uniqueWonIds = new Set([
+            ...projects.filter(p => p.client.status === 'Concluido').map(p => p.id),
+            ...batches.filter(b => b.currentStepId === '9.0').map(b => b.projectId)
+        ]);
+
+        const conversionRate = totalProjects > 0 ? ((uniqueWonIds.size / totalProjects) * 100).toFixed(1) : 0;
+
+        return { totalSales, activeProjects, conversionRate };
+    }, [batches, projects]);
+
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="bg-white dark:bg-[#1a2632] p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
+                <p className="text-sm font-bold text-slate-500 uppercase tracking-wide">Volume de Vendas</p>
+                <h3 className="text-2xl font-extrabold text-slate-800 dark:text-white">
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(kpiData.totalSales)}
+                </h3>
+            </div>
+            <div className="bg-white dark:bg-[#1a2632] p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
+                <p className="text-sm font-bold text-slate-500 uppercase tracking-wide">Projetos Ativos</p>
+                <h3 className="text-2xl font-extrabold text-slate-800 dark:text-white">{kpiData.activeProjects}</h3>
+            </div>
+            <div className="bg-white dark:bg-[#1a2632] p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
+                <p className="text-sm font-bold text-slate-500 uppercase tracking-wide">Taxa de Conversão</p>
+                <h3 className="text-2xl font-extrabold text-slate-800 dark:text-white">{kpiData.conversionRate}%</h3>
+            </div>
+        </div>
+    );
+};
+
+export const DashboardGraphs: React.FC = () => {
     const { batches, projects, workflowConfig } = useProjects();
 
     const funnelData = useMemo(() => {
@@ -24,7 +77,6 @@ export const DashboardCharts: React.FC = () => {
             9: 'Conclusão'
         };
 
-        // Initialize counts
         Object.keys(stageNames).forEach(stage => stageCounts[stage] = 0);
 
         batches.forEach(batch => {
@@ -46,15 +98,7 @@ export const DashboardCharts: React.FC = () => {
         const sales: Record<string, number> = {};
 
         projects.forEach(project => {
-            // Consider "Sold" if status is Concluido or check Batches for 9.0?
-            // For now, let's sum ALL potentials or just won?
-            // Usually "Sales by Seller" implies closed deals.
-            // Let's check client status 'Concluido' OR if the project has a batch in 9.0
-
-            // Check if project is completed (won)
             const isWon = project.client.status === 'Concluido';
-
-            // OR check if associated batch is 9.0
             const projectBatch = batches.find(b => b.projectId === project.id);
             const isDelivered = projectBatch?.currentStepId === '9.0';
 
@@ -68,51 +112,8 @@ export const DashboardCharts: React.FC = () => {
         return Object.entries(sales).map(([name, value]) => ({ name, value }));
     }, [projects, batches]);
 
-    const kpiData = useMemo(() => {
-        const totalSales = salesBySeller.reduce((acc, curr) => acc + curr.value, 0);
-
-        let activeProjects = 0;
-        batches.forEach(b => {
-            if (b.currentStepId !== '9.0' && b.currentStepId !== '9.1') {
-                activeProjects++;
-            }
-        });
-
-        const totalProjects = projects.length;
-        const wonProjects = projects.filter(p => p.client.status === 'Concluido').length + batches.filter(b => b.currentStepId === '9.0').length;
-        // Note: Avoiding double count if both true is tricky without ID checks, but simple approximation:
-        // Let's stick to unique ID check if needed, but for KPI standard:
-
-        const uniqueWonIds = new Set([
-            ...projects.filter(p => p.client.status === 'Concluido').map(p => p.id),
-            ...batches.filter(b => b.currentStepId === '9.0').map(b => b.projectId)
-        ]);
-
-        const conversionRate = totalProjects > 0 ? ((uniqueWonIds.size / totalProjects) * 100).toFixed(1) : 0;
-
-        return { totalSales, activeProjects, conversionRate };
-    }, [salesBySeller, batches, projects]);
-
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            {/* KPI Overview (Integrated here or kept in parent? Parent has basic task stats, these are business KPIs) */}
-            <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white dark:bg-[#1a2632] p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
-                    <p className="text-sm font-bold text-slate-500 uppercase tracking-wide">Volume de Vendas</p>
-                    <h3 className="text-2xl font-extrabold text-slate-800 dark:text-white">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(kpiData.totalSales)}
-                    </h3>
-                </div>
-                <div className="bg-white dark:bg-[#1a2632] p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
-                    <p className="text-sm font-bold text-slate-500 uppercase tracking-wide">Projetos Ativos</p>
-                    <h3 className="text-2xl font-extrabold text-slate-800 dark:text-white">{kpiData.activeProjects}</h3>
-                </div>
-                <div className="bg-white dark:bg-[#1a2632] p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
-                    <p className="text-sm font-bold text-slate-500 uppercase tracking-wide">Taxa de Conversão</p>
-                    <h3 className="text-2xl font-extrabold text-slate-800 dark:text-white">{kpiData.conversionRate}%</h3>
-                </div>
-            </div>
-
             {/* Funnel Chart */}
             <div className="bg-white dark:bg-[#1a2632] p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 min-h-[400px]">
                 <h4 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Funil de Projetos</h4>
@@ -166,3 +167,4 @@ export const DashboardCharts: React.FC = () => {
         </div>
     );
 };
+
