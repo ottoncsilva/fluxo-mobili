@@ -183,6 +183,9 @@ export interface Project {
   environments: Environment[];
   notes: Note[];
   postAssembly?: PostAssemblyEvaluation;
+  postAssemblyItems?: AssistanceItem[]; // Reusing AssistanceItem for consistency
+  postAssemblyEvents?: AssistanceEvent[];
+  postAssemblyPriority?: 'Normal' | 'Urgente';
 
   factoryOrders: FactoryOrder[];
   total_estimated_value?: number;
@@ -201,13 +204,13 @@ export interface Batch {
 
 // Assistance Types
 export type AssistanceStatus =
-  | 'VISITA'
   | '10.1'
   | '10.2'
   | '10.3'
   | '10.4'
+  | '10.5'
   | '10.6'
-  | 'CONCLUIDO';
+  | '10.7';
 
 export interface AssistanceItem {
   id: string;
