@@ -505,7 +505,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     // Save Configuration to Firebase
     const saveStoreConfig = async () => {
-        if (!currentStore) return false;
+        if (!currentStore || !db) return false;
         try {
             const configRef = doc(db, 'store_configs', currentStore.id);
             await setDoc(configRef, {
@@ -526,7 +526,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     // Load Configuration from Firebase (Real-time listener)
     useEffect(() => {
-        if (!currentStore) return;
+        if (!currentStore || !db) return;
 
         const configRef = doc(db, 'store_configs', currentStore.id);
         const unsubscribe = onSnapshot(configRef, (docSnap) => {
@@ -1262,7 +1262,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             addAssistanceStep, updateAssistanceStep, deleteAssistanceStep, reorderAssistanceSteps,
 
             addProject, deleteProject, advanceBatch, moveBatchToStep, markProjectAsLost, reactivateProject, isLastStep, splitBatch, getProjectById, addNote, updateWorkflowSla, setCurrentProjectId, updateEnvironmentStatus, requestFactoryPart,
-            updateEnvironmentDetails, updateClientData, updateProjectITPP, updateProjectSeller,
+            updateEnvironmentDetails, updateClientData, updateProjectITPP, updateProjectSeller, updateProjectPostAssembly,
             addAssistanceTicket, updateAssistanceTicket,
             canUserAdvanceStep, canUserViewStage, canUserEditAssistance,
             saveStoreConfig, resetStoreDefaults

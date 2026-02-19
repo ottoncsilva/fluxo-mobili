@@ -66,7 +66,9 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onComplete }) => {
             name: envName.trim(),
             area_sqm: 0,
             urgency_level: 'Média',
-            estimated_value: 0
+            estimated_value: 0,
+            observations: '',
+            status: 'Pending'
         };
 
         setEnvironments([...environments, newEnv]);
