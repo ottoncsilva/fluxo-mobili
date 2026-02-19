@@ -274,6 +274,21 @@ const AppContent: React.FC = () => {
 };
 
 const App: React.FC = () => {
+  // Dark Mode Management
+  useEffect(() => {
+    const applyTheme = () => {
+      const pref = localStorage.getItem('fluxo_erp_theme') || 'auto';
+      const isDark = pref === 'dark' || (pref === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.classList.toggle('dark', isDark);
+    };
+    applyTheme();
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = () => applyTheme();
+    mq.addEventListener('change', handler);
+    window.addEventListener('storage', applyTheme);
+    return () => { mq.removeEventListener('change', handler); window.removeEventListener('storage', applyTheme); };
+  }, []);
+
   return (
     <ProjectProvider>
       <NotificationProvider>

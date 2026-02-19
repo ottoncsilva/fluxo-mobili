@@ -315,6 +315,7 @@ interface ProjectContextType {
 
     addProject: (client: Client, environments: Environment[]) => void;
     advanceBatch: (batchId: string) => void;
+    moveBatchToStep: (batchId: string, targetStepId: string) => void;
     markProjectAsLost: (projectId: string, reason: string) => void;
     reactivateProject: (projectId: string) => void;
     isLastStep: (stepId: string) => boolean;
@@ -916,6 +917,33 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         return true;
     };
 
+    const moveBatchToStep = (batchId: string, targetStepId: string) => {
+        const batch = allBatches.find(b => b.id === batchId);
+        if (!batch) return;
+
+        // Permission check for the CURRENT step being finished
+        if (!canUserAdvanceStep(batch.currentStepId)) {
+            alert("Você não tem permissão para esta ação nesta etapa.");
+            return;
+        }
+
+        const currentStepLabel = workflowConfig[batch.currentStepId]?.label || batch.currentStepId;
+        const nextStepLabel = workflowConfig[targetStepId]?.label || targetStepId;
+
+        addNote(batch.projectId, `Movimentação direta: ${currentStepLabel} → ${nextStepLabel}`, currentUser?.id || 'sys');
+
+        const updateData = {
+            currentStepId: targetStepId,
+            lastUpdated: new Date().toISOString()
+        };
+
+        if (useCloud) {
+            persist("batches", batchId, updateData);
+        } else {
+            setAllBatches((prev: Batch[]) => prev.map(b => b.id !== batchId ? b : { ...b, ...updateData }));
+        }
+    };
+
     const advanceBatch = (batchId: string) => {
         const batch = allBatches.find(b => b.id === batchId);
         if (!batch) return;
@@ -1148,7 +1176,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             addWorkflowStep, updateWorkflowStep, deleteWorkflowStep, reorderWorkflowSteps,
             addAssistanceStep, updateAssistanceStep, deleteAssistanceStep, reorderAssistanceSteps,
 
-            addProject, advanceBatch, markProjectAsLost, reactivateProject, isLastStep, splitBatch, getProjectById, addNote, updateWorkflowSla, setCurrentProjectId, updateEnvironmentStatus, requestFactoryPart,
+            addProject, advanceBatch, moveBatchToStep, markProjectAsLost, reactivateProject, isLastStep, splitBatch, getProjectById, addNote, updateWorkflowSla, setCurrentProjectId, updateEnvironmentStatus, requestFactoryPart,
             updateEnvironmentDetails, updateClientData, updateProjectITPP, updateProjectSeller,
             addAssistanceTicket, updateAssistanceTicket,
             canUserAdvanceStep, canUserViewStage, canUserEditAssistance,

@@ -4,6 +4,7 @@ import { useProjects } from '../context/ProjectContext';
 import AuditDrawer from './AuditDrawer';
 import LotModal from './LotModal';
 import SplitBatchModal from './SplitBatchModal';
+import StepDecisionModal from './StepDecisionModal';
 
 // Define UI Columns. 
 // IDs 1-8 match the 'stage' property in workflowConfig.
@@ -29,12 +30,13 @@ const KanbanBoard: React.FC = () => {
     const [selectedColumnId, setSelectedColumnId] = useState<number | null>(4);
     const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
     const [subStepFilter, setSubStepFilter] = useState<string | null>(null);
+    const [decisionModalData, setDecisionModalData] = useState<{ batch: Batch, step: any } | null>(null);
 
     // Visibility Toggles
     const [showCompleted, setShowCompleted] = useState(false);
     const [showLost, setShowLost] = useState(false);
 
-    const { batches, projects, workflowConfig, setCurrentProjectId, canUserViewStage, splitBatch, advanceBatch } = useProjects();
+    const { batches, projects, workflowConfig, setCurrentProjectId, canUserViewStage, splitBatch, advanceBatch, moveBatchToStep, canUserAdvanceStep } = useProjects();
 
     // Filter Columns based on User Permissions and Toggles
     const visibleUiColumns = useMemo(() => {
@@ -132,16 +134,62 @@ const KanbanBoard: React.FC = () => {
                         date: new Date(b.lastUpdated).toLocaleDateString(),
                         environmentCount: b.environmentIds.length,
                         currentStepId: b.currentStepId,
-                        projectId: b.projectId
+                        projectId: b.projectId,
+                        batch: b, // Pass the full batch object for actions
+                        step: step, // Pass the full step object for actions
                     };
                 })
             };
         });
-    }, [batches, projects, selectedColumnId, subStepFilter, workflowConfig, visibleUiColumns]);
+    }, [batches, projects, selectedColumnId, subStepFilter, workflowConfig, visibleUiColumns, advanceBatch, moveBatchToStep, canUserAdvanceStep]);
 
     // Handle Card Click
     const handleCardClick = (batchId: string, currentStepId: string, projectId: string) => {
         setCurrentProjectId(projectId);
+    };
+
+    const handleAdvanceClick = (e: React.MouseEvent, batch: Batch) => {
+        e.stopPropagation();
+        const step = workflowConfig[batch.currentStepId];
+
+        // CHECK FOR BRANCHING
+        if (batch.currentStepId === '2.5' || batch.currentStepId === '2.8' || batch.currentStepId === '4.6') {
+            setDecisionModalData({ batch, step });
+            return;
+        }
+
+        // Standard Advance
+        advanceBatch(batch.id);
+    };
+
+    const handleDecisionSelect = (targetStepId: string) => {
+        if (!decisionModalData) return;
+        moveBatchToStep(decisionModalData.batch.id, targetStepId);
+        setDecisionModalData(null);
+    };
+
+    const getBranchingOptions = (stepId: string) => {
+        if (stepId === '2.5') {
+            return [
+                { label: 'Aprovado', description: 'Prosseguir para negociação/fechamento', targetStepId: '2.8', color: 'emerald', icon: 'check_circle' } as const,
+                { label: 'Ajuste Solicitado', description: 'Retornar para ajustes de projeto', targetStepId: '2.6', color: 'orange', icon: 'edit' } as const,
+                { label: 'Follow Up', description: 'Manter em acompanhamento', targetStepId: '2.7', color: 'primary', icon: 'running_with_errors' } as const,
+            ];
+        }
+        if (stepId === '2.8') {
+            return [
+                { label: 'Contrato Assinado', description: 'Iniciar detalhamento de contrato', targetStepId: '2.9', color: 'emerald', icon: 'assignment_turned_in' } as const,
+                { label: 'Revisão de Valores', description: 'Retornar para ajuste de proposta', targetStepId: '2.6', color: 'orange', icon: 'payments' } as const,
+                { label: 'Agendar Nova Reunião', description: 'Realizar mais reuniões de venda', targetStepId: '2.7', color: 'primary', icon: 'calendar_month' } as const,
+            ];
+        }
+        if (stepId === '4.6') {
+            return [
+                { label: 'Tudo Certo', description: 'Prosseguir para aprovação financeira', targetStepId: '4.8', color: 'emerald', icon: 'verified' } as const,
+                { label: 'Precisa Correção', description: 'Retornar para o liberador corrigir', targetStepId: '4.7', color: 'rose', icon: 'build' } as const,
+            ];
+        }
+        return [];
     };
 
     const handleSplitClick = (e: React.MouseEvent, batch: Batch) => {
@@ -399,21 +447,36 @@ const KanbanBoard: React.FC = () => {
                                                 )}
                                             </div>
 
-                                            {/* 5. Split/Advance Button for Specific Stages */}
-                                            {(column.id === 3 || column.id === 4 || column.id === 5) && (
-                                                <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700 flex justify-end">
+                                            {/* 5. Actions */}
+                                            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center gap-2">
+                                                {/* Split button (only for specific stages) */}
+                                                {(column.id === 3 || column.id === 4 || column.id === 5) ? (
                                                     <button
                                                         onClick={(e) => {
                                                             const batch = batches.find(b => b.id === card.id);
                                                             if (batch) handleSplitClick(e, batch);
                                                         }}
-                                                        className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors shadow-sm"
+                                                        className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 border border-blue-100 dark:border-blue-800 rounded transition-colors"
                                                     >
-                                                        <span className="material-symbols-outlined text-[12px]">call_split</span>
-                                                        Dividir / Avançar
+                                                        <span className="material-symbols-outlined text-[14px]">call_split</span>
+                                                        Dividir
                                                     </button>
-                                                </div>
-                                            )}
+                                                ) : <div />}
+
+                                                {/* Main Advance Button (if actionable) */}
+                                                {canUserAdvanceStep(card.currentStepId) && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            const batch = batches.find(b => b.id === card.id);
+                                                            if (batch) handleAdvanceClick(e, batch);
+                                                        }}
+                                                        className="flex items-center gap-1 px-3 py-1 text-[10px] font-bold text-white bg-primary hover:bg-primary-600 rounded shadow-sm transition-all active:scale-95"
+                                                    >
+                                                        <span className="material-symbols-outlined text-[14px]">done_all</span>
+                                                        Concluir
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -429,6 +492,16 @@ const KanbanBoard: React.FC = () => {
                     isOpen={isLotModalOpen}
                     onClose={() => { setIsLotModalOpen(false); setSelectedBatchId(null); }}
                     batchId={selectedBatchId}
+                />
+            )}
+            {decisionModalData && (
+                <StepDecisionModal
+                    isOpen={!!decisionModalData}
+                    onClose={() => setDecisionModalData(null)}
+                    batchName={decisionModalData.batch.name}
+                    currentStep={decisionModalData.step}
+                    options={getBranchingOptions(decisionModalData.batch.currentStepId)}
+                    onSelect={handleDecisionSelect}
                 />
             )}
         </div>

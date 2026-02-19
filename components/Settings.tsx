@@ -16,7 +16,32 @@ const Settings: React.FC = () => {
 
     const { appointmentTypes, addAppointmentType, updateAppointmentType, deleteAppointmentType, agendaUsers, toggleAgendaUser } = useAgenda();
 
-    const [activeTab, setActiveTab] = useState<'COMPANY' | 'USERS' | 'PERMISSIONS' | 'SLA' | 'SLA_ASSISTANCE' | 'ORIGINS' | 'AGENDA'>('COMPANY');
+    const [activeTab, setActiveTab] = useState<'COMPANY' | 'USERS' | 'PERMISSIONS' | 'SLA' | 'SLA_ASSISTANCE' | 'ORIGINS' | 'AGENDA' | 'APPEARANCE'>('COMPANY');
+
+    // Dark Mode State
+    const [theme, setTheme] = useState<'light' | 'dark' | 'auto'>(() => {
+        return (localStorage.getItem('fluxo_erp_theme') as 'light' | 'dark' | 'auto') || 'auto';
+    });
+
+    const handleThemeChange = (newTheme: 'light' | 'dark' | 'auto') => {
+        setTheme(newTheme);
+        localStorage.setItem('fluxo_erp_theme', newTheme);
+        const isDark = newTheme === 'dark' || (newTheme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', isDark);
+    };
+
+    // Logo File Upload Handler
+    const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (file.size > 500 * 1024) { alert('A imagem deve ter no máximo 500KB.'); return; }
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const base64 = ev.target?.result as string;
+            setCompanyLogo(base64);
+        };
+        reader.readAsDataURL(file);
+    };
 
     // User Management Modal State
     const [isUserModalOpen, setIsUserModalOpen] = useState(false);
@@ -323,6 +348,12 @@ const Settings: React.FC = () => {
                     >
                         Agenda
                     </button>
+                    <button
+                        onClick={() => setActiveTab('APPEARANCE')}
+                        className={`pb-4 px-2 font-bold text-sm transition-colors border-b-2 whitespace-nowrap ${activeTab === 'APPEARANCE' ? 'border-primary text-primary' : 'border-transparent text-slate-500'}`}
+                    >
+                        Aparência
+                    </button>
                 </div>
 
                 {/* AGENDA TAB */}
@@ -414,14 +445,29 @@ const Settings: React.FC = () => {
                 {activeTab === 'COMPANY' && (
                     <div className="bg-white dark:bg-[#1a2632] p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 animate-fade-in space-y-6">
                         <div className="flex gap-6 items-start">
-                            <div className="w-32 h-32 bg-slate-100 rounded-xl border-2 border-dashed border-slate-300 flex items-center justify-center shrink-0 overflow-hidden relative">
+                            <div className="w-32 h-32 bg-slate-100 dark:bg-slate-800 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center shrink-0 overflow-hidden relative group cursor-pointer" onClick={() => document.getElementById('logo-upload')?.click()}>
                                 {companyLogo ? <img src={companyLogo} className="w-full h-full object-cover" /> : <span className="text-slate-400 font-bold text-4xl">{companyName.charAt(0)}</span>}
+                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <span className="material-symbols-outlined text-white text-2xl">upload</span>
+                                </div>
+                                <input id="logo-upload" type="file" accept="image/*" className="hidden" onChange={handleLogoFileChange} />
                             </div>
                             <div className="flex-1 space-y-4">
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">URL da Logo</label>
-                                    <input type="text" value={companyLogo} onChange={e => setCompanyLogo(e.target.value)} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm" placeholder="https://..." />
-                                    <p className="text-xs text-slate-400 mt-1">Cole o link direto da imagem.</p>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Logo da Empresa</label>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => document.getElementById('logo-upload')?.click()} className="bg-primary/10 text-primary font-bold py-2 px-4 rounded-lg text-sm hover:bg-primary/20 transition-colors flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-sm">upload</span>
+                                            Enviar Imagem
+                                        </button>
+                                        {companyLogo && (
+                                            <button onClick={() => setCompanyLogo('')} className="bg-rose-50 text-rose-500 font-bold py-2 px-4 rounded-lg text-sm hover:bg-rose-100 transition-colors flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-sm">delete</span>
+                                                Remover
+                                            </button>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-slate-400 mt-2">Formatos aceitos: JPG, PNG, SVG. Máximo 500KB.</p>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-2">ID de Login (Slug)</label>
@@ -914,6 +960,39 @@ const Settings: React.FC = () => {
                                 {saving ? 'Salvando...' : 'Salvar Alterações'}
                             </button>
                             {saveMessage && <span className="text-sm font-medium">{saveMessage}</span>}
+                        </div>
+                    </div>
+                )}
+
+                {/* APPEARANCE TAB */}
+                {activeTab === 'APPEARANCE' && (
+                    <div className="space-y-6 animate-fade-in">
+                        <div className="bg-white dark:bg-[#1a2632] p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+                            <h3 className="font-bold text-slate-800 dark:text-white mb-2">Tema da Interface</h3>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Escolha como o FluxoERP aparece para você.</p>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {([
+                                    { key: 'light' as const, icon: 'light_mode', label: 'Claro', desc: 'Fundo claro com texto escuro' },
+                                    { key: 'dark' as const, icon: 'dark_mode', label: 'Escuro', desc: 'Fundo escuro, ideal para noite' },
+                                    { key: 'auto' as const, icon: 'contrast', label: 'Automático', desc: 'Segue a preferência do sistema' },
+                                ]).map(opt => (
+                                    <button
+                                        key={opt.key}
+                                        onClick={() => handleThemeChange(opt.key)}
+                                        className={`p-5 rounded-xl border-2 text-left transition-all duration-200 ${theme === opt.key
+                                                ? 'border-primary bg-primary/5 dark:bg-primary/10 shadow-md'
+                                                : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                                            }`}
+                                    >
+                                        <div className="flex items-center gap-3 mb-2">
+                                            <span className={`material-symbols-outlined text-2xl ${theme === opt.key ? 'text-primary' : 'text-slate-400'}`}>{opt.icon}</span>
+                                            <span className={`font-bold ${theme === opt.key ? 'text-primary' : 'text-slate-700 dark:text-slate-300'}`}>{opt.label}</span>
+                                            {theme === opt.key && <span className="material-symbols-outlined text-primary text-sm ml-auto">check_circle</span>}
+                                        </div>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">{opt.desc}</p>
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 )}
