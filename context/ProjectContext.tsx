@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo } from 'react';
-import { Project, Batch, WorkflowStep, Environment, Client, User, Role, Note, FactoryOrder, PermissionConfig, AssistanceTicket, CompanySettings, AssistanceWorkflowStep, Store, StoreConfig, PostAssemblyEvaluation } from '../types';
+import { Project, Batch, WorkflowStep, Environment, Client, User, Role, Note, FactoryOrder, PermissionConfig, AssistanceTicket, CompanySettings, AssistanceWorkflowStep, Store, StoreConfig, PostAssemblyEvaluation, AssistanceItem, AssistanceEvent } from '../types';
 import { db } from '../firebase'; // Import Firebase DB
 import { collection, onSnapshot, addDoc, setDoc, doc, updateDoc, deleteDoc, query, where, getDoc, Firestore } from "firebase/firestore";
 
@@ -345,6 +345,7 @@ interface ProjectContextType {
     updateProjectSeller: (projectId: string, sellerId: string, sellerName: string) => void;
     requestFactoryPart: (projectId: string, envId: string, description: string) => void;
     updateProjectPostAssembly: (projectId: string, evaluation: PostAssemblyEvaluation) => void;
+    updateProjectPostAssemblyItems: (projectId: string, data: { items?: AssistanceItem[], events?: AssistanceEvent[], priority?: 'Normal' | 'Urgente' }) => void;
 
     addAssistanceTicket: (ticket: Omit<AssistanceTicket, 'id' | 'createdAt' | 'updatedAt' | 'storeId'>) => void;
     updateAssistanceTicket: (ticket: AssistanceTicket) => void;
@@ -1207,6 +1208,8 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         }
         addNote(projectId, `Avaliação Pós-Montagem registrada. Nota: ${evaluation.rating}/5`, currentUser?.id || 'sys');
     };
+
+
 
     const updateProjectPostAssemblyItems = (projectId: string, data: { items?: AssistanceItem[], events?: AssistanceEvent[], priority?: 'Normal' | 'Urgente' }) => {
         setAllProjects(prev => prev.map(p => {
