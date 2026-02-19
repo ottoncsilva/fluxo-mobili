@@ -67,7 +67,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                     setTime(now.toTimeString().slice(0, 5));
                 }
 
-                setDuration(60);
+                setDuration(30); // Default to 30 mins or whatever preferred
                 setTypeId(appointmentTypes[0]?.id || '');
 
                 // Try to match client from task
@@ -219,21 +219,18 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                     {/* Duration */}
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Duração</label>
-                        <div className="grid grid-cols-4 gap-2">
-                            {[30, 60, 90, 120].map(m => (
-                                <button
-                                    key={m}
-                                    type="button"
-                                    onClick={() => setDuration(m)}
-                                    className={`py-2 px-1 rounded-lg text-xs font-medium border transition-colors ${duration === m
-                                        ? 'bg-primary/10 border-primary text-primary'
-                                        : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300'
-                                        }`}
-                                >
-                                    {m < 60 ? `${m}m` : `${m / 60}h`}
-                                </button>
-                            ))}
-                        </div>
+                        <select
+                            value={duration}
+                            onChange={(e) => setDuration(Number(e.target.value))}
+                            className="w-full rounded-lg border-slate-200 dark:bg-slate-800 dark:border-slate-700 text-sm"
+                        >
+                            <option value={15}>15 minutos</option>
+                            <option value={30}>30 minutos</option>
+                            <option value={60}>1 hora</option>
+                            <option value={90}>1,5 horas</option>
+                            <option value={120}>2 horas</option>
+                            <option value={150}>2,5 horas</option>
+                        </select>
                     </div>
 
                     {/* Notes */}

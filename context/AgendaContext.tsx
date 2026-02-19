@@ -45,10 +45,12 @@ export const AgendaProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     // Default Types
     const defaultTypes: AppointmentType[] = [
-        { id: '1', name: 'Visita Técnica', color: '#3b82f6', requireClient: true }, // Blue
-        { id: '2', name: 'Reunião de Apresentação', color: '#8b5cf6', requireClient: true }, // Purple
-        { id: '3', name: 'Reunião de Fechamento', color: '#10b981', requireClient: true }, // Emerald
-        { id: '4', name: 'Outro', color: '#64748b', requireClient: false }, // Slate
+        { id: '1', name: 'Visita A Obra', color: '#3b82f6', requireClient: false }, // Blue
+        { id: '2', name: 'Reunião de Fechamento', color: '#eab308', requireClient: false }, // Yellow
+        { id: '3', name: 'Medição', color: '#ec4899', requireClient: false }, // Pink
+        { id: '4', name: 'Telefonema', color: '#14b8a6', requireClient: false }, // Teal
+        { id: '5', name: 'Vistoria de Montagem', color: '#ef4444', requireClient: false }, // Red
+        { id: '6', name: 'Primeira Apresentacao', color: '#d946ef', requireClient: false }, // Magenta
     ];
 
     const [appointments, setAppointments] = useState<Appointment[]>([]);

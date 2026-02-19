@@ -5,6 +5,7 @@ import AuditDrawer from './AuditDrawer';
 import LotModal from './LotModal';
 import SplitBatchModal from './SplitBatchModal';
 import StepDecisionModal from './StepDecisionModal';
+import { addBusinessDays, getBusinessDaysDifference } from '../utils/dateUtils';
 
 // Define UI Columns. 
 // IDs 1-8 match the 'stage' property in workflowConfig.
@@ -96,12 +97,33 @@ const KanbanBoard: React.FC = () => {
                     const project = projects.find(p => p.id === b.projectId);
                     const step = workflowConfig[b.currentStepId];
 
-                    // Calculate SLA
+                    // Calculate SLA (Business Days)
                     const now = new Date();
                     const lastUpdate = new Date(b.lastUpdated);
-                    const deadline = new Date(lastUpdate.getTime() + (step.sla * 24 * 60 * 60 * 1000));
-                    const diffTime = deadline.getTime() - now.getTime();
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                    // Deadline is N business days after last update
+                    const deadline = addBusinessDays(lastUpdate, step.sla);
+
+                    // Diff is business days remaining from now to deadline
+                    // If deadline is past, this should be negative
+                    const diffDays = getBusinessDaysDifference(now, deadline);
+
+                    // Fix: getBusinessDaysDifference returns absolute difference or 0 if start > end in my implementation?
+                    // Let's check dateUtils implementation. 
+                    // My implementation: if (start > end) return 0; 
+                    // This is bad for "late" calculation. I need it to return negative if late.
+                    // I will verify dateUtils first or just fix it here.
+                    // Actually, let's just use raw date comparison for "is late" check if getBusinessDaysDifference doesn't handle negative.
+
+                    // Let's trust I will fix dateUtils or use a workaround.
+                    // Workaround: 
+                    let remainingDays = 0;
+                    if (now > deadline) {
+                        // Late
+                        remainingDays = -getBusinessDaysDifference(deadline, now);
+                    } else {
+                        remainingDays = getBusinessDaysDifference(now, deadline);
+                    }
 
                     let slaStatus: 'No Prazo' | 'Atenção' | 'Atrasado' | 'Perdido' | 'Concluido' = 'No Prazo';
                     let slaColor: 'emerald' | 'orange' | 'rose' | 'slate' | 'blue' = 'emerald';
@@ -112,10 +134,10 @@ const KanbanBoard: React.FC = () => {
                     } else if (b.currentStepId === '9.0') {
                         slaStatus = 'Concluido';
                         slaColor = 'blue';
-                    } else if (diffDays < 0) {
+                    } else if (remainingDays < 0) {
                         slaStatus = 'Atrasado';
                         slaColor = 'rose';
-                    } else if (diffDays <= 1) {
+                    } else if (remainingDays <= 1) {
                         slaStatus = 'Atenção';
                         slaColor = 'orange';
                     }
@@ -130,7 +152,7 @@ const KanbanBoard: React.FC = () => {
                         sellerName: project?.sellerName || 'Vendedor',
                         slaStatus,
                         slaColor,
-                        daysDiff: diffDays,
+                        daysDiff: remainingDays,
                         date: new Date(b.lastUpdated).toLocaleDateString(),
                         environmentCount: b.environmentIds.length,
                         currentStepId: b.currentStepId,
@@ -178,9 +200,9 @@ const KanbanBoard: React.FC = () => {
         }
         if (stepId === '2.8') {
             return [
-                { label: 'Contrato Assinado', description: 'Iniciar detalhamento de contrato', targetStepId: '2.9', color: 'emerald', icon: 'assignment_turned_in' } as const,
-                { label: 'Revisão de Valores', description: 'Retornar para ajuste de proposta', targetStepId: '2.6', color: 'orange', icon: 'payments' } as const,
-                { label: 'Agendar Nova Reunião', description: 'Realizar mais reuniões de venda', targetStepId: '2.7', color: 'primary', icon: 'calendar_month' } as const,
+                { label: 'Venda Fechada', description: 'Assinatura do contrato e detalhamento', targetStepId: '2.9', color: 'emerald', icon: 'verified' } as const,
+                { label: 'Ajuste Solicitado', description: 'Retornar para ajustes na proposta', targetStepId: '2.6', color: 'orange', icon: 'edit_square' } as const,
+                { label: 'Ir para Follow-up', description: 'Manter contato para fechamento futuro', targetStepId: '2.7', color: 'primary', icon: 'event_repeat' } as const,
             ];
         }
         if (stepId === '4.6') {

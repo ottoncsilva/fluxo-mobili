@@ -11,12 +11,13 @@ const Settings: React.FC = () => {
         assistanceWorkflow, addAssistanceStep, updateAssistanceStep, deleteAssistanceStep, reorderAssistanceSteps,
         origins, updateOrigins,
         companySettings, updateCompanySettings, currentStore,
-        saveStoreConfig
+        companySettings, updateCompanySettings, currentStore,
+        saveStoreConfig, resetStoreDefaults
     } = useProjects();
 
     const { appointmentTypes, addAppointmentType, updateAppointmentType, deleteAppointmentType, agendaUsers, toggleAgendaUser } = useAgenda();
 
-    const [activeTab, setActiveTab] = useState<'COMPANY' | 'USERS' | 'PERMISSIONS' | 'SLA' | 'SLA_ASSISTANCE' | 'ORIGINS' | 'AGENDA' | 'APPEARANCE'>('COMPANY');
+    const [activeTab, setActiveTab] = useState<'COMPANY' | 'USERS' | 'PERMISSIONS' | 'ORIGINS' | 'AGENDA' | 'APPEARANCE' | 'ASSISTANCE'>('COMPANY');
 
     // Dark Mode State
     const [theme, setTheme] = useState<'light' | 'dark' | 'auto'>(() => {
@@ -324,18 +325,7 @@ const Settings: React.FC = () => {
                     >
                         Cargos e Permissões
                     </button>
-                    <button
-                        onClick={() => setActiveTab('SLA')}
-                        className={`pb-4 px-2 font-bold text-sm transition-colors border-b-2 whitespace-nowrap ${activeTab === 'SLA' ? 'border-primary text-primary' : 'border-transparent text-slate-500'}`}
-                    >
-                        Fluxo de Trabalho (SLA)
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('SLA_ASSISTANCE')}
-                        className={`pb-4 px-2 font-bold text-sm transition-colors border-b-2 whitespace-nowrap ${activeTab === 'SLA_ASSISTANCE' ? 'border-primary text-primary' : 'border-transparent text-slate-500'}`}
-                    >
-                        Fluxo Assistência
-                    </button>
+
                     <button
                         onClick={() => setActiveTab('ORIGINS')}
                         className={`pb-4 px-2 font-bold text-sm transition-colors border-b-2 whitespace-nowrap ${activeTab === 'ORIGINS' ? 'border-primary text-primary' : 'border-transparent text-slate-500'}`}
@@ -347,6 +337,12 @@ const Settings: React.FC = () => {
                         className={`pb-4 px-2 font-bold text-sm transition-colors border-b-2 whitespace-nowrap ${activeTab === 'AGENDA' ? 'border-primary text-primary' : 'border-transparent text-slate-500'}`}
                     >
                         Agenda
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('ASSISTANCE')}
+                        className={`pb-4 px-2 font-bold text-sm transition-colors border-b-2 whitespace-nowrap ${activeTab === 'ASSISTANCE' ? 'border-primary text-primary' : 'border-transparent text-slate-500'}`}
+                    >
+                        Assistência
                     </button>
                     <button
                         onClick={() => setActiveTab('APPEARANCE')}
@@ -723,205 +719,7 @@ const Settings: React.FC = () => {
                     </div>
                 )}
 
-                {/* SLA TAB */}
-                {activeTab === 'SLA' && (
-                    <div className="bg-white dark:bg-[#1a2632] rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden animate-fade-in flex flex-col h-[calc(100vh-200px)]">
-
-                        {/* Header / Add New */}
-                        <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex flex-col md:flex-row gap-4 items-end">
-                            <div className="flex-1 grid grid-cols-2 md:grid-cols-5 gap-2 w-full">
-                                <input type="text" placeholder="ID (ex: 1.4)" value={newStepId} onChange={e => setNewStepId(e.target.value)} className="rounded border-slate-200 text-sm p-2 w-full" />
-                                <input type="text" placeholder="Nome da Etapa" value={newStepLabel} onChange={e => setNewStepLabel(e.target.value)} className="rounded border-slate-200 text-sm p-2 w-full md:col-span-2" />
-                                <select value={newStepRole} onChange={e => setNewStepRole(e.target.value as any)} className="rounded border-slate-200 text-sm p-2 w-full">
-                                    {['Vendedor', 'Projetista', 'Medidor', 'Liberador', 'Financeiro', 'Industria', 'Logistica', 'Coordenador de Montagem', 'Montador', 'Gerente'].map(r => <option key={r}>{r}</option>)}
-                                </select>
-                                <div className="flex gap-1">
-                                    <input type="number" placeholder="SLA" value={newStepSla} onChange={e => setNewStepSla(Number(e.target.value))} className="rounded border-slate-200 text-sm p-2 w-1/2" title="Dias" />
-                                    <input type="number" placeholder="Fase" value={newStepStage} onChange={e => setNewStepStage(Number(e.target.value))} className="rounded border-slate-200 text-sm p-2 w-1/2" title="Fase Kanban (1-9)" min="1" max="9" />
-                                </div>
-                            </div>
-                            <button onClick={handleAddWorkflowStep} className="bg-primary text-white font-bold py-2 px-4 rounded shadow hover:bg-primary-600 whitespace-nowrap">
-                                + Adicionar
-                            </button>
-                        </div>
-
-                        {/* List */}
-                        <div className="flex-1 overflow-y-auto">
-                            <table className="w-full text-left">
-                                <thead className="bg-slate-100 dark:bg-slate-800 sticky top-0 z-10">
-                                    <tr>
-                                        <th className="px-4 py-2 text-xs font-bold text-slate-500 uppercase w-16">Ordem</th>
-                                        <th className="px-4 py-2 text-xs font-bold text-slate-500 uppercase w-20">ID</th>
-                                        <th className="px-4 py-2 text-xs font-bold text-slate-500 uppercase">Etapa</th>
-                                        <th className="px-4 py-2 text-xs font-bold text-slate-500 uppercase">Responsável</th>
-                                        <th className="px-4 py-2 text-xs font-bold text-slate-500 uppercase w-20">SLA</th>
-                                        <th className="px-4 py-2 text-xs font-bold text-slate-500 uppercase w-20">Fase</th>
-                                        <th className="px-4 py-2 text-xs font-bold text-slate-500 uppercase w-16">Ação</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                    {workflowOrder.map((stepId, index) => {
-                                        const step = workflowConfig[stepId];
-                                        if (!step) return null;
-                                        const isLocked = step.id === '9.0' || step.id === '9.1';
-                                        return (
-                                            <tr key={stepId} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                                                <td className="px-4 py-2">
-                                                    <div className="flex flex-col gap-1">
-                                                        <button onClick={() => handleMoveWorkflowStep(index, 'up')} disabled={index === 0} className="text-slate-400 hover:text-primary disabled:opacity-30"><span className="material-symbols-outlined text-sm">keyboard_arrow_up</span></button>
-                                                        <button onClick={() => handleMoveWorkflowStep(index, 'down')} disabled={index === workflowOrder.length - 1} className="text-slate-400 hover:text-primary disabled:opacity-30"><span className="material-symbols-outlined text-sm">keyboard_arrow_down</span></button>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-2 text-sm font-mono text-slate-500">
-                                                    {step.id}
-                                                    {isLocked && <span className="ml-1 text-xs text-amber-500" title="Etapa do Sistema (Bloqueada)">🔒</span>}
-                                                </td>
-                                                <td className="px-4 py-2">
-                                                    <input
-                                                        type="text"
-                                                        value={step.label}
-                                                        onChange={(e) => updateWorkflowStep(step.id, { label: e.target.value })}
-                                                        disabled={isLocked}
-                                                        className="w-full bg-transparent border-none p-0 text-sm font-medium text-slate-800 dark:text-white focus:ring-0 disabled:opacity-60"
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-2">
-                                                    <select
-                                                        value={step.ownerRole}
-                                                        onChange={(e) => updateWorkflowStep(step.id, { ownerRole: e.target.value as any })}
-                                                        disabled={isLocked}
-                                                        className="bg-transparent border-none p-0 text-sm text-slate-600 dark:text-slate-300 focus:ring-0 cursor-pointer disabled:opacity-60"
-                                                    >
-                                                        {['Vendedor', 'Projetista', 'Medidor', 'Liberador', 'Financeiro', 'Industria', 'Logistica', 'Coordenador de Montagem', 'Montador', 'Gerente'].map(r => <option key={r} value={r}>{r}</option>)}
-                                                    </select>
-                                                </td>
-                                                <td className="px-4 py-2">
-                                                    <input
-                                                        type="number"
-                                                        value={step.sla}
-                                                        onChange={(e) => updateWorkflowStep(step.id, { sla: Number(e.target.value) })}
-                                                        disabled={isLocked}
-                                                        className="w-16 rounded border-slate-200 text-sm py-1 h-8 disabled:opacity-60"
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-2">
-                                                    <input
-                                                        type="number"
-                                                        value={step.stage}
-                                                        onChange={(e) => updateWorkflowStep(step.id, { stage: Number(e.target.value) })}
-                                                        disabled={isLocked}
-                                                        className="w-16 rounded border-slate-200 text-sm py-1 h-8 disabled:opacity-60"
-                                                        min="1" max="9"
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-2 text-center">
-                                                    {!isLocked && (
-                                                        <button onClick={() => { if (confirm('Excluir esta etapa?')) deleteWorkflowStep(step.id); }} className="text-slate-400 hover:text-rose-500 transition-colors">
-                                                            <span className="material-symbols-outlined text-lg">delete</span>
-                                                        </button>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* Save Button */}
-                        <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex items-center gap-4">
-                            <button
-                                onClick={handleSaveConfig}
-                                disabled={saving}
-                                className="bg-green-600 text-white font-bold py-3 px-8 rounded-lg text-sm hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 shadow-lg"
-                            >
-                                <span className="material-symbols-outlined text-sm">save</span>
-                                {saving ? 'Salvando...' : 'Salvar Alterações'}
-                            </button>
-                            {saveMessage && <span className="text-sm font-medium">{saveMessage}</span>}
-                        </div>
-                    </div>
-                )}
-
-                {/* SLA ASSISTANCE TAB */}
-                {activeTab === 'SLA_ASSISTANCE' && (
-                    <div className="bg-white dark:bg-[#1a2632] rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden animate-fade-in flex flex-col h-[calc(100vh-200px)]">
-
-                        {/* Header / Add New */}
-                        <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex flex-col md:flex-row gap-4 items-end">
-                            <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-2 w-full">
-                                <input type="text" placeholder="Cód (ex: 10.1)" value={newAssistId} onChange={e => setNewAssistId(e.target.value)} className="rounded border-slate-200 text-sm p-2 w-full" />
-                                <input type="text" placeholder="Nome da Etapa" value={newAssistLabel} onChange={e => setNewAssistLabel(e.target.value)} className="rounded border-slate-200 text-sm p-2 w-full md:col-span-2" />
-                                <input type="number" placeholder="SLA (Dias)" value={newAssistSla} onChange={e => setNewAssistSla(Number(e.target.value))} className="rounded border-slate-200 text-sm p-2 w-full" />
-                            </div>
-                            <button onClick={handleAddAssistStep} className="bg-primary text-white font-bold py-2 px-4 rounded shadow hover:bg-primary-600 whitespace-nowrap">
-                                + Adicionar
-                            </button>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto">
-                            <table className="w-full text-left">
-                                <thead className="bg-slate-100 dark:bg-slate-800 sticky top-0 z-10">
-                                    <tr>
-                                        <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase w-16">Ordem</th>
-                                        <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase w-24">Código</th>
-                                        <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Etapa do Fluxo</th>
-                                        <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase w-24">SLA</th>
-                                        <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase w-16">Ação</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                    {assistanceWorkflow.map((step, index) => (
-                                        <tr key={step.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                                            <td className="px-6 py-3">
-                                                <div className="flex flex-col gap-1">
-                                                    <button onClick={() => handleMoveAssistStep(index, 'up')} disabled={index === 0} className="text-slate-400 hover:text-primary disabled:opacity-30"><span className="material-symbols-outlined text-sm">keyboard_arrow_up</span></button>
-                                                    <button onClick={() => handleMoveAssistStep(index, 'down')} disabled={index === assistanceWorkflow.length - 1} className="text-slate-400 hover:text-primary disabled:opacity-30"><span className="material-symbols-outlined text-sm">keyboard_arrow_down</span></button>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-3 text-sm font-mono text-slate-400">{step.id}</td>
-                                            <td className="px-6 py-3">
-                                                <input
-                                                    type="text"
-                                                    value={step.label}
-                                                    onChange={(e) => updateAssistanceStep(step.id, { label: e.target.value })}
-                                                    className="w-full bg-transparent border-none p-0 text-sm font-medium text-slate-800 dark:text-white focus:ring-0"
-                                                />
-                                            </td>
-                                            <td className="px-6 py-3">
-                                                <input
-                                                    type="number"
-                                                    value={step.sla}
-                                                    onChange={(e) => updateAssistanceStep(step.id, { sla: Number(e.target.value) })}
-                                                    className="w-20 rounded border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm py-1"
-                                                />
-                                            </td>
-                                            <td className="px-6 py-3 text-center">
-                                                <button onClick={() => { if (confirm('Excluir?')) deleteAssistanceStep(step.id); }} className="text-slate-400 hover:text-rose-500 transition-colors">
-                                                    <span className="material-symbols-outlined text-lg">delete</span>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* Save Button */}
-                        <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex items-center gap-4">
-                            <button
-                                onClick={handleSaveConfig}
-                                disabled={saving}
-                                className="bg-green-600 text-white font-bold py-3 px-8 rounded-lg text-sm hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 shadow-lg"
-                            >
-                                <span className="material-symbols-outlined text-sm">save</span>
-                                {saving ? 'Salvando...' : 'Salvar Alterações'}
-                            </button>
-                            {saveMessage && <span className="text-sm font-medium">{saveMessage}</span>}
-                        </div>
-                    </div>
-                )}
-
+                {/* ORIGINS TAB */}
                 {activeTab === 'ORIGINS' && (
                     <div className="space-y-6 animate-fade-in">
                         <div className="bg-white dark:bg-[#1a2632] p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
@@ -936,7 +734,20 @@ const Settings: React.FC = () => {
                         </div>
 
                         <div className="bg-white dark:bg-[#1a2632] rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
-                            <h3 className="font-bold text-slate-800 dark:text-white mb-4">Origens Cadastradas</h3>
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-bold text-slate-800 dark:text-white">Origens Cadastradas</h3>
+                                <button
+                                    onClick={async () => {
+                                        if (window.confirm('Tem certeza? Isso redefinirá as origens para o padrão do sistema.')) {
+                                            await resetStoreDefaults('origins');
+                                            alert('Origens restauradas!');
+                                        }
+                                    }}
+                                    className="text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 px-3 py-1 rounded text-xs font-bold border border-rose-200 dark:border-rose-800 transition-colors"
+                                >
+                                    Restaurar Padrão
+                                </button>
+                            </div>
                             <div className="flex flex-wrap gap-3">
                                 {origins.map(orig => (
                                     <div key={orig} className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
@@ -962,157 +773,199 @@ const Settings: React.FC = () => {
                             {saveMessage && <span className="text-sm font-medium">{saveMessage}</span>}
                         </div>
                     </div>
-                )}
+                )
+                }
 
                 {/* APPEARANCE TAB */}
-                {activeTab === 'APPEARANCE' && (
-                    <div className="space-y-6 animate-fade-in">
-                        <div className="bg-white dark:bg-[#1a2632] p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
-                            <h3 className="font-bold text-slate-800 dark:text-white mb-2">Tema da Interface</h3>
-                            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Escolha como o FluxoERP aparece para você.</p>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                {([
-                                    { key: 'light' as const, icon: 'light_mode', label: 'Claro', desc: 'Fundo claro com texto escuro' },
-                                    { key: 'dark' as const, icon: 'dark_mode', label: 'Escuro', desc: 'Fundo escuro, ideal para noite' },
-                                    { key: 'auto' as const, icon: 'contrast', label: 'Automático', desc: 'Segue a preferência do sistema' },
-                                ]).map(opt => (
-                                    <button
-                                        key={opt.key}
-                                        onClick={() => handleThemeChange(opt.key)}
-                                        className={`p-5 rounded-xl border-2 text-left transition-all duration-200 ${theme === opt.key
+                {
+                    activeTab === 'APPEARANCE' && (
+                        <div className="space-y-6 animate-fade-in">
+                            <div className="bg-white dark:bg-[#1a2632] p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+                                <h3 className="font-bold text-slate-800 dark:text-white mb-2">Tema da Interface</h3>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Escolha como o FluxoERP aparece para você.</p>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    {([
+                                        { key: 'light' as const, icon: 'light_mode', label: 'Claro', desc: 'Fundo claro com texto escuro' },
+                                        { key: 'dark' as const, icon: 'dark_mode', label: 'Escuro', desc: 'Fundo escuro, ideal para noite' },
+                                        { key: 'auto' as const, icon: 'contrast', label: 'Automático', desc: 'Segue a preferência do sistema' },
+                                    ]).map(opt => (
+                                        <button
+                                            key={opt.key}
+                                            onClick={() => handleThemeChange(opt.key)}
+                                            className={`p-5 rounded-xl border-2 text-left transition-all duration-200 ${theme === opt.key
                                                 ? 'border-primary bg-primary/5 dark:bg-primary/10 shadow-md'
                                                 : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
-                                            }`}
-                                    >
-                                        <div className="flex items-center gap-3 mb-2">
-                                            <span className={`material-symbols-outlined text-2xl ${theme === opt.key ? 'text-primary' : 'text-slate-400'}`}>{opt.icon}</span>
-                                            <span className={`font-bold ${theme === opt.key ? 'text-primary' : 'text-slate-700 dark:text-slate-300'}`}>{opt.label}</span>
-                                            {theme === opt.key && <span className="material-symbols-outlined text-primary text-sm ml-auto">check_circle</span>}
+                                                }`}
+                                        >
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <span className={`material-symbols-outlined text-2xl ${theme === opt.key ? 'text-primary' : 'text-slate-400'}`}>{opt.icon}</span>
+                                                <span className={`font-bold ${theme === opt.key ? 'text-primary' : 'text-slate-700 dark:text-slate-300'}`}>{opt.label}</span>
+                                                {theme === opt.key && <span className="material-symbols-outlined text-primary text-sm ml-auto">check_circle</span>}
+                                            </div>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400">{opt.desc}</p>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )
+                }
+
+                {/* ASSISTANCE TAB */}
+                {activeTab === 'ASSISTANCE' && (
+                    <div className="space-y-6 animate-fade-in">
+                        <div className="bg-white dark:bg-[#1a2632] p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+                            <div className="flex justify-between items-center mb-6">
+                                <div>
+                                    <h3 className="font-bold text-slate-800 dark:text-white">Fluxo de Assistência Técnica</h3>
+                                    <p className="text-sm text-slate-500">Defina as etapas do processo de assistência.</p>
+                                </div>
+                                <button
+                                    onClick={async () => {
+                                        if (window.confirm('Tem certeza? Isso redefinirá as etapas de assistência para o padrão do sistema. Personalizações serão perdidas.')) {
+                                            await resetStoreDefaults('assistance');
+                                            alert('Padrões restaurados!');
+                                        }
+                                    }}
+                                    className="text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 px-3 py-1 rounded text-xs font-bold border border-rose-200 dark:border-rose-800 transition-colors"
+                                >
+                                    Restaurar Padrão
+                                </button>
+                            </div>
+
+                            <div className="space-y-2">
+                                {assistanceWorkflow.map((step) => (
+                                    <div key={step.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-800">
+                                        <div className="flex items-center gap-3">
+                                            <span className="font-mono text-xs font-bold text-slate-400 bg-slate-200 dark:bg-slate-700 px-2 py-1 rounded">{step.id}</span>
+                                            <span className="font-bold text-slate-700 dark:text-slate-200">{step.label}</span>
+                                            <span className="text-xs text-slate-500">SLA: {step.sla} dias</span>
                                         </div>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400">{opt.desc}</p>
-                                    </button>
+                                    </div>
                                 ))}
                             </div>
                         </div>
                     </div>
                 )}
-            </div>
+            </div >
 
             {/* User Edit Modal */}
-            {isUserModalOpen && (
-                <div
-                    className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fade-in"
-                    onClick={() => setIsUserModalOpen(false)}
-                >
+            {
+                isUserModalOpen && (
                     <div
-                        className="bg-white dark:bg-[#1a2632] w-full max-w-4xl max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-scale-up"
-                        onClick={(e) => e.stopPropagation()}
+                        className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fade-in"
+                        onClick={() => setIsUserModalOpen(false)}
                     >
-                        <div className="px-8 py-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-[#1a2632] shrink-0">
-                            <h2 className="text-xl font-bold text-slate-900 dark:text-white">{editingUser ? 'Editar Colaborador' : 'Novo Colaborador'}</h2>
-                            <button onClick={() => setIsUserModalOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-500">
-                                <span className="material-symbols-outlined">close</span>
-                            </button>
-                        </div>
+                        <div
+                            className="bg-white dark:bg-[#1a2632] w-full max-w-4xl max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-scale-up"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="px-8 py-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-[#1a2632] shrink-0">
+                                <h2 className="text-xl font-bold text-slate-900 dark:text-white">{editingUser ? 'Editar Colaborador' : 'Novo Colaborador'}</h2>
+                                <button onClick={() => setIsUserModalOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-500">
+                                    <span className="material-symbols-outlined">close</span>
+                                </button>
+                            </div>
 
-                        <div className="flex-1 overflow-y-auto p-8 space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="md:col-span-2">
-                                    <h3 className="text-sm font-bold text-primary uppercase tracking-wider mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">Dados Pessoais</h3>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Nome Completo</label>
-                                    <input type="text" value={uName} onChange={e => setUName(e.target.value)} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">CPF</label>
-                                    <input type="text" value={uCpf} onChange={e => setUCpf(e.target.value)} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm" placeholder="000.000.000-00" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">RG</label>
-                                    <input type="text" value={uRg} onChange={e => setURg(e.target.value)} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Telefone / WhatsApp</label>
-                                    <input type="text" value={uPhone} onChange={e => setUPhone(e.target.value)} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm" />
-                                </div>
-                                <div className="md:col-span-2">
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Endereço Completo</label>
-                                    <input type="text" value={uAddress} onChange={e => setUAddress(e.target.value)} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm" />
-                                </div>
-
-                                <div className="md:col-span-2 mt-4">
-                                    <h3 className="text-sm font-bold text-primary uppercase tracking-wider mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">Dados Corporativos</h3>
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Cargo / Função</label>
-                                    <select value={uRole} onChange={e => setURole(e.target.value as Role)} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm">
-                                        <option>Vendedor</option>
-                                        <option>Projetista</option>
-                                        <option>Medidor</option>
-                                        <option>Liberador</option>
-                                        <option>Financeiro</option>
-                                        <option>Industria</option>
-                                        <option>Coordenador de Montagem</option>
-                                        <option>Montador</option>
-                                        <option>Logistica</option>
-                                        <option>Gerente</option>
-                                        <option>Proprietario</option>
-                                        <option>Admin</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Tipo de Contrato</label>
-                                    <select value={uContract} onChange={e => setUContract(e.target.value as any)} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm">
-                                        <option>CLT</option>
-                                        <option>PJ</option>
-                                    </select>
-                                </div>
-
-                                <div className="md:col-span-2 mt-4">
-                                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2 mb-4">
-                                        <h3 className="text-sm font-bold text-primary uppercase tracking-wider">Acesso ao Sistema</h3>
-                                        <label className="flex items-center gap-2 cursor-pointer">
-                                            <input type="checkbox" checked={uIsSystemUser} onChange={e => setUIsSystemUser(e.target.checked)} className="rounded text-primary focus:ring-primary" />
-                                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Este funcionário utiliza o ERP?</span>
-                                        </label>
+                            <div className="flex-1 overflow-y-auto p-8 space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="md:col-span-2">
+                                        <h3 className="text-sm font-bold text-primary uppercase tracking-wider mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">Dados Pessoais</h3>
                                     </div>
-                                </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Nome Completo</label>
+                                        <input type="text" value={uName} onChange={e => setUName(e.target.value)} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">CPF</label>
+                                        <input type="text" value={uCpf} onChange={e => setUCpf(e.target.value)} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm" placeholder="000.000.000-00" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">RG</label>
+                                        <input type="text" value={uRg} onChange={e => setURg(e.target.value)} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Telefone / WhatsApp</label>
+                                        <input type="text" value={uPhone} onChange={e => setUPhone(e.target.value)} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm" />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Endereço Completo</label>
+                                        <input type="text" value={uAddress} onChange={e => setUAddress(e.target.value)} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm" />
+                                    </div>
 
-                                {uIsSystemUser && (
-                                    <>
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Usuário de Login</label>
-                                            <input
-                                                type="text"
-                                                value={uUsername}
-                                                onChange={e => setUUsername(e.target.value)}
-                                                className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm"
-                                                placeholder="usuario.sobrenome"
-                                            />
+                                    <div className="md:col-span-2 mt-4">
+                                        <h3 className="text-sm font-bold text-primary uppercase tracking-wider mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">Dados Corporativos</h3>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Cargo / Função</label>
+                                        <select value={uRole} onChange={e => setURole(e.target.value as Role)} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm">
+                                            <option>Vendedor</option>
+                                            <option>Projetista</option>
+                                            <option>Medidor</option>
+                                            <option>Liberador</option>
+                                            <option>Financeiro</option>
+                                            <option>Industria</option>
+                                            <option>Coordenador de Montagem</option>
+                                            <option>Montador</option>
+                                            <option>Logistica</option>
+                                            <option>Gerente</option>
+                                            <option>Proprietario</option>
+                                            <option>Admin</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Tipo de Contrato</label>
+                                        <select value={uContract} onChange={e => setUContract(e.target.value as any)} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm">
+                                            <option>CLT</option>
+                                            <option>PJ</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="md:col-span-2 mt-4">
+                                        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2 mb-4">
+                                            <h3 className="text-sm font-bold text-primary uppercase tracking-wider">Acesso ao Sistema</h3>
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input type="checkbox" checked={uIsSystemUser} onChange={e => setUIsSystemUser(e.target.checked)} className="rounded text-primary focus:ring-primary" />
+                                                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Este funcionário utiliza o ERP?</span>
+                                            </label>
                                         </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Email (Opcional)</label>
-                                            <input type="email" value={uEmail} onChange={e => setUEmail(e.target.value)} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Senha</label>
-                                            <input type="password" value={uPass} onChange={e => setUPass(e.target.value)} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm" placeholder={editingUser ? "Deixe em branco para manter" : "Senha inicial"} />
-                                        </div>
-                                    </>
-                                )}
+                                    </div>
+
+                                    {uIsSystemUser && (
+                                        <>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Usuário de Login</label>
+                                                <input
+                                                    type="text"
+                                                    value={uUsername}
+                                                    onChange={e => setUUsername(e.target.value)}
+                                                    className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm"
+                                                    placeholder="usuario.sobrenome"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Email (Opcional)</label>
+                                                <input type="email" value={uEmail} onChange={e => setUEmail(e.target.value)} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Senha</label>
+                                                <input type="password" value={uPass} onChange={e => setUPass(e.target.value)} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm" placeholder={editingUser ? "Deixe em branco para manter" : "Senha inicial"} />
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="p-6 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex justify-end gap-3">
+                                <button onClick={() => setIsUserModalOpen(false)} className="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-600 dark:text-slate-300">Cancelar</button>
+                                <button onClick={handleSaveUser} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary-600">Salvar</button>
                             </div>
                         </div>
-
-                        <div className="p-6 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex justify-end gap-3">
-                            <button onClick={() => setIsUserModalOpen(false)} className="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-600 dark:text-slate-300">Cancelar</button>
-                            <button onClick={handleSaveUser} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary-600">Salvar</button>
-                        </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };
 

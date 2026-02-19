@@ -34,8 +34,7 @@ const INITIAL_WORKFLOW_CONFIG: Record<string, WorkflowStep> = {
     '4.5': { id: '4.5', label: 'Detalhamento Executivo', ownerRole: 'Liberador', sla: 3, stage: 4 },
     '4.6': { id: '4.6', label: 'Aprovação do Executivo', ownerRole: 'Vendedor', sla: 2, stage: 4 },
     '4.7': { id: '4.7', label: 'Correção', ownerRole: 'Liberador', sla: 1, stage: 4 },
-    '4.8': { id: '4.8', label: 'Aprov. Financeira (Executivo)', ownerRole: 'Financeiro', sla: 1, stage: 4 },
-    '4.9': { id: '4.9', label: 'Aprov. Executivo (Final)', ownerRole: 'Liberador', sla: 0, stage: 4 },
+    '4.8': { id: '4.8', label: 'Aprov. Executivo (Final)', ownerRole: 'Liberador', sla: 0, stage: 4 },
 
     // 5 - Fabricação
     '5.1': { id: '5.1', label: 'Implantação', ownerRole: 'Financeiro', sla: 1, stage: 5 },
@@ -66,7 +65,7 @@ const INITIAL_WORKFLOW_ORDER = [
     '1.1', '1.2', '1.3',
     '2.1', '2.2', '2.3', '2.4', '2.5', '2.6', '2.7', '2.8', '2.9', '2.10',
     '3.1', '3.2',
-    '4.1', '4.2', '4.3', '4.4', '4.5', '4.6', '4.7', '4.8', '4.9',
+    '4.1', '4.2', '4.3', '4.4', '4.5', '4.6', '4.7', '4.8',
     '5.1', '5.2',
     '6.1', '6.2', '6.3',
     '7.1', '7.2',
@@ -95,7 +94,21 @@ const DEFAULT_COMPANY_SETTINGS: CompanySettings = {
     socialMedia: '@fluxomodelo'
 };
 
-const DEFAULT_ORIGINS = ['Captação (Vendedor)', 'Porta de Loja', 'Indicação Cliente', 'Indicação Especif.', 'Recompra', 'Redes Sociais', 'Google Ads'];
+const DEFAULT_ORIGINS = [
+    'Captação (Vendedor)',
+    'Porta de Loja',
+    'Indicação Cliente',
+    'Recompra',
+    'Google Ads',
+    'Arquiteto',
+    'Engenheiro',
+    'Instagram',
+    'Facebook',
+    'Captação (Gerente)',
+    'Captação (Proprietario)',
+    'Construtora',
+    'Corretor'
+];
 const ALL_STEPS = Object.keys(INITIAL_WORKFLOW_CONFIG);
 const ALL_STAGES = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
@@ -1167,6 +1180,34 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         setAssistanceTickets(prev => prev.map(t => t.id === ticket.id ? { ...ticket, updatedAt: new Date().toISOString() } : t));
     };
 
+    const resetStoreDefaults = async (type: 'origins' | 'assistance' | 'all') => {
+        if (!currentStore) return false;
+
+        let updates: any = {};
+
+        if (type === 'origins' || type === 'all') {
+            setOrigins(DEFAULT_ORIGINS);
+            updates.origins = DEFAULT_ORIGINS;
+        }
+
+        if (type === 'assistance' || type === 'all') {
+            setAssistanceWorkflow(INITIAL_ASSISTANCE_WORKFLOW);
+            updates.assistanceWorkflow = INITIAL_ASSISTANCE_WORKFLOW;
+        }
+
+        if (useCloud && Object.keys(updates).length > 0) {
+            try {
+                const storeRef = doc(db, 'stores', currentStore.id);
+                await updateDoc(storeRef, updates);
+                return true;
+            } catch (e) {
+                console.error("Error resetting defaults:", e);
+                return false;
+            }
+        }
+        return true;
+    };
+
     return (
         <ProjectContext.Provider value={{
             currentUser, currentStore, users, stores, allUsers, projects, batches, workflowConfig, workflowOrder, permissions, currentProjectId, origins, assistanceTickets, companySettings, assistanceWorkflow,
@@ -1180,7 +1221,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             updateEnvironmentDetails, updateClientData, updateProjectITPP, updateProjectSeller,
             addAssistanceTicket, updateAssistanceTicket,
             canUserAdvanceStep, canUserViewStage, canUserEditAssistance,
-            saveStoreConfig
+            saveStoreConfig, resetStoreDefaults
         }}>
             {children}
         </ProjectContext.Provider>

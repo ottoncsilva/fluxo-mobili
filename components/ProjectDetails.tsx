@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useProjects } from '../context/ProjectContext';
-import { Client, Environment } from '../types';
+import { Client, Environment, Batch, WorkflowStep, Role } from '../types';
+import StepDecisionModal from './StepDecisionModal';
+import LotModal from './LotModal';
+import SplitBatchModal from './SplitBatchModal';
 
 interface ProjectDetailsProps {
     onBack: () => void;
 }
 
-const ProjectDetails: React.FC<ProjectDetailsProps> = ({ onBack }) => {
-    const { currentProjectId, getProjectById, batches, workflowConfig, addNote, advanceBatch, markProjectAsLost, reactivateProject, currentUser, updateEnvironmentDetails, updateProjectITPP, updateClientData, origins, isLastStep, canUserAdvanceStep, allUsers, permissions, updateProjectSeller } = useProjects();
+export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
+    const { currentProjectId, getProjectById, batches, workflowConfig, addNote, advanceBatch, moveBatchToStep, splitBatch, markProjectAsLost, reactivateProject, currentUser, updateEnvironmentDetails, updateProjectITPP, updateClientData, origins, isLastStep, canUserAdvanceStep, allUsers, permissions, updateProjectSeller } = useProjects();
     const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'ENVIRONMENTS' | 'ITPP' | 'TIMELINE'>('OVERVIEW');
     const [noteContent, setNoteContent] = useState('');
 
@@ -28,13 +31,20 @@ const ProjectDetails: React.FC<ProjectDetailsProps> = ({ onBack }) => {
     const [isLostModalOpen, setIsLostModalOpen] = useState(false);
     const [lostReason, setLostReason] = useState('');
 
+    // Branching & Split State
+    const [decisionModalData, setDecisionModalData] = useState<{ batch: Batch, step: WorkflowStep } | null>(null);
+    const [selectedBatchIdForSplit, setSelectedBatchIdForSplit] = useState<string | null>(null);
+    const [isLotModalOpen, setIsLotModalOpen] = useState(false);
+    const [splitModalBatch, setSplitModalBatch] = useState<Batch | null>(null);
+    const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
+
     const project = currentProjectId ? getProjectById(currentProjectId) : null;
 
     // Calculate Totals
     const totalEnvironmentsValue = useMemo(() => {
         if (!project) return 0;
-        return project.environments.reduce((sum, env) => sum + (env.estimated_value || 0), 0);
-    }, [project]);
+        return project.environments.reduce((sum: number, env: Environment) => sum + (env.estimated_value || 0), 0);
+    }, [project?.environments]);
 
     useEffect(() => {
         if (project && isEditClientOpen) {
@@ -61,7 +71,7 @@ const ProjectDetails: React.FC<ProjectDetailsProps> = ({ onBack }) => {
 
     if (!project) return null;
 
-    const projectBatches = batches.filter(b => b.projectId === project.id);
+    const projectBatches = batches.filter((b: Batch) => b.projectId === project.id);
 
     const handleAddNote = () => {
         if (!noteContent.trim() || !currentUser) return;
@@ -69,13 +79,74 @@ const ProjectDetails: React.FC<ProjectDetailsProps> = ({ onBack }) => {
         setNoteContent('');
     };
 
-    const handleAdvance = (batchId: string) => {
-        setIsUpdatingStep(batchId);
-        // Small timeout to allow UI to show processing state before potential heavy re-render or just for feedback
+    const handleAdvance = (batch: Batch) => {
+        const step = workflowConfig[batch.currentStepId];
+
+        // CHECK FOR BRANCHING
+        if (batch.currentStepId === '2.5' || batch.currentStepId === '2.8' || batch.currentStepId === '4.6') {
+            setDecisionModalData({ batch, step });
+            return;
+        }
+
+        setIsUpdatingStep(batch.id);
         setTimeout(() => {
-            advanceBatch(batchId);
+            advanceBatch(batch.id);
             setIsUpdatingStep(null);
         }, 300);
+    };
+
+    const handleDecisionSelect = (targetStepId: string) => {
+        if (!decisionModalData) return;
+        moveBatchToStep(decisionModalData.batch.id, targetStepId);
+        setDecisionModalData(null);
+    };
+
+    const getBranchingOptions = (stepId: string) => {
+        if (stepId === '2.5') {
+            return [
+                { label: 'Aprovado', description: 'Prosseguir para negociação/fechamento', targetStepId: '2.8', color: 'emerald', icon: 'check_circle' } as const,
+                { label: 'Ajuste Solicitado', description: 'Retornar para ajustes de projeto', targetStepId: '2.6', color: 'orange', icon: 'edit' } as const,
+                { label: 'Follow Up', description: 'Manter em acompanhamento', targetStepId: '2.7', color: 'primary', icon: 'running_with_errors' } as const,
+            ];
+        }
+        if (stepId === '2.8') {
+            return [
+                { label: 'Venda Fechada', description: 'Assinatura do contrato e detalhamento', targetStepId: '2.9', color: 'emerald', icon: 'verified' } as const,
+                { label: 'Ajuste Solicitado', description: 'Retornar para ajustes na proposta', targetStepId: '2.6', color: 'orange', icon: 'edit_square' } as const,
+                { label: 'Ir para Follow-up', description: 'Manter contato para fechamento futuro', targetStepId: '2.7', color: 'primary', icon: 'event_repeat' } as const,
+            ];
+        }
+        if (stepId === '4.6') {
+            return [
+                { label: 'Tudo Certo', description: 'Prosseguir para aprovação financeira', targetStepId: '4.8', color: 'emerald', icon: 'verified' } as const,
+                { label: 'Precisa Correção', description: 'Retornar para o liberador corrigir', targetStepId: '4.7', color: 'rose', icon: 'build' } as const,
+            ];
+        }
+        return [];
+    };
+
+    const handleSplitClick = (batch: Batch) => {
+        setSplitModalBatch(batch);
+        setIsSplitModalOpen(true);
+    };
+
+    const handleSplitConfirmed = async (selectedIds: string[]) => {
+        if (!splitModalBatch) return;
+
+        if (selectedIds.length === splitModalBatch.environmentIds.length) {
+            setIsUpdatingStep(splitModalBatch.id);
+            await advanceBatch(splitModalBatch.id);
+            setIsUpdatingStep(null);
+        } else {
+            const newBatchId = splitBatch(splitModalBatch.id, selectedIds);
+            if (newBatchId) {
+                setIsUpdatingStep(newBatchId);
+                await advanceBatch(newBatchId);
+                setIsUpdatingStep(null);
+            }
+        }
+        setIsSplitModalOpen(false);
+        setSplitModalBatch(null);
     };
 
     const handleSaveClientData = () => {
@@ -120,7 +191,7 @@ const ProjectDetails: React.FC<ProjectDetailsProps> = ({ onBack }) => {
 
     // Helper to check if current user can edit client data (Sales/Admin only usually)
     const canEditClient = currentUser?.role === 'Admin' || currentUser?.role === 'Vendedor' || currentUser?.role === 'Proprietario' || currentUser?.role === 'Gerente';
-    const canChangeSeller = permissions.find(p => p.role === currentUser?.role)?.canChangeSeller || false;
+    const canChangeSeller = permissions.find((p: { role: Role }) => p.role === currentUser?.role)?.canChangeSeller || false;
 
     return (
         <div className="flex flex-col h-full bg-slate-50 dark:bg-[#101922] overflow-hidden">
@@ -180,7 +251,7 @@ const ProjectDetails: React.FC<ProjectDetailsProps> = ({ onBack }) => {
             {/* Tabs */}
             <div className="px-6 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1a2632] shrink-0">
                 <div className="flex gap-8">
-                    {['OVERVIEW', 'ENVIRONMENTS', 'ITPP', 'TIMELINE'].map(tab => (
+                    {(['OVERVIEW', 'ENVIRONMENTS', 'ITPP', 'TIMELINE'] as const).map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab as any)}
@@ -201,7 +272,7 @@ const ProjectDetails: React.FC<ProjectDetailsProps> = ({ onBack }) => {
                 {/* OVERVIEW TAB */}
                 {activeTab === 'OVERVIEW' && (
                     <div className="space-y-6">
-                        {projectBatches.map(batch => {
+                        {projectBatches.map((batch: Batch) => {
                             const step = workflowConfig[batch.currentStepId];
                             const isFinished = batch.currentStepId === '9.0';
                             const isLost = batch.currentStepId === '9.1';
@@ -280,28 +351,42 @@ const ProjectDetails: React.FC<ProjectDetailsProps> = ({ onBack }) => {
                                             </div>
 
                                             {!isLastStep(batch.currentStepId) && userCanAdvance && (
-                                                <button
-                                                    onClick={() => handleAdvance(batch.id)}
-                                                    disabled={isUpdatingStep === batch.id}
-                                                    className={`
-                                                    px-8 py-4 rounded-xl font-bold text-lg shadow-xl flex items-center gap-3 transition-all 
-                                                    ${isUpdatingStep === batch.id
-                                                            ? 'bg-slate-300 text-slate-500 cursor-wait'
-                                                            : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20 hover:scale-105 active:scale-95'}
-                                                `}
-                                                >
-                                                    {isUpdatingStep === batch.id ? (
-                                                        <>
-                                                            <span className="material-symbols-outlined text-3xl animate-spin">sync</span>
-                                                            Processando...
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <span className="material-symbols-outlined text-3xl">check_circle</span>
-                                                            Concluir Etapa
-                                                        </>
+                                                <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
+                                                    {/* Split button (only for specific stages 3, 4, 5) */}
+                                                    {(step.stage === 3 || step.stage === 4 || step.stage === 5) && (
+                                                        <button
+                                                            onClick={() => handleSplitClick(batch)}
+                                                            className="px-8 py-4 rounded-xl font-bold text-lg border-2 border-primary text-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-2"
+                                                        >
+                                                            <span className="material-symbols-outlined text-3xl">call_split</span>
+                                                            Dividir Lote
+                                                        </button>
                                                     )}
-                                                </button>
+
+                                                    <button
+                                                        onClick={() => handleAdvance(batch)}
+                                                        disabled={isUpdatingStep === batch.id}
+                                                        className={`
+                                                        px-8 py-4 rounded-xl font-bold text-lg shadow-xl flex items-center justify-center gap-3 transition-all 
+                                                        ${isUpdatingStep === batch.id
+                                                                ? 'bg-slate-300 text-slate-500 cursor-wait'
+                                                                : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20 hover:scale-105 active:scale-95'}
+                                                        ${(step.stage === 3 || step.stage === 4 || step.stage === 5) ? 'flex-1' : 'w-auto'}
+                                                    `}
+                                                    >
+                                                        {isUpdatingStep === batch.id ? (
+                                                            <>
+                                                                <span className="material-symbols-outlined text-3xl animate-spin">sync</span>
+                                                                Processando...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <span className="material-symbols-outlined text-3xl">check_circle</span>
+                                                                Concluir Etapa
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                </div>
                                             )}
                                         </div>
                                     </div>
@@ -327,7 +412,7 @@ const ProjectDetails: React.FC<ProjectDetailsProps> = ({ onBack }) => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                {project.environments.map(env => (
+                                {project.environments.map((env: Environment) => (
                                     <tr key={env.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                                         <td className="px-6 py-4 font-bold text-slate-800 dark:text-white">{env.name}</td>
 
@@ -779,7 +864,7 @@ const ProjectDetails: React.FC<ProjectDetailsProps> = ({ onBack }) => {
                                             className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm"
                                         >
                                             <option value="">Selecione...</option>
-                                            {origins.map(o => <option key={o} value={o}>{o}</option>)}
+                                            {origins.map((o: string) => <option key={o} value={o}>{o}</option>)}
                                         </select>
                                     </div>
                                     <div>
@@ -788,7 +873,7 @@ const ProjectDetails: React.FC<ProjectDetailsProps> = ({ onBack }) => {
                                             <select
                                                 value={editClientForm.sellerId}
                                                 onChange={e => {
-                                                    const selectedUser = allUsers.find(u => u.id === e.target.value);
+                                                    const selectedUser = allUsers.find((u: { id: string }) => u.id === e.target.value);
                                                     if (selectedUser) {
                                                         setEditClientForm({
                                                             ...editClientForm,
@@ -855,8 +940,31 @@ const ProjectDetails: React.FC<ProjectDetailsProps> = ({ onBack }) => {
                     </div>
                 </div>
             )}
+            {decisionModalData && (
+                <StepDecisionModal
+                    isOpen={!!decisionModalData}
+                    onClose={() => setDecisionModalData(null)}
+                    batchName={decisionModalData.batch.name}
+                    currentStep={decisionModalData.step}
+                    options={getBranchingOptions(decisionModalData.batch.currentStepId)}
+                    onSelect={handleDecisionSelect}
+                />
+            )}
+
+            <SplitBatchModal
+                isOpen={isSplitModalOpen}
+                onClose={() => setIsSplitModalOpen(false)}
+                batch={splitModalBatch}
+                onSplitConfirmed={handleSplitConfirmed}
+            />
+
+            {selectedBatchIdForSplit && (
+                <LotModal
+                    isOpen={isLotModalOpen}
+                    onClose={() => { setIsLotModalOpen(false); setSelectedBatchIdForSplit(null); }}
+                    batchId={selectedBatchIdForSplit}
+                />
+            )}
         </div>
     );
-};
-
-export default ProjectDetails;
+}
