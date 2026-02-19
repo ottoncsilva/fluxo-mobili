@@ -10,6 +10,7 @@ COPY package*.json ./
 RUN npm install
 
 # Copy source code
+ARG BUILD_DATE
 COPY . .
 
 # Build the application
