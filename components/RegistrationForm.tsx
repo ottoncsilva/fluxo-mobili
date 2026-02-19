@@ -422,40 +422,36 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onComplete }) => {
         </div>
     )
 }
-                </div >
 
-    {/* Action Footer */ }
-    < div className = "mt-6 flex justify-between items-center bg-white dark:bg-[#1a2632] p-4 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 sticky bottom-0 z-20 shrink-0" >
-                    <button
-                        onClick={() => { if (currentStep > 1) setCurrentStep(prev => prev - 1) }}
-                        className={`px-6 py-2.5 font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors ${currentStep === 1 ? 'invisible' : ''}`}
-                    >
-                        Voltar
-                    </button>
+{/* Action Footer */ }
+<div className="mt-6 flex justify-between items-center bg-white dark:bg-[#1a2632] p-4 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 sticky bottom-0 z-20 shrink-0">
+    <button
+        onClick={() => { if (currentStep > 1) setCurrentStep(prev => prev - 1) }}
+        className={`px-6 py-2.5 font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors ${currentStep === 1 ? 'invisible' : ''}`}
+    >
+        Voltar
+    </button>
 
-                    <div className="flex gap-4">
-                        {currentStep < 3 ? (
-                            <button
-                                onClick={handleNext}
-                                className="px-8 py-3 bg-slate-900 dark:bg-slate-700 text-white font-bold rounded-lg hover:bg-slate-800 transition-all flex items-center gap-2"
-                            >
-                                Próximo Passo
-                                <span className="material-symbols-outlined">arrow_forward</span>
-                            </button>
-                        ) : (
-                            <button
-                                onClick={handleSave}
-                                className="px-8 py-3 bg-primary text-white font-bold rounded-lg shadow-lg shadow-primary/20 hover:bg-primary-600 transition-all flex items-center gap-2"
-                            >
-                                <span className="material-symbols-outlined">rocket_launch</span>
-                                Finalizar Cadastro
-                            </button>
-                        )}
-                    </div>
-                </div >
-            </div >
-        </div >
-    );
-};
+    <div className="flex gap-4">
+        {currentStep < 3 ? (
+            <button
+                onClick={handleNext}
+                className="px-8 py-3 bg-slate-900 dark:bg-slate-700 text-white font-bold rounded-lg hover:bg-slate-800 transition-all flex items-center gap-2"
+            >
+                Próximo Passo
+                <span className="material-symbols-outlined">arrow_forward</span>
+            </button>
+        ) : (
+            <button
+                onClick={handleSave}
+                className="px-8 py-3 bg-primary text-white font-bold rounded-lg shadow-lg shadow-primary/20 hover:bg-primary-600 transition-all flex items-center gap-2"
+            >
+                <span className="material-symbols-outlined">rocket_launch</span>
+                Finalizar Cadastro
+            </button>
+        )}
+    </div>
+</div>
+
 
 export default RegistrationForm;
