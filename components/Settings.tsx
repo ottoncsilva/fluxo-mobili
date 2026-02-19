@@ -11,7 +11,6 @@ const Settings: React.FC = () => {
         assistanceWorkflow, addAssistanceStep, updateAssistanceStep, deleteAssistanceStep, reorderAssistanceSteps,
         origins, updateOrigins,
         companySettings, updateCompanySettings, currentStore,
-        companySettings, updateCompanySettings, currentStore,
         saveStoreConfig, resetStoreDefaults
     } = useProjects();
 

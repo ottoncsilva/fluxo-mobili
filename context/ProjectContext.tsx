@@ -348,8 +348,9 @@ interface ProjectContextType {
     updateAssistanceTicket: (ticket: AssistanceTicket) => void;
 
     canUserAdvanceStep: (stepId: string) => boolean;
-    canUserViewStage: (stage: number) => boolean;
+    canUserViewStage: (stageId: number) => boolean;
     canUserEditAssistance: () => boolean;
+    resetStoreDefaults: (type: 'origins' | 'assistance' | 'all') => Promise<boolean>;
 }
 
 export const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -1195,7 +1196,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             updates.assistanceWorkflow = INITIAL_ASSISTANCE_WORKFLOW;
         }
 
-        if (useCloud && Object.keys(updates).length > 0) {
+        if (useCloud && db && Object.keys(updates).length > 0) {
             try {
                 const storeRef = doc(db, 'stores', currentStore.id);
                 await updateDoc(storeRef, updates);
