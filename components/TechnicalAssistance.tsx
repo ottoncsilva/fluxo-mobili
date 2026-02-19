@@ -3,18 +3,18 @@ import { useProjects } from '../context/ProjectContext';
 import { AssistanceTicket, AssistanceStatus, AssistanceItem, AssistanceEvent } from '../types';
 
 const ASSISTANCE_COLUMNS_DEF: { id: AssistanceStatus, title: string }[] = [
-    { id: 'VISITA', title: 'Visita de Levantamento' },
-    { id: '10.1', title: '10.1 - Solicitação de Peças' },
-    { id: '10.2', title: '10.2 - Fabricação' },
-    { id: '10.3', title: '10.3 - Transporte e Entrega' },
-    { id: '10.4', title: '10.4 - Montagem Assistência' },
-    { id: '10.6', title: '10.6 - Checklist Finalização' },
-    { id: 'CONCLUIDO', title: 'Concluído' },
+    { id: '10.1', title: '10.1 - Levantamento' },
+    { id: '10.2', title: '10.2 - Solicitação de Assistencia' },
+    { id: '10.3', title: '10.3 - Fabricação de Assistencia' },
+    { id: '10.4', title: '10.4 - Transporte de Assistencia' },
+    { id: '10.5', title: '10.5 - Montagem Assistencia' },
+    { id: '10.6', title: '10.6 - Vistoria de Assistencia' },
+    { id: '10.7', title: '10.7 - Concluido' },
 ];
 
 const TechnicalAssistance: React.FC = () => {
     const { assistanceTickets, updateAssistanceTicket, addAssistanceTicket, projects, assistanceWorkflow, canUserEditAssistance, currentUser, companySettings } = useProjects();
-    
+
     // Filters
     const [hideCompleted, setHideCompleted] = useState(false);
     const [filterClient, setFilterClient] = useState('');
@@ -25,15 +25,15 @@ const TechnicalAssistance: React.FC = () => {
     const [isInspectionOpen, setIsInspectionOpen] = useState(false);
     const [activeTicket, setActiveTicket] = useState<AssistanceTicket | null>(null);
     const [activeTab, setActiveTab] = useState<'DETAILS' | 'HISTORY'>('DETAILS');
-    
+
     // New Ticket State
     const [selectedClient, setSelectedClient] = useState('');
     const [ticketTitle, setTicketTitle] = useState('');
-    const [ticketPriority, setTicketPriority] = useState<'Normal'|'Urgente'>('Normal');
-    
+    const [ticketPriority, setTicketPriority] = useState<'Normal' | 'Urgente'>('Normal');
+
     // New Item State (for Ticket Creation)
     const [newItems, setNewItems] = useState<Partial<AssistanceItem>[]>([]);
-    
+
     // Temp Item Fields
     const [tempEnv, setTempEnv] = useState('');
     const [tempProb, setTempProb] = useState('');
@@ -47,7 +47,7 @@ const TechnicalAssistance: React.FC = () => {
     const [editItemForm, setEditItemForm] = useState<Partial<AssistanceItem>>({});
 
     const handleAddItemToDraft = () => {
-        if(!tempEnv || !tempProb) {
+        if (!tempEnv || !tempProb) {
             alert("Ambiente e Problema são obrigatórios para adicionar o item.");
             return;
         }
@@ -70,17 +70,17 @@ const TechnicalAssistance: React.FC = () => {
     };
 
     const handleCreateTicket = () => {
-        if(!selectedClient || !ticketTitle || newItems.length === 0) {
+        if (!selectedClient || !ticketTitle || newItems.length === 0) {
             alert("Preencha o cliente, título e adicione pelo menos um item.");
             return;
         }
         const clientName = projects.find(p => p.client.id === selectedClient)?.client.name || 'Cliente';
-        
+
         addAssistanceTicket({
             clientId: selectedClient,
             clientName: clientName,
             title: ticketTitle,
-            status: 'VISITA',
+            status: '10.1',
             priority: ticketPriority,
             items: newItems as AssistanceItem[],
             assemblerName: '', // Can be assigned later
@@ -117,7 +117,7 @@ const TechnicalAssistance: React.FC = () => {
     const [inspectObs, setInspectObs] = useState('');
 
     const handleAddInspectionItem = () => {
-        if(!activeTicket || !inspectEnv || !inspectProb) return;
+        if (!activeTicket || !inspectEnv || !inspectProb) return;
         const newItem: AssistanceItem = {
             id: `item-${Date.now()}`,
             environmentName: inspectEnv,
@@ -127,7 +127,7 @@ const TechnicalAssistance: React.FC = () => {
             supplierDeadline: inspectDeadline,
             observations: inspectObs
         };
-        
+
         const newEvent: AssistanceEvent = {
             id: `evt-${Date.now()}`,
             description: `Novo item adicionado: ${inspectEnv} - ${inspectProb}`,
@@ -143,7 +143,7 @@ const TechnicalAssistance: React.FC = () => {
         };
         updateAssistanceTicket(updatedTicket);
         setActiveTicket(updatedTicket); // Update local state immediately
-        
+
         // Reset
         setInspectEnv('');
         setInspectProb('');
@@ -152,15 +152,15 @@ const TechnicalAssistance: React.FC = () => {
         setInspectDeadline('');
         setInspectObs('');
     };
-    
+
     const handleAdvanceTicket = () => {
-        if(!activeTicket) return;
+        if (!activeTicket) return;
         const currentIdx = ASSISTANCE_COLUMNS_DEF.findIndex(c => c.id === activeTicket.status);
         if (currentIdx < ASSISTANCE_COLUMNS_DEF.length - 1) {
-             const nextStatus = ASSISTANCE_COLUMNS_DEF[currentIdx + 1].id;
-             const nextStatusTitle = ASSISTANCE_COLUMNS_DEF[currentIdx + 1].title;
-             
-             const newEvent: AssistanceEvent = {
+            const nextStatus = ASSISTANCE_COLUMNS_DEF[currentIdx + 1].id;
+            const nextStatusTitle = ASSISTANCE_COLUMNS_DEF[currentIdx + 1].title;
+
+            const newEvent: AssistanceEvent = {
                 id: `evt-${Date.now()}`,
                 description: `Status alterado para: ${nextStatusTitle}`,
                 date: new Date().toISOString(),
@@ -168,26 +168,26 @@ const TechnicalAssistance: React.FC = () => {
                 type: 'STATUS_CHANGE'
             };
 
-             updateAssistanceTicket({ 
-                 ...activeTicket, 
-                 status: nextStatus,
-                 events: [...(activeTicket.events || []), newEvent]
-             });
-             setIsInspectionOpen(false);
-             setActiveTicket(null);
+            updateAssistanceTicket({
+                ...activeTicket,
+                status: nextStatus,
+                events: [...(activeTicket.events || []), newEvent]
+            });
+            setIsInspectionOpen(false);
+            setActiveTicket(null);
         }
     }
 
     const handleStartEditingItem = (item: AssistanceItem) => {
         setEditingItemId(item.id);
-        setEditItemForm({...item});
+        setEditItemForm({ ...item });
     };
 
     const handleSaveItemEdit = () => {
-        if(!activeTicket || !editingItemId) return;
-        
+        if (!activeTicket || !editingItemId) return;
+
         const updatedItems = activeTicket.items.map(item => {
-            if(item.id === editingItemId) {
+            if (item.id === editingItemId) {
                 return { ...item, ...editItemForm } as AssistanceItem;
             }
             return item;
@@ -214,8 +214,8 @@ const TechnicalAssistance: React.FC = () => {
     };
 
     const printServiceOrder = () => {
-        if(!activeTicket) return;
-        
+        if (!activeTicket) return;
+
         const project = projects.find(p => p.client.id === activeTicket.clientId);
         const address = project?.client.address || 'Endereço não cadastrado';
         const phone = project?.client.phone || 'Telefone não cadastrado';
@@ -328,7 +328,7 @@ const TechnicalAssistance: React.FC = () => {
                         </div>
                     </div>
                     {canEdit && (
-                        <button 
+                        <button
                             onClick={() => setIsCreateOpen(true)}
                             className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-orange-600/20"
                         >
@@ -341,9 +341,9 @@ const TechnicalAssistance: React.FC = () => {
                 <div className="flex flex-wrap items-center gap-4 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg">
                     <div className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-3 py-1.5 flex-1 min-w-[200px]">
                         <span className="material-symbols-outlined text-slate-400 text-sm">search</span>
-                        <input 
-                            type="text" 
-                            placeholder="Filtrar por Cliente..." 
+                        <input
+                            type="text"
+                            placeholder="Filtrar por Cliente..."
                             value={filterClient}
                             onChange={(e) => setFilterClient(e.target.value)}
                             className="bg-transparent border-none text-sm w-full focus:ring-0 p-0 text-slate-700 dark:text-slate-200"
@@ -351,18 +351,18 @@ const TechnicalAssistance: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-3 py-1.5 flex-1 min-w-[200px]">
                         <span className="material-symbols-outlined text-slate-400 text-sm">person</span>
-                        <input 
-                            type="text" 
-                            placeholder="Filtrar por Montador..." 
+                        <input
+                            type="text"
+                            placeholder="Filtrar por Montador..."
                             value={filterAssembler}
                             onChange={(e) => setFilterAssembler(e.target.value)}
                             className="bg-transparent border-none text-sm w-full focus:ring-0 p-0 text-slate-700 dark:text-slate-200"
                         />
                     </div>
                     <label className="flex items-center gap-2 cursor-pointer select-none px-2">
-                        <input 
-                            type="checkbox" 
-                            checked={hideCompleted} 
+                        <input
+                            type="checkbox"
+                            checked={hideCompleted}
                             onChange={(e) => setHideCompleted(e.target.checked)}
                             className="rounded text-orange-600 focus:ring-orange-600 border-slate-300 dark:border-slate-600"
                         />
@@ -375,8 +375,8 @@ const TechnicalAssistance: React.FC = () => {
             <div className="flex-1 overflow-x-auto p-6 custom-scrollbar">
                 <div className="flex h-full gap-4 w-max">
                     {ASSISTANCE_COLUMNS_DEF.map(col => {
-                        if (hideCompleted && col.id === 'CONCLUIDO') return null;
-                        
+                        if (hideCompleted && col.id === '10.7') return null;
+
                         // Filter logic
                         const columnTickets = assistanceTickets.filter(t => {
                             if (t.status !== col.id) return false;
@@ -393,13 +393,13 @@ const TechnicalAssistance: React.FC = () => {
                                         {columnTickets.length}
                                     </span>
                                 </div>
-                                
+
                                 <div className="flex-1 bg-slate-100/30 dark:bg-[#15202b]/50 rounded-xl p-2 border border-slate-200/50 dark:border-slate-800 overflow-y-auto custom-scrollbar flex flex-col gap-3">
                                     {columnTickets.map(ticket => {
                                         const slaDays = assistanceWorkflow.find(s => s.id === ticket.status)?.sla || 0;
                                         return (
-                                            <div 
-                                                key={ticket.id} 
+                                            <div
+                                                key={ticket.id}
                                                 onClick={() => handleCardClick(ticket)}
                                                 className="bg-white dark:bg-[#1e2936] p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 group hover:shadow-md transition-all cursor-pointer relative overflow-hidden"
                                             >
@@ -411,7 +411,7 @@ const TechnicalAssistance: React.FC = () => {
                                                 </div>
                                                 <h4 className="font-bold text-slate-800 dark:text-white mb-1 truncate">{ticket.clientName}</h4>
                                                 <p className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-2 truncate">{ticket.title}</p>
-                                                
+
                                                 {ticket.assemblerName && (
                                                     <div className="flex items-center gap-1 mb-2">
                                                         <span className="material-symbols-outlined text-xs text-slate-400">person</span>
@@ -420,8 +420,8 @@ const TechnicalAssistance: React.FC = () => {
                                                 )}
 
                                                 <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
-                                                     <span className="material-symbols-outlined text-sm text-slate-400">format_list_bulleted</span>
-                                                     <span className="text-xs text-slate-500">{ticket.items.length} itens</span>
+                                                    <span className="material-symbols-outlined text-sm text-slate-400">format_list_bulleted</span>
+                                                    <span className="text-xs text-slate-500">{ticket.items.length} itens</span>
                                                 </div>
                                             </div>
                                         );
@@ -435,25 +435,25 @@ const TechnicalAssistance: React.FC = () => {
 
             {/* Create Ticket Modal */}
             {isCreateOpen && (
-                <div 
+                <div
                     className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fade-in"
                     onClick={() => setIsCreateOpen(false)}
                 >
-                    <div 
+                    <div
                         className="bg-white dark:bg-slate-900 w-full max-w-3xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="p-6 border-b border-slate-200 dark:border-slate-800">
-                             <h2 className="text-xl font-bold text-slate-900 dark:text-white">Abertura de Chamado</h2>
-                             <p className="text-sm text-slate-500">Inicia na etapa: <span className="font-bold text-orange-600">Visita de Levantamento</span></p>
+                            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Abertura de Chamado</h2>
+                            <p className="text-sm text-slate-500">Inicia na etapa: <span className="font-bold text-orange-600">Visita de Levantamento</span></p>
                         </div>
-                        
+
                         <div className="flex-1 overflow-y-auto p-6 space-y-6">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Cliente</label>
-                                    <select 
-                                        value={selectedClient} 
+                                    <select
+                                        value={selectedClient}
                                         onChange={e => setSelectedClient(e.target.value)}
                                         className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm"
                                     >
@@ -550,27 +550,27 @@ const TechnicalAssistance: React.FC = () => {
 
             {/* Inspection / Detail Modal */}
             {isInspectionOpen && activeTicket && (
-                <div 
+                <div
                     className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fade-in"
                     onClick={() => { setIsInspectionOpen(false); setActiveTicket(null); }}
                 >
-                    <div 
+                    <div
                         className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden flex flex-col h-[90vh]"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Modal Header */}
                         <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-900">
-                             <div>
-                                 <div className="flex items-center gap-2 mb-1">
-                                     <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                                         Etapa: {ASSISTANCE_COLUMNS_DEF.find(c => c.id === activeTicket.status)?.title}
-                                     </span>
-                                     {activeTicket.priority === 'Urgente' && <span className="px-2 py-0.5 bg-rose-100 text-rose-600 rounded text-[10px] font-bold uppercase">URGENTE</span>}
-                                 </div>
-                                 <h2 className="text-xl font-bold text-slate-900 dark:text-white">{activeTicket.clientName} - {activeTicket.title}</h2>
-                             </div>
-                             <div className="flex gap-2">
-                                <button 
+                            <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                        Etapa: {ASSISTANCE_COLUMNS_DEF.find(c => c.id === activeTicket.status)?.title}
+                                    </span>
+                                    {activeTicket.priority === 'Urgente' && <span className="px-2 py-0.5 bg-rose-100 text-rose-600 rounded text-[10px] font-bold uppercase">URGENTE</span>}
+                                </div>
+                                <h2 className="text-xl font-bold text-slate-900 dark:text-white">{activeTicket.clientName} - {activeTicket.title}</h2>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
                                     onClick={printServiceOrder}
                                     className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-600 dark:text-slate-300"
                                     title="Imprimir Ordem de Serviço"
@@ -580,18 +580,18 @@ const TechnicalAssistance: React.FC = () => {
                                 <button onClick={() => { setIsInspectionOpen(false); setActiveTicket(null); }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full">
                                     <span className="material-symbols-outlined">close</span>
                                 </button>
-                             </div>
+                            </div>
                         </div>
 
                         {/* Tabs */}
                         <div className="px-6 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex gap-6">
-                            <button 
+                            <button
                                 onClick={() => setActiveTab('DETAILS')}
                                 className={`py-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'DETAILS' ? 'border-orange-600 text-orange-600' : 'border-transparent text-slate-500'}`}
                             >
                                 Detalhes e Itens
                             </button>
-                            <button 
+                            <button
                                 onClick={() => setActiveTab('HISTORY')}
                                 className={`py-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'HISTORY' ? 'border-orange-600 text-orange-600' : 'border-transparent text-slate-500'}`}
                             >
@@ -601,7 +601,7 @@ const TechnicalAssistance: React.FC = () => {
 
                         {/* Modal Body */}
                         <div className="flex-1 overflow-y-auto p-6 bg-slate-50 dark:bg-[#101922]">
-                            
+
                             {activeTab === 'DETAILS' && (
                                 <>
                                     {/* Items List */}
@@ -617,23 +617,23 @@ const TechnicalAssistance: React.FC = () => {
                                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                             <div>
                                                                 <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Ambiente</label>
-                                                                <input type="text" value={editItemForm.environmentName} onChange={e => setEditItemForm({...editItemForm, environmentName: e.target.value})} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm" />
+                                                                <input type="text" value={editItemForm.environmentName} onChange={e => setEditItemForm({ ...editItemForm, environmentName: e.target.value })} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm" />
                                                             </div>
                                                             <div>
                                                                 <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Problema</label>
-                                                                <input type="text" value={editItemForm.problemDescription} onChange={e => setEditItemForm({...editItemForm, problemDescription: e.target.value})} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm" />
+                                                                <input type="text" value={editItemForm.problemDescription} onChange={e => setEditItemForm({ ...editItemForm, problemDescription: e.target.value })} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm" />
                                                             </div>
                                                             <div>
                                                                 <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Fornecedor</label>
-                                                                <input type="text" value={editItemForm.supplier || ''} onChange={e => setEditItemForm({...editItemForm, supplier: e.target.value})} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm" />
+                                                                <input type="text" value={editItemForm.supplier || ''} onChange={e => setEditItemForm({ ...editItemForm, supplier: e.target.value })} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm" />
                                                             </div>
                                                             <div>
                                                                 <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Prazo</label>
-                                                                <input type="date" value={editItemForm.supplierDeadline || ''} onChange={e => setEditItemForm({...editItemForm, supplierDeadline: e.target.value})} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm" />
+                                                                <input type="date" value={editItemForm.supplierDeadline || ''} onChange={e => setEditItemForm({ ...editItemForm, supplierDeadline: e.target.value })} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm" />
                                                             </div>
                                                             <div className="md:col-span-2">
                                                                 <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Observações</label>
-                                                                <textarea value={editItemForm.observations || ''} onChange={e => setEditItemForm({...editItemForm, observations: e.target.value})} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm" rows={2} />
+                                                                <textarea value={editItemForm.observations || ''} onChange={e => setEditItemForm({ ...editItemForm, observations: e.target.value })} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm" rows={2} />
                                                             </div>
                                                         </div>
                                                         <div className="flex justify-end gap-2 mt-2">
@@ -656,7 +656,7 @@ const TechnicalAssistance: React.FC = () => {
                                                             )}
                                                         </div>
                                                         <p className="text-slate-600 dark:text-slate-300 font-medium mb-3">{item.problemDescription}</p>
-                                                        
+
                                                         <div className="grid grid-cols-2 gap-2 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800 p-3 rounded">
                                                             {item.supplier && <p>Fornecedor: <span className="font-semibold text-slate-700 dark:text-slate-300">{item.supplier}</span></p>}
                                                             {item.supplierDeadline && <p>Prazo Forn.: <span className="font-semibold text-slate-700 dark:text-slate-300">{item.supplierDeadline}</span></p>}
@@ -669,7 +669,7 @@ const TechnicalAssistance: React.FC = () => {
                                     </div>
 
                                     {/* Add New Item Form (Only visible in VISITA or by Admin) - AND if user can edit */}
-                                    {activeTicket.status === 'VISITA' && canEdit && (
+                                    {activeTicket.status === '10.1' && canEdit && (
                                         <div className="mt-8 bg-orange-50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-900/30 p-4 rounded-xl">
                                             <h3 className="font-bold text-orange-800 dark:text-orange-400 mb-4 flex items-center gap-2">
                                                 <span className="material-symbols-outlined">add_circle</span>
@@ -684,7 +684,7 @@ const TechnicalAssistance: React.FC = () => {
                                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Problema</label>
                                                     <input type="text" value={inspectProb} onChange={e => setInspectProb(e.target.value)} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm" />
                                                 </div>
-                                                
+
                                                 <div>
                                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo de Custo</label>
                                                     <select value={inspectCostType} onChange={e => setInspectCostType(e.target.value as any)} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm">
@@ -712,7 +712,7 @@ const TechnicalAssistance: React.FC = () => {
                                     )}
                                 </>
                             )}
-                            
+
                             {activeTab === 'HISTORY' && (
                                 <div className="space-y-6">
                                     <div className="relative pl-4 space-y-6">
@@ -750,8 +750,8 @@ const TechnicalAssistance: React.FC = () => {
                             </p>
                             <div className="flex gap-3">
                                 <button onClick={() => { setIsInspectionOpen(false); setActiveTicket(null); }} className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 font-bold text-sm">Fechar</button>
-                                {activeTicket.status !== 'CONCLUIDO' && canEdit && (
-                                    <button 
+                                {activeTicket.status !== '10.7' && canEdit && (
+                                    <button
                                         onClick={handleAdvanceTicket}
                                         className="px-6 py-2 rounded-lg bg-green-600 text-white font-bold text-sm hover:bg-green-700 flex items-center gap-2 shadow-lg shadow-green-600/20"
                                     >

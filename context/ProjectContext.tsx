@@ -48,11 +48,13 @@ const INITIAL_WORKFLOW_CONFIG: Record<string, WorkflowStep> = {
     '7.2': { id: '7.2', label: 'Vistoria Montagem', ownerRole: 'Coordenador de Montagem', sla: 1, stage: 7 },
 
     // 8 - Pós Montagem
-    '8.1': { id: '8.1', label: 'Solicitação de Peças', ownerRole: 'Liberador', sla: 2, stage: 8 },
-    '8.2': { id: '8.2', label: 'Fabricação Pós Montagem', ownerRole: 'Industria', sla: 10, stage: 8 },
-    '8.3': { id: '8.3', label: 'Transporte Pós Montagem', ownerRole: 'Logistica', sla: 5, stage: 8 },
-    '8.4': { id: '8.4', label: 'Pós Montagem', ownerRole: 'Montador', sla: 5, stage: 8 },
-    '8.5': { id: '8.5', label: 'Vistoria Pós Montagem', ownerRole: 'Coordenador de Montagem', sla: 1, stage: 8 },
+    '8.1': { id: '8.1', label: 'Levantamento', ownerRole: 'Montador', sla: 2, stage: 8 },
+    '8.2': { id: '8.2', label: 'Solicitação de Pós Montagem', ownerRole: 'Liberador', sla: 2, stage: 8 },
+    '8.3': { id: '8.3', label: 'Fabricação Pós Montagem', ownerRole: 'Industria', sla: 10, stage: 8 },
+    '8.4': { id: '8.4', label: 'Transporte Pós Montagem', ownerRole: 'Logistica', sla: 5, stage: 8 },
+    '8.5': { id: '8.5', label: 'Pós Montagem', ownerRole: 'Montador', sla: 5, stage: 8 },
+    '8.6': { id: '8.6', label: 'Vistoria Pós Montagem', ownerRole: 'Coordenador de Montagem', sla: 1, stage: 8 },
+    '8.7': { id: '8.7', label: 'Concluido', ownerRole: 'Gerente', sla: 0, stage: 8 },
 
     // 9 - Conclusão
     '9.0': { id: '9.0', label: 'Projeto Entregue', ownerRole: 'Gerente', sla: 0, stage: 9 },
@@ -67,18 +69,18 @@ const INITIAL_WORKFLOW_ORDER = [
     '5.1', '5.2',
     '6.1', '6.2', '6.3',
     '7.1', '7.2',
-    '8.1', '8.2', '8.3', '8.4', '8.5',
+    '8.1', '8.2', '8.3', '8.4', '8.5', '8.6', '8.7',
     '9.0', '9.1'
 ];
 
 const INITIAL_ASSISTANCE_WORKFLOW: AssistanceWorkflowStep[] = [
-    { id: 'VISITA', label: 'Visita de Levantamento', sla: 3 },
-    { id: '10.1', label: 'Solicitação de Peças', sla: 2 },
-    { id: '10.2', label: 'Fabricação', sla: 15 },
-    { id: '10.3', label: 'Transporte e Entrega', sla: 5 },
-    { id: '10.4', label: 'Montagem Assistência', sla: 4 },
-    { id: '10.6', label: 'Checklist Finalização Assistência', sla: 1 },
-    { id: 'CONCLUIDO', label: 'Concluído', sla: 0 },
+    { id: '10.1', label: 'Levantamento', sla: 3 },
+    { id: '10.2', label: 'Solicitação de Assistencia', sla: 2 },
+    { id: '10.3', label: 'Fabricação de Assistencia', sla: 15 },
+    { id: '10.4', label: 'Transporte de Assistencia', sla: 5 },
+    { id: '10.5', label: 'Montagem Assistencia', sla: 4 },
+    { id: '10.6', label: 'Vistoria de Assistencia', sla: 1 },
+    { id: '10.7', label: 'Concluido', sla: 0 },
 ];
 
 const MASTER_STORE_ID = 'store-modelo';
@@ -1206,6 +1208,19 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         addNote(projectId, `Avaliação Pós-Montagem registrada. Nota: ${evaluation.rating}/5`, currentUser?.id || 'sys');
     };
 
+    const updateProjectPostAssemblyItems = (projectId: string, data: { items?: AssistanceItem[], events?: AssistanceEvent[], priority?: 'Normal' | 'Urgente' }) => {
+        setAllProjects(prev => prev.map(p => {
+            if (p.id !== projectId) return p;
+            return {
+                ...p,
+                postAssemblyItems: data.items !== undefined ? data.items : p.postAssemblyItems,
+                postAssemblyEvents: data.events !== undefined ? data.events : p.postAssemblyEvents,
+                postAssemblyPriority: data.priority !== undefined ? data.priority : p.postAssemblyPriority
+            };
+        }));
+        // TODO: Persist if cloud enabled
+    };
+
     // Assistance
     const addAssistanceTicket = (ticketData: Omit<AssistanceTicket, 'id' | 'createdAt' | 'updatedAt' | 'storeId'>) => {
         if (!currentUser) return;
@@ -1262,7 +1277,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             addAssistanceStep, updateAssistanceStep, deleteAssistanceStep, reorderAssistanceSteps,
 
             addProject, deleteProject, advanceBatch, moveBatchToStep, markProjectAsLost, reactivateProject, isLastStep, splitBatch, getProjectById, addNote, updateWorkflowSla, setCurrentProjectId, updateEnvironmentStatus, requestFactoryPart,
-            updateEnvironmentDetails, updateClientData, updateProjectITPP, updateProjectSeller, updateProjectPostAssembly,
+            updateEnvironmentDetails, updateClientData, updateProjectITPP, updateProjectSeller, updateProjectPostAssembly, updateProjectPostAssemblyItems,
             addAssistanceTicket, updateAssistanceTicket,
             canUserAdvanceStep, canUserViewStage, canUserEditAssistance,
             saveStoreConfig, resetStoreDefaults
