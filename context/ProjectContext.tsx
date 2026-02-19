@@ -338,7 +338,7 @@ interface ProjectContextType {
     canUserEditAssistance: () => boolean;
 }
 
-const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
+export const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
 // Storage Keys
 const STORAGE_KEY_USER = 'fluxo_erp_user';
