@@ -491,7 +491,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         if (!currentUser || !useCloud || !db || currentUser.role === 'SuperAdmin') return;
         const loadStoreConfig = async () => {
             try {
-                const configDoc = await getDoc(doc(db, "storeConfigs", currentUser.storeId));
+                const configDoc = await getDoc(doc(db as Firestore, "storeConfigs", currentUser.storeId));
                 if (configDoc.exists()) {
                     const data = configDoc.data();
                     if (data.workflowConfig && Object.keys(data.workflowConfig).length > 0) {

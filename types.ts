@@ -108,13 +108,16 @@ export interface Client {
   phone: string;
   email: string;
   address: string;
-  condominium?: string; // New field
+  // New fields
+  condominium?: string;
   cpf?: string;
   rg?: string;
+
   status: 'Ativo' | 'Perdido' | 'Concluido';
 
   origin?: string;
   consultant_name?: string;
+  sellerId?: string; // Link to the responsible seller (User ID)
   commissioned_specifier?: string;
   briefing_date?: string;
 
