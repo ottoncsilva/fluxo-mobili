@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAgenda, Appointment, AppointmentType } from '../context/AgendaContext';
 import { useProjects } from '../context/ProjectContext';
 import { Client } from '../types';
@@ -20,7 +20,18 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
     editingAppointment
 }) => {
     const { appointmentTypes, addAppointment, updateAppointment, deleteAppointment } = useAgenda();
-    const { clients, currentUser } = useProjects();
+    const { projects, currentUser } = useProjects();
+
+    // Derive clients from projects since it's not directly exposed in context
+    const clients = useMemo(() => {
+        const uniqueClients = new Map<string, Client>();
+        projects.forEach(p => {
+            if (p.client) {
+                uniqueClients.set(p.client.id, p.client);
+            }
+        });
+        return Array.from(uniqueClients.values());
+    }, [projects]);
 
     const [title, setTitle] = useState('');
     const [date, setDate] = useState('');
@@ -61,7 +72,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
                 // Try to match client from task
                 if (initialTask) {
-                    const matchedClient = clients.find(c => c.name === initialTask.clientName);
+                    const matchedClient = clients.find((c: Client) => c.name === initialTask.clientName);
                     if (matchedClient) setClientId(matchedClient.id);
                 } else {
                     setClientId('');
@@ -79,7 +90,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
         const startDateTime = new Date(`${date}T${time}`);
         const endDateTime = new Date(startDateTime.getTime() + duration * 60000);
 
-        const client = clients.find(c => c.id === clientId);
+        const client = clients.find((c: Client) => c.id === clientId);
 
         const appointmentData: any = {
             title,
@@ -149,8 +160,8 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                                     type="button"
                                     onClick={() => setTypeId(type.id)}
                                     className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${typeId === type.id
-                                            ? 'border-transparent text-white shadow-sm ring-2 ring-offset-1 dark:ring-offset-[#1a2632]'
-                                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300'
+                                        ? 'border-transparent text-white shadow-sm ring-2 ring-offset-1 dark:ring-offset-[#1a2632]'
+                                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300'
                                         }`}
                                     style={{
                                         backgroundColor: typeId === type.id ? type.color : undefined,
@@ -174,7 +185,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                                 className="w-full rounded-lg border-slate-200 dark:bg-slate-800 dark:border-slate-700 text-sm"
                             >
                                 <option value="">Selecione um cliente...</option>
-                                {clients.map(client => (
+                                {clients.map((client: Client) => (
                                     <option key={client.id} value={client.id}>{client.name}</option>
                                 ))}
                             </select>
@@ -215,8 +226,8 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                                     type="button"
                                     onClick={() => setDuration(m)}
                                     className={`py-2 px-1 rounded-lg text-xs font-medium border transition-colors ${duration === m
-                                            ? 'bg-primary/10 border-primary text-primary'
-                                            : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300'
+                                        ? 'bg-primary/10 border-primary text-primary'
+                                        : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300'
                                         }`}
                                 >
                                     {m < 60 ? `${m}m` : `${m / 60}h`}

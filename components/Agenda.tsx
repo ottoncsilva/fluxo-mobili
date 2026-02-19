@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAgenda, Appointment } from '../context/AgendaContext';
 import CalendarGrid from './CalendarGrid';
 import TaskSidebar from './TaskSidebar';

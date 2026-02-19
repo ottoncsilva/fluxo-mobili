@@ -87,8 +87,8 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                             onClick={() => onViewChange(v as any)}
                             disabled={v !== 'month'} // Todo: Implement Week/Day
                             className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all capitalize ${view === v
-                                    ? 'bg-white dark:bg-slate-700 text-primary shadow-sm'
-                                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 opacity-50 cursor-not-allowed'
+                                ? 'bg-white dark:bg-slate-700 text-primary shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 opacity-50 cursor-not-allowed'
                                 }`}
                         >
                             {v === 'month' ? 'Mês' : v === 'week' ? 'Semana' : 'Dia'}
@@ -108,7 +108,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
 
                 {/* Days */}
                 <div className="col-span-7 grid grid-cols-7 auto-rows-fr overflow-y-auto">
-                    {calendarDays.map((day, idx) => {
+                    {calendarDays.map((day: Date, idx: number) => {
                         const dayApts = getDayAppointments(day);
                         const isCurrentMonth = isSameMonth(day, monthStart);
                         const isToday = isSameDay(day, new Date());
