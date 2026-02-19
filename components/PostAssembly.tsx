@@ -1,283 +1,235 @@
 import React, { useState } from 'react';
 import { useProjects } from '../context/ProjectContext';
-import { Project, ViewState, PostAssemblyEvaluation } from '../types';
+import { Project } from '../types';
 
 const PostAssembly: React.FC = () => {
-    const { projects, batches, workflowConfig, isLastStep, updateProjectPostAssembly, currentUser } = useProjects();
-    const [searchTerm, setSearchTerm] = useState('');
+    const { projects, moveBatchToStep, workflowConfig, currentUser } = useProjects();
 
-    // Modal State
-    const [isEvaluationOpen, setIsEvaluationOpen] = useState(false);
+    // Define Post-Assembly Columns (Stage 8) based on IDs
+    const POST_ASSEMBLY_STEP_IDS = ['8.1', '8.2', '8.3', '8.4', '8.5'];
+
+    // Filters
+    const [filterClient, setFilterClient] = useState('');
+
+    // Modals
+    const [isStartOpen, setIsStartOpen] = useState(false);
+    const [isDetailsOpen, setIsDetailsOpen] = useState(false);
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+    const [projectToStart, setProjectToStart] = useState('');
 
-    // Form State
-    const [rating, setRating] = useState(5);
-    const [feedback, setFeedback] = useState('');
-    const [checklist, setChecklist] = useState({
-        clean_environment: false,
-        scraps_removed: false,
-        manual_delivered: false,
-        client_satisfied: false,
-        final_photos_taken: false
+    // Filter projects eligible for Post-Assembly (Stage 7.1 or 7.2)
+    // We check if the current step of the project corresponds to Stage 7
+    const eligibleProjects = projects.filter(p => {
+        const step = workflowConfig[p.currentStepId];
+        // Ensure step exists and is in stage 7. Using IDs 7.1 and 7.2 as requested.
+        return step && (step.id === '7.1' || step.id === '7.2');
     });
 
-    const handleOpenEvaluation = (project: Project) => {
+    const handleStartPostAssembly = async () => {
+        if (!projectToStart) return;
+
+        const project = projects.find(p => p.id === projectToStart);
+        if (project) {
+            // Move main batch to 8.1
+            const mainBatch = project.batches[0];
+            if (mainBatch) {
+                await moveBatchToStep(mainBatch.id, '8.1');
+            }
+        }
+        setIsStartOpen(false);
+        setProjectToStart('');
+    };
+
+    const handleCardClick = (project: Project) => {
         setSelectedProject(project);
-        setRating(project.postAssembly?.rating || 5);
-        setFeedback(project.postAssembly?.feedback || '');
-        setChecklist(project.postAssembly?.checklist || {
-            clean_environment: false,
-            scraps_removed: false,
-            manual_delivered: false,
-            client_satisfied: false,
-            final_photos_taken: false
-        });
-        setIsEvaluationOpen(true);
+        setIsDetailsOpen(true);
     };
 
-    const handleSaveEvaluation = () => {
-        if (!selectedProject || !currentUser) return;
+    const handleAdvanceStep = async () => {
+        if (!selectedProject) return;
+        const currentStep = selectedProject.currentStepId;
+        const currentIndex = POST_ASSEMBLY_STEP_IDS.indexOf(currentStep);
 
-        const evaluation: PostAssemblyEvaluation = {
-            rating,
-            feedback,
-            checklist,
-            completedAt: new Date().toISOString(),
-            evaluatorId: currentUser.id
-        };
-
-        updateProjectPostAssembly(selectedProject.id, evaluation);
-        setIsEvaluationOpen(false);
-        setSelectedProject(null);
+        if (currentIndex !== -1 && currentIndex < POST_ASSEMBLY_STEP_IDS.length - 1) {
+            const nextStep = POST_ASSEMBLY_STEP_IDS[currentIndex + 1];
+            const mainBatch = selectedProject.batches[0];
+            if (mainBatch) {
+                await moveBatchToStep(mainBatch.id, nextStep);
+                setIsDetailsOpen(false);
+            }
+        } else if (currentIndex === POST_ASSEMBLY_STEP_IDS.length - 1) {
+            // Option to finish? For now just close.
+            setIsDetailsOpen(false);
+        }
     };
-
-    // Filter projects compliant with Post-Assembly criteria
-    const completedProjects = projects.filter(project => {
-        // 1. Text Search
-        const searchLower = searchTerm.toLowerCase();
-        const matchesSearch =
-            project.client.name.toLowerCase().includes(searchLower) ||
-            project.id.toLowerCase().includes(searchLower) ||
-            project.client.email.toLowerCase().includes(searchLower);
-
-        if (!matchesSearch) return false;
-
-        // 2. Status check
-        if (project.client.status === 'Concluido') return true;
-
-        // 3. Step check (if project has batches in Post Assembly stage - Stage 8)
-        const projectBatches = batches.filter(b => b.projectId === project.id);
-        const hasPostAssemblyBatch = projectBatches.some(b => {
-            const step = workflowConfig[b.currentStepId];
-            return step && step.stage === 8;
-        });
-
-        return hasPostAssemblyBatch;
-    });
 
     return (
-        <div className="h-full flex flex-col bg-slate-50 dark:bg-[#111827]">
+        <div className="flex flex-col h-full bg-slate-50 dark:bg-[#101922] overflow-hidden">
             {/* Header */}
-            <div className="bg-white dark:bg-[#1a2632] border-b border-slate-200 dark:border-slate-800 px-8 py-6">
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Pós-Montagem</h1>
-                        <p className="text-slate-500 dark:text-slate-400 mt-1">Gestão de finalização e avaliação de qualidade</p>
+            <div className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1a2632] flex flex-col px-6 py-4 shrink-0 z-20 gap-4">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className="size-10 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 rounded-lg flex items-center justify-center">
+                            <span className="material-symbols-outlined">verified</span>
+                        </div>
+                        <div>
+                            <h1 className="text-xl font-bold text-slate-800 dark:text-white">Pós-Montagem</h1>
+                            <p className="text-xs text-slate-500">Fluxo de resolução e qualidade (Etapa 8).</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => setIsStartOpen(true)}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/20"
+                    >
+                        <span className="material-symbols-outlined text-sm">play_arrow</span> Iniciar Pós-Montagem
+                    </button>
+                </div>
+
+                {/* Filter Bar */}
+                <div className="flex flex-wrap items-center gap-4 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg">
+                    <div className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-3 py-1.5 flex-1 min-w-[200px]">
+                        <span className="material-symbols-outlined text-slate-400 text-sm">search</span>
+                        <input
+                            type="text"
+                            placeholder="Filtrar por Cliente..."
+                            value={filterClient}
+                            onChange={(e) => setFilterClient(e.target.value)}
+                            className="bg-transparent border-none text-sm w-full focus:ring-0 p-0 text-slate-700 dark:text-slate-200"
+                        />
                     </div>
                 </div>
+            </div>
 
-                {/* Search */}
-                <div className="relative max-w-md">
-                    <span className="material-symbols-outlined absolute left-3 top-2.5 text-slate-400">search</span>
-                    <input
-                        type="text"
-                        placeholder="Buscar cliente..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 dark:bg-slate-800 focus:ring-2 focus:ring-indigo-500 transition-all font-mono text-sm"
-                    />
+            {/* Kanban */}
+            <div className="flex-1 overflow-x-auto p-6 custom-scrollbar">
+                <div className="flex h-full gap-4 w-max">
+                    {POST_ASSEMBLY_STEP_IDS.map(stepId => {
+                        const stepConfig = workflowConfig[stepId];
+                        const title = stepConfig ? `${stepConfig.id} - ${stepConfig.label}` : stepId;
+
+                        // Filter logic
+                        const columnProjects = projects.filter(p => {
+                            if (p.currentStepId !== stepId) return false;
+                            const matchClient = p.client.name.toLowerCase().includes(filterClient.toLowerCase());
+                            return matchClient;
+                        });
+
+                        return (
+                            <div key={stepId} className="flex flex-col w-80 h-full shrink-0">
+                                <div className="flex items-center justify-between mb-3 px-3 py-2 bg-slate-100 dark:bg-[#15202b] rounded-lg border border-slate-200 dark:border-slate-800">
+                                    <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm">{title}</h3>
+                                    <span className="bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-600">
+                                        {columnProjects.length}
+                                    </span>
+                                </div>
+
+                                <div className="flex-1 bg-slate-100/30 dark:bg-[#15202b]/50 rounded-xl p-2 border border-slate-200/50 dark:border-slate-800 overflow-y-auto custom-scrollbar flex flex-col gap-3">
+                                    {columnProjects.map(project => {
+                                        return (
+                                            <div
+                                                key={project.id}
+                                                onClick={() => handleCardClick(project)}
+                                                className="bg-white dark:bg-[#1e2936] p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 group hover:shadow-md transition-all cursor-pointer relative overflow-hidden"
+                                            >
+                                                <h4 className="font-bold text-slate-800 dark:text-white mb-1 truncate">{project.client.name}</h4>
+                                                <p className="text-xs text-slate-500 mb-2 truncate">{project.title}</p>
+
+                                                <div className="flex items-center gap-1 mb-2">
+                                                    <span className="material-symbols-outlined text-xs text-slate-400">calendar_today</span>
+                                                    <span className="text-xs text-slate-500">
+                                                        {new Date(project.updatedAt).toLocaleDateString()}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
 
-            {/* Content */}
-            <div className="flex-1 overflow-auto p-8">
-                <div className="bg-white dark:bg-[#1a2632] rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
-                    <table className="w-full text-left border-collapse">
-                        <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
-                            <tr>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Cliente</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Contato</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Status</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Avaliação</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                            {completedProjects.length === 0 ? (
-                                <tr>
-                                    <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
-                                        Nenhum projeto encontrado para Pós-Montagem.
-                                    </td>
-                                </tr>
-                            ) : (
-                                completedProjects.map(project => {
-                                    const projectBatches = batches.filter(b => b.projectId === project.id);
-                                    const currentBatch = projectBatches[0];
-                                    const currentStep = currentBatch ? workflowConfig[currentBatch.currentStepId] : null;
+            {/* Start Modal */}
+            {isStartOpen && (
+                <div
+                    className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fade-in"
+                    onClick={() => setIsStartOpen(false)}
+                >
+                    <div
+                        className="bg-white dark:bg-slate-900 w-full max-w-md rounded-xl shadow-2xl overflow-hidden flex flex-col"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="p-6 border-b border-slate-200 dark:border-slate-800">
+                            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Iniciar Pós-Montagem</h2>
+                            <p className="text-sm text-slate-500">Selecione um projeto na etapa de Montagem (7.x).</p>
+                        </div>
 
-                                    return (
-                                        <tr key={project.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                            <td className="px-6 py-4">
-                                                <div className="font-bold text-slate-900 dark:text-white">{project.client.name}</div>
-                                                <div className="text-xs text-slate-500">ID: {project.id}</div>
-                                            </td>
-                                            <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">
-                                                <div>{project.client.phone}</div>
-                                                <div className="text-xs text-slate-400">{project.client.email}</div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className={`px-2 py-1 rounded-full text-xs font-bold ${project.client.status === 'Concluido'
-                                                    ? 'bg-green-100 text-green-700'
-                                                    : 'bg-blue-100 text-blue-700'
-                                                    }`}>
-                                                    {currentStep ? currentStep.label : project.client.status}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">
-                                                {project.postAssembly ? (
-                                                    <div className="flex items-center text-amber-500">
-                                                        <span className="material-symbols-outlined text-sm mr-1">star</span>
-                                                        <span className="font-bold">{project.postAssembly.rating}</span>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-slate-400 italic">Pendente</span>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <button
-                                                    onClick={() => handleOpenEvaluation(project)}
-                                                    className="text-indigo-600 hover:text-indigo-800 font-medium text-sm flex items-center gap-1"
-                                                >
-                                                    <span className="material-symbols-outlined text-base">checklist</span>
-                                                    {project.postAssembly ? 'Editar Avaliação' : 'Avaliar'}
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    );
-                                })
+                        <div className="p-6">
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Projeto / Cliente</label>
+                            <select
+                                value={projectToStart}
+                                onChange={e => setProjectToStart(e.target.value)}
+                                className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm"
+                            >
+                                <option value="">Selecione...</option>
+                                {eligibleProjects.map(p => (
+                                    <option key={p.id} value={p.id}>{p.client.name} - {p.title} ({p.currentStepId})</option>
+                                ))}
+                            </select>
+                            {eligibleProjects.length === 0 && (
+                                <p className="text-xs text-amber-500 mt-2">Nenhum projeto encontrado nas etapas 7.1 ou 7.2.</p>
                             )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                        </div>
 
-            {/* Evaluation Modal */}
-            {isEvaluationOpen && selectedProject && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white dark:bg-[#1a2632] rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-scale-in">
-                        <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                            <h3 className="text-lg font-bold text-slate-800 dark:text-white">
-                                Avaliação Final - {selectedProject.client.name}
-                            </h3>
-                            <button onClick={() => setIsEvaluationOpen(false)} className="text-slate-400 hover:text-slate-600">
+                        <div className="p-6 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-3 bg-slate-50 dark:bg-slate-900">
+                            <button onClick={() => setIsStartOpen(false)} className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 font-bold text-sm">Cancelar</button>
+                            <button
+                                onClick={handleStartPostAssembly}
+                                disabled={!projectToStart}
+                                className="px-4 py-2 rounded-lg bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                                Iniciar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Details Modal */}
+            {isDetailsOpen && selectedProject && (
+                <div
+                    className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fade-in"
+                    onClick={() => setIsDetailsOpen(false)}
+                >
+                    <div
+                        className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                            <div>
+                                <h2 className="text-xl font-bold text-slate-900 dark:text-white">{selectedProject.client.name}</h2>
+                                <p className="text-sm text-slate-500">Etapa Atual: <span className="font-bold text-emerald-600">{
+                                    workflowConfig[selectedProject.currentStepId]?.label || selectedProject.currentStepId
+                                }</span></p>
+                            </div>
+                            <button onClick={() => setIsDetailsOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full">
                                 <span className="material-symbols-outlined">close</span>
                             </button>
                         </div>
 
-                        <div className="p-6 space-y-6">
-                            {/* Rating */}
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Nota Geral</label>
-                                <div className="flex gap-2">
-                                    {[1, 2, 3, 4, 5].map(star => (
-                                        <button
-                                            key={star}
-                                            onClick={() => setRating(star)}
-                                            className={`text-2xl transition-transform hover:scale-110 ${rating >= star ? 'text-amber-400 fill-current' : 'text-slate-300'}`}
-                                        >
-                                            <span className="material-symbols-outlined fill-current">star</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Checklist */}
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Checklist de Entrega</label>
-                                <div className="space-y-2">
-                                    <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={checklist.clean_environment}
-                                            onChange={e => setChecklist(prev => ({ ...prev, clean_environment: e.target.checked }))}
-                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                        />
-                                        <span className="text-sm text-slate-700 dark:text-slate-300">Ambiente limpo e organizado</span>
-                                    </label>
-                                    <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={checklist.scraps_removed}
-                                            onChange={e => setChecklist(prev => ({ ...prev, scraps_removed: e.target.checked }))}
-                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                        />
-                                        <span className="text-sm text-slate-700 dark:text-slate-300">Sobras e lixos retirados</span>
-                                    </label>
-                                    <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={checklist.manual_delivered}
-                                            onChange={e => setChecklist(prev => ({ ...prev, manual_delivered: e.target.checked }))}
-                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                        />
-                                        <span className="text-sm text-slate-700 dark:text-slate-300">Manual e garantias entregues</span>
-                                    </label>
-                                    <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={checklist.final_photos_taken}
-                                            onChange={e => setChecklist(prev => ({ ...prev, final_photos_taken: e.target.checked }))}
-                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                        />
-                                        <span className="text-sm text-slate-700 dark:text-slate-300">Fotos finais registradas</span>
-                                    </label>
-                                    <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={checklist.client_satisfied}
-                                            onChange={e => setChecklist(prev => ({ ...prev, client_satisfied: e.target.checked }))}
-                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                        />
-                                        <span className="text-sm text-slate-700 dark:text-slate-300">Cliente declarou satisfação</span>
-                                    </label>
-                                </div>
-                            </div>
-
-                            {/* Feedback */}
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Observações / Feedback do Cliente</label>
-                                <textarea
-                                    value={feedback}
-                                    onChange={e => setFeedback(e.target.value)}
-                                    className="w-full h-24 p-3 rounded-lg border border-slate-200 dark:border-slate-700 dark:bg-slate-800 focus:ring-2 focus:ring-indigo-500 text-sm"
-                                    placeholder="Descreva observações importantes..."
-                                />
-                            </div>
-                        </div>
-
-                        <div className="p-6 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3">
+                        <div className="p-6">
+                            <h3 className="font-bold text-slate-800 dark:text-white mb-2">Ações</h3>
                             <button
-                                onClick={() => setIsEvaluationOpen(false)}
-                                className="px-4 py-2 text-slate-600 hover:text-slate-800 font-medium text-sm"
+                                onClick={handleAdvanceStep}
+                                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg flex items-center justify-center gap-2 transition-colors"
                             >
-                                Cancelar
+                                <span className="material-symbols-outlined">arrow_forward</span>
+                                Avançar para Próxima Etapa
                             </button>
-                            <button
-                                onClick={handleSaveEvaluation}
-                                className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium text-sm shadow-md transition-colors"
-                            >
-                                Salvar Avaliação
-                            </button>
+                            <p className="text-xs text-slate-500 mt-2 text-center">
+                                Move o projeto de <strong>{selectedProject.currentStepId}</strong> para a próxima etapa do fluxo de pós-montagem.
+                            </p>
                         </div>
                     </div>
                 </div>
