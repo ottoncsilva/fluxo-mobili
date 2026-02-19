@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useProjects } from './ProjectContext';
+import { db } from '../firebase';
+import { collection, onSnapshot, addDoc, setDoc, deleteDoc, updateDoc, doc, Firestore } from "firebase/firestore";
 
 export interface AppointmentType {
     id: string;
@@ -39,6 +41,7 @@ const AgendaContext = createContext<AgendaContextType | undefined>(undefined);
 
 export const AgendaProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const { currentUser } = useProjects();
+    const useCloud = !!(currentUser && db);
 
     // Default Types
     const defaultTypes: AppointmentType[] = [
@@ -52,60 +55,136 @@ export const AgendaProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const [appointmentTypes, setAppointmentTypes] = useState<AppointmentType[]>(defaultTypes);
     const [agendaUsers, setAgendaUsers] = useState<string[]>([]); // User IDs allowed to have agenda
 
-    // Load from LocalStorage
+    // Load Data
     useEffect(() => {
-        const savedApts = localStorage.getItem('fluxo_agenda_appointments');
-        const savedTypes = localStorage.getItem('fluxo_agenda_types');
-        const savedUsers = localStorage.getItem('fluxo_agenda_users');
+        if (useCloud && db) {
+            // Firestore Subscriptions
 
-        if (savedApts) setAppointments(JSON.parse(savedApts));
-        if (savedTypes) setAppointmentTypes(JSON.parse(savedTypes));
-        if (savedUsers) setAgendaUsers(JSON.parse(savedUsers));
-    }, []);
+            // Appointments
+            const unsubAppointments = onSnapshot(collection(db, "appointments"), (snapshot) => {
+                const loadedApts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Appointment[];
+                setAppointments(loadedApts);
+            });
 
-    // Persist changes
+            // Appointment Types
+            const unsubTypes = onSnapshot(collection(db, "appointmentTypes"), (snapshot) => {
+                const loadedTypes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as AppointmentType[];
+                if (loadedTypes.length > 0) {
+                    setAppointmentTypes(loadedTypes);
+                } else {
+                    // Optionally seed defaults if empty, but for now let's keep defaults if nothing loads? 
+                    // Actually better to respect DB being empty if specifically deleted.
+                    // But for migration, if DB is empty, user might want defaults.
+                    // Let's stick to: if DB empty, keep defaultTypes (initial state). 
+                    // If DB has data, use it.
+                    if (snapshot.size > 0) setAppointmentTypes(loadedTypes);
+                }
+            });
+
+            // Agenda Users (Config)
+            // Storing transparently in a 'configs' or similar? Or just a doc.
+            // Let's use a specific doc in a 'storeConfigs' or similar if we were being strict but
+            // for simplicity let's assume a collection 'agendaSettings' or just 'agendaUsers' doc?
+            // To keep it simple and consistent with localStorage approach, let's create a collection 'agenda_settings'
+            const unsubSettings = onSnapshot(doc(db, "agenda_settings", "users"), (docSnapshot) => {
+                if (docSnapshot.exists()) {
+                    setAgendaUsers(docSnapshot.data().userIds || []);
+                } else {
+                    setAgendaUsers([]); // If the document doesn't exist, assume no users are set
+                }
+            });
+
+            return () => {
+                unsubAppointments();
+                unsubTypes();
+                unsubSettings();
+            };
+
+        } else {
+            // LocalStorage Fallback
+            const savedApts = localStorage.getItem('fluxo_agenda_appointments');
+            const savedTypes = localStorage.getItem('fluxo_agenda_types');
+            const savedUsers = localStorage.getItem('fluxo_agenda_users');
+
+            if (savedApts) setAppointments(JSON.parse(savedApts));
+            if (savedTypes) setAppointmentTypes(JSON.parse(savedTypes));
+            if (savedUsers) setAgendaUsers(JSON.parse(savedUsers));
+        }
+    }, [useCloud]);
+
+    // Persist Logic (Only for LocalStorage, Firestore handles via methods)
     useEffect(() => {
-        localStorage.setItem('fluxo_agenda_appointments', JSON.stringify(appointments));
-    }, [appointments]);
+        if (!useCloud) {
+            localStorage.setItem('fluxo_agenda_appointments', JSON.stringify(appointments));
+            localStorage.setItem('fluxo_agenda_types', JSON.stringify(appointmentTypes));
+            localStorage.setItem('fluxo_agenda_users', JSON.stringify(agendaUsers));
+        }
+    }, [appointments, appointmentTypes, agendaUsers, useCloud]);
 
-    useEffect(() => {
-        localStorage.setItem('fluxo_agenda_types', JSON.stringify(appointmentTypes));
-    }, [appointmentTypes]);
 
-    useEffect(() => {
-        localStorage.setItem('fluxo_agenda_users', JSON.stringify(agendaUsers));
-    }, [agendaUsers]);
-
-    const addAppointment = (apt: Omit<Appointment, 'id'>) => {
+    const addAppointment = async (apt: Omit<Appointment, 'id'>) => {
         const newApt = { ...apt, id: crypto.randomUUID() };
-        setAppointments(prev => [...prev, newApt]);
+        if (useCloud && db) {
+            await setDoc(doc(db, "appointments", newApt.id), newApt);
+        } else {
+            setAppointments(prev => [...prev, newApt]);
+        }
     };
 
-    const updateAppointment = (id: string, updates: Partial<Appointment>) => {
-        setAppointments(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
+    const updateAppointment = async (id: string, updates: Partial<Appointment>) => {
+        if (useCloud && db) {
+            await updateDoc(doc(db, "appointments", id), updates);
+        } else {
+            setAppointments(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
+        }
     };
 
-    const deleteAppointment = (id: string) => {
-        setAppointments(prev => prev.filter(a => a.id !== id));
+    const deleteAppointment = async (id: string) => {
+        if (useCloud && db) {
+            await deleteDoc(doc(db, "appointments", id));
+        } else {
+            setAppointments(prev => prev.filter(a => a.id !== id));
+        }
     };
 
-    const addAppointmentType = (type: Omit<AppointmentType, 'id'>) => {
+    const addAppointmentType = async (type: Omit<AppointmentType, 'id'>) => {
         const newType = { ...type, id: crypto.randomUUID() };
-        setAppointmentTypes(prev => [...prev, newType]);
+        if (useCloud && db) {
+            await setDoc(doc(db, "appointmentTypes", newType.id), newType);
+        } else {
+            setAppointmentTypes(prev => [...prev, newType]);
+        }
     };
 
-    const updateAppointmentType = (id: string, updates: Partial<AppointmentType>) => {
-        setAppointmentTypes(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+    const updateAppointmentType = async (id: string, updates: Partial<AppointmentType>) => {
+        if (useCloud && db) {
+            await updateDoc(doc(db, "appointmentTypes", id), updates);
+        } else {
+            setAppointmentTypes(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+        }
     };
 
-    const deleteAppointmentType = (id: string) => {
-        setAppointmentTypes(prev => prev.filter(t => t.id !== id));
+    const deleteAppointmentType = async (id: string) => {
+        if (useCloud && db) {
+            await deleteDoc(doc(db, "appointmentTypes", id));
+        } else {
+            setAppointmentTypes(prev => prev.filter(t => t.id !== id));
+        }
     };
 
-    const toggleAgendaUser = (userId: string) => {
-        setAgendaUsers(prev =>
-            prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
-        );
+    const toggleAgendaUser = async (userId: string) => {
+        let newUsers;
+        if (agendaUsers.includes(userId)) {
+            newUsers = agendaUsers.filter(id => id !== userId);
+        } else {
+            newUsers = [...agendaUsers, userId];
+        }
+
+        if (useCloud && db) {
+            await setDoc(doc(db, "agenda_settings", "users"), { userIds: newUsers });
+        } else {
+            setAgendaUsers(newUsers);
+        }
     };
 
     return (
@@ -133,3 +212,4 @@ export const useAgenda = () => {
     }
     return context;
 };
+
