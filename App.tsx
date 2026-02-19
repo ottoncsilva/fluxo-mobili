@@ -22,49 +22,47 @@ const AppContent: React.FC = () => {
     return () => window.removeEventListener('navigate-registration', handleNav);
   }, []);
 
-  // Update view state when user changes (e.g. login as SuperAdmin)
+  // Always reset to Dashboard (Visão Geral) on login
   useEffect(() => {
-      if (currentUser?.role === 'SuperAdmin') {
-          setCurrentView(ViewState.SUPER_ADMIN);
-      } else if (currentUser && currentView === ViewState.SUPER_ADMIN) {
-          // If a normal user somehow gets stuck on SUPER_ADMIN view, reset them
-          setCurrentView(ViewState.DASHBOARD);
-      }
+    if (currentUser?.role === 'SuperAdmin') {
+      setCurrentView(ViewState.SUPER_ADMIN);
+    } else if (currentUser) {
+      setCurrentView(ViewState.DASHBOARD);
+    }
   }, [currentUser]);
 
   // Auth Guard
   if (!currentUser) {
-      return <Login />;
+    return <Login />;
   }
 
   // Permission Check Helper
   const canAccess = (view: ViewState): boolean => {
-      if (currentUser.role === 'SuperAdmin') return view === ViewState.SUPER_ADMIN;
+    if (currentUser.role === 'SuperAdmin') return view === ViewState.SUPER_ADMIN;
 
-      const userPerms = permissions.find(p => p.role === currentUser.role);
-      if(!userPerms) return false;
-      
-      switch(view) {
-          case ViewState.DASHBOARD: return userPerms.canViewDashboard;
-          case ViewState.KANBAN: return userPerms.canViewKanban;
-          case ViewState.CLIENT_LIST: return userPerms.canViewClients;
-          case ViewState.SETTINGS: return userPerms.canViewSettings;
-          default: return true;
-      }
+    const userPerms = permissions.find(p => p.role === currentUser.role);
+    if (!userPerms) return false;
+
+    switch (view) {
+      case ViewState.DASHBOARD: return userPerms.canViewDashboard;
+      case ViewState.KANBAN: return userPerms.canViewKanban;
+      case ViewState.CLIENT_LIST: return userPerms.canViewClients;
+      case ViewState.SETTINGS: return userPerms.canViewSettings;
+      default: return true;
+    }
   };
 
   const handleBackToKanban = () => {
-      setCurrentProjectId(null);
-      // No need to switch view since ProjectDetails is now a modal
+    setCurrentProjectId(null);
   };
-  
+
   const handleBackToClientList = () => {
-      setCurrentView(ViewState.CLIENT_LIST);
+    setCurrentView(ViewState.CLIENT_LIST);
   }
 
   const renderContent = () => {
     if (currentUser.role === 'SuperAdmin') {
-        return <SuperAdminDashboard />;
+      return <SuperAdminDashboard />;
     }
 
     switch (currentView) {
@@ -78,145 +76,160 @@ const AppContent: React.FC = () => {
     }
   };
 
+  // Get page title
+  const getTitle = () => {
+    if (currentUser.role === 'SuperAdmin') return "Gestão Global";
+    switch (currentView) {
+      case ViewState.DASHBOARD: return "Visão Geral";
+      case ViewState.KANBAN: return "Painel de Controle";
+      case ViewState.CLIENT_REGISTRATION: return "Novo Cadastro";
+      case ViewState.CLIENT_LIST: return "Carteira de Clientes";
+      case ViewState.SETTINGS: return "Configurações";
+      case ViewState.ASSISTANCE: return "Assistência";
+      default: return "FluxoERP";
+    }
+  };
+
+  // Build nav items based on permissions
+  const navItems: { icon: string; view: ViewState; label: string }[] = [];
+  if (currentUser.role === 'SuperAdmin') {
+    navItems.push({ icon: 'domain', view: ViewState.SUPER_ADMIN, label: 'Lojas' });
+  } else {
+    if (canAccess(ViewState.DASHBOARD)) navItems.push({ icon: 'dashboard', view: ViewState.DASHBOARD, label: 'Início' });
+    if (canAccess(ViewState.CLIENT_LIST)) navItems.push({ icon: 'groups', view: ViewState.CLIENT_LIST, label: 'Clientes' });
+    if (canAccess(ViewState.KANBAN)) navItems.push({ icon: 'view_kanban', view: ViewState.KANBAN, label: 'Kanban' });
+    navItems.push({ icon: 'handyman', view: ViewState.ASSISTANCE, label: 'Assistência' });
+    if (canAccess(ViewState.SETTINGS)) navItems.push({ icon: 'settings', view: ViewState.SETTINGS, label: 'Config' });
+  }
+
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background-light dark:bg-background-dark font-display relative">
-      {/* Sidebar */}
-      <aside className="w-20 bg-white dark:bg-[#1a2632] border-r border-slate-200 dark:border-slate-800 flex flex-col items-center py-6 z-30 shrink-0">
+    <div className="flex flex-col md:flex-row h-screen w-screen overflow-hidden bg-background-light dark:bg-background-dark font-display relative">
+
+      {/* === Desktop Sidebar (hidden on mobile) === */}
+      <aside className="hidden md:flex w-20 bg-white dark:bg-[#1a2632] border-r border-slate-200 dark:border-slate-800 flex-col items-center py-6 z-30 shrink-0">
         <div className={`size-10 rounded-xl flex items-center justify-center text-white font-bold text-xl mb-8 shadow-lg overflow-hidden ${currentUser.role === 'SuperAdmin' ? 'bg-purple-600 shadow-purple-500/20' : 'bg-primary shadow-primary/20'}`}>
           {currentUser.role === 'SuperAdmin' ? (
-              <span className="material-symbols-outlined">admin_panel_settings</span>
+            <span className="material-symbols-outlined">admin_panel_settings</span>
           ) : companySettings.logoUrl ? (
-              <img src={companySettings.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+            <img src={companySettings.logoUrl} alt="Logo" className="w-full h-full object-cover" />
           ) : (
-              companySettings.name.charAt(0)
+            companySettings.name.charAt(0)
           )}
         </div>
-        
+
         <nav className="flex flex-col gap-6 w-full px-4">
-          {/* Normal User Menu */}
-          {currentUser.role !== 'SuperAdmin' && (
-              <>
-                {canAccess(ViewState.DASHBOARD) && (
-                    <SidebarButton 
-                        icon="dashboard" 
-                        isActive={currentView === ViewState.DASHBOARD} 
-                        onClick={() => setCurrentView(ViewState.DASHBOARD)}
-                        tooltip="Início"
-                    />
-                )}
-                {canAccess(ViewState.CLIENT_LIST) && (
-                    <SidebarButton 
-                        icon="groups" 
-                        isActive={currentView === ViewState.CLIENT_LIST || currentView === ViewState.CLIENT_REGISTRATION} 
-                        onClick={() => setCurrentView(ViewState.CLIENT_LIST)}
-                        tooltip="Clientes"
-                    />
-                )}
-                {canAccess(ViewState.KANBAN) && (
-                    <SidebarButton 
-                        icon="view_kanban" 
-                        isActive={currentView === ViewState.KANBAN} 
-                        onClick={() => setCurrentView(ViewState.KANBAN)}
-                        tooltip="Painel de Controle"
-                    />
-                )}
-                
-                <SidebarButton 
-                    icon="handyman" 
-                    isActive={currentView === ViewState.ASSISTANCE} 
-                    onClick={() => setCurrentView(ViewState.ASSISTANCE)}
-                    tooltip="Pedido de Assistência"
-                />
-                <div className="h-px bg-slate-200 dark:bg-slate-700 w-full my-2"></div>
-                {canAccess(ViewState.SETTINGS) && (
-                    <SidebarButton 
-                        icon="settings" 
-                        isActive={currentView === ViewState.SETTINGS} 
-                        onClick={() => setCurrentView(ViewState.SETTINGS)} 
-                        tooltip="Configurações" 
-                    />
-                )}
-              </>
-          )}
-
-          {/* Super Admin Menu */}
-          {currentUser.role === 'SuperAdmin' && (
-              <SidebarButton 
-                  icon="domain" 
-                  isActive={true} 
-                  onClick={() => {}}
-                  tooltip="Gestão de Lojas"
-              />
-          )}
-
-          <button 
-             onClick={logout}
-             className="w-full aspect-square rounded-xl flex items-center justify-center text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all mt-auto"
-             title="Sair"
+          {navItems.map(item => (
+            <SidebarButton
+              key={item.view}
+              icon={item.icon}
+              isActive={currentView === item.view || (item.view === ViewState.CLIENT_LIST && currentView === ViewState.CLIENT_REGISTRATION)}
+              onClick={() => setCurrentView(item.view)}
+              tooltip={item.label}
+            />
+          ))}
+          <div className="h-px bg-slate-200 dark:bg-slate-700 w-full my-2"></div>
+          <button
+            onClick={logout}
+            className="w-full aspect-square rounded-xl flex items-center justify-center text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all"
+            title="Sair"
           >
-              <span className="material-symbols-outlined">logout</span>
+            <span className="material-symbols-outlined">logout</span>
           </button>
         </nav>
       </aside>
 
-      {/* Main Content Area */}
+      {/* === Main Content Area === */}
       <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-        <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1a2632] flex items-center justify-between px-6 shrink-0 z-20">
-             <div className="flex items-center gap-4">
-               <h1 className="text-xl font-bold text-slate-800 dark:text-white">
-                 {currentUser.role === 'SuperAdmin' ? "Gestão Global" : (
-                     <>
-                        {currentView === ViewState.DASHBOARD && "Visão Geral"}
-                        {currentView === ViewState.KANBAN && "Painel de Controle"}
-                        {currentView === ViewState.CLIENT_REGISTRATION && "Novo Cadastro"}
-                        {currentView === ViewState.CLIENT_LIST && "Carteira de Clientes"}
-                        {currentView === ViewState.SETTINGS && "Configurações do Sistema"}
-                        {currentView === ViewState.ASSISTANCE && "Central de Assistência"}
-                     </>
-                 )}
-               </h1>
-             </div>
-             <div className="flex items-center gap-6">
-                {/* Fantasy Name Highlight */}
-               <div className="hidden md:flex flex-col items-end">
-                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                       {currentUser.role === 'SuperAdmin' ? 'Acesso' : 'Empresa'}
-                   </span>
-                   <span className={`text-sm font-bold ${currentUser.role === 'SuperAdmin' ? 'text-purple-600' : 'text-primary dark:text-blue-400'}`}>
-                       {currentUser.role === 'SuperAdmin' ? 'Administrador' : companySettings.name}
-                   </span>
-               </div>
-               <div className="h-8 w-px bg-slate-200 dark:border-slate-700"></div>
-               <div className="flex items-center gap-3">
-                 <div className="size-9 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600 overflow-hidden">
-                     {currentUser.avatar ? <img src={currentUser.avatar} alt="Avatar" className="w-full h-full object-cover" /> : currentUser.name.charAt(0)}
-                 </div>
-                 <div className="hidden md:block">
-                   <p className="text-sm font-bold text-slate-800 dark:text-white leading-none">{currentUser.name}</p>
-                   <p className="text-xs text-slate-500">{currentUser.role}</p>
-                 </div>
-               </div>
-             </div>
+        {/* Header */}
+        <header className="h-14 md:h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1a2632] flex items-center justify-between px-4 md:px-6 shrink-0 z-20">
+          <div className="flex items-center gap-3">
+            <div className={`md:hidden size-8 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow overflow-hidden ${currentUser.role === 'SuperAdmin' ? 'bg-purple-600' : 'bg-primary'}`}>
+              {currentUser.role === 'SuperAdmin' ? (
+                <span className="material-symbols-outlined text-lg">admin_panel_settings</span>
+              ) : companySettings.logoUrl ? (
+                <img src={companySettings.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+              ) : (
+                companySettings.name.charAt(0)
+              )}
+            </div>
+            <h1 className="text-lg md:text-xl font-bold text-slate-800 dark:text-white">
+              {getTitle()}
+            </h1>
+          </div>
+          <div className="flex items-center gap-3 md:gap-6">
+            {/* Company Name - desktop only */}
+            <div className="hidden md:flex flex-col items-end">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                {currentUser.role === 'SuperAdmin' ? 'Acesso' : 'Empresa'}
+              </span>
+              <span className={`text-sm font-bold ${currentUser.role === 'SuperAdmin' ? 'text-purple-600' : 'text-primary dark:text-blue-400'}`}>
+                {currentUser.role === 'SuperAdmin' ? 'Administrador' : companySettings.name}
+              </span>
+            </div>
+            <div className="hidden md:block h-8 w-px bg-slate-200 dark:border-slate-700"></div>
+            <div className="flex items-center gap-2 md:gap-3">
+              <div className="size-8 md:size-9 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600 overflow-hidden">
+                {currentUser.avatar ? <img src={currentUser.avatar} alt="Avatar" className="w-full h-full object-cover" /> : currentUser.name.charAt(0)}
+              </div>
+              <div className="hidden md:block">
+                <p className="text-sm font-bold text-slate-800 dark:text-white leading-none">{currentUser.name}</p>
+                <p className="text-xs text-slate-500">{currentUser.role}</p>
+              </div>
+              {/* Logout - mobile only (since desktop has it in sidebar) */}
+              <button
+                onClick={logout}
+                className="md:hidden size-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors"
+                title="Sair"
+              >
+                <span className="material-symbols-outlined text-xl">logout</span>
+              </button>
+            </div>
+          </div>
         </header>
-        
-        <div className="flex-1 overflow-hidden relative">
-            {renderContent()}
+
+        {/* Content - add bottom padding on mobile for the bottom nav */}
+        <div className="flex-1 overflow-hidden relative pb-16 md:pb-0">
+          {renderContent()}
         </div>
       </div>
 
+      {/* === Mobile Bottom Navigation (hidden on desktop) === */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-[#1a2632] border-t border-slate-200 dark:border-slate-800 bottom-nav">
+        <div className="flex items-center justify-around h-16 px-1">
+          {navItems.map(item => {
+            const isActive = currentView === item.view || (item.view === ViewState.CLIENT_LIST && currentView === ViewState.CLIENT_REGISTRATION);
+            return (
+              <button
+                key={item.view}
+                onClick={() => setCurrentView(item.view)}
+                className={`flex flex-col items-center justify-center gap-0.5 flex-1 py-1 transition-colors ${isActive ? 'text-primary' : 'text-slate-400'
+                  }`}
+              >
+                <span className={`material-symbols-outlined text-2xl ${isActive ? 'font-bold' : ''}`} style={isActive ? { fontVariationSettings: "'FILL' 1, 'wght' 600" } : {}}>
+                  {item.icon}
+                </span>
+                <span className={`text-[10px] leading-tight ${isActive ? 'font-bold' : 'font-medium'}`}>
+                  {item.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
       {/* Project Details Modal Overlay */}
       {currentProjectId && currentUser.role !== 'SuperAdmin' && (
-          <div 
-            className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fade-in"
-            onClick={handleBackToKanban}
+        <div
+          className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-2 md:p-4 animate-fade-in"
+          onClick={handleBackToKanban}
+        >
+          <div
+            className="bg-white dark:bg-[#101922] w-full max-w-[90vw] h-[95vh] md:h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-scale-up"
+            onClick={(e) => e.stopPropagation()}
           >
-              <div 
-                className="bg-white dark:bg-[#101922] w-full max-w-[90vw] h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-scale-up"
-                onClick={(e) => e.stopPropagation()}
-              >
-                  <ProjectDetails onBack={handleBackToKanban} />
-              </div>
+            <ProjectDetails onBack={handleBackToKanban} />
           </div>
+        </div>
       )}
     </div>
   );
@@ -239,13 +252,13 @@ interface SidebarButtonProps {
 
 const SidebarButton: React.FC<SidebarButtonProps> = ({ icon, isActive, onClick, tooltip }) => {
   return (
-    <button 
+    <button
       onClick={onClick}
       title={tooltip}
       className={`
         w-full aspect-square rounded-xl flex items-center justify-center transition-all duration-200 group relative
-        ${isActive 
-          ? 'bg-primary text-white shadow-lg shadow-primary/30' 
+        ${isActive
+          ? 'bg-primary text-white shadow-lg shadow-primary/30'
           : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-primary'}
       `}
     >

@@ -26,12 +26,12 @@ export interface User {
   storeId: string; // Tenant isolation
   name: string;
   username: string; // Login ID
-  email?: string; 
-  password?: string; 
+  email?: string;
+  password?: string;
   role: Role;
   phone?: string;
   avatar?: string;
-  
+
   // Employee Details
   isSystemUser: boolean;
   cpf?: string;
@@ -58,6 +58,7 @@ export interface PermissionConfig {
   canViewClients: boolean;
   canViewSettings: boolean;
   canEditProject: boolean;
+  canChangeSeller?: boolean; // New permission
   viewableStages: number[];
   actionableSteps: string[];
 }
@@ -107,9 +108,12 @@ export interface Client {
   phone: string;
   email: string;
   address: string;
+  condominium?: string; // New field
+  cpf?: string;
+  rg?: string;
   status: 'Ativo' | 'Perdido' | 'Concluido';
-  
-  origin?: string; 
+
+  origin?: string;
   consultant_name?: string;
   commissioned_specifier?: string;
   briefing_date?: string;
@@ -165,13 +169,13 @@ export interface Batch {
 }
 
 // Assistance Types
-export type AssistanceStatus = 
-  | 'VISITA' 
-  | '10.1' 
-  | '10.2' 
-  | '10.3' 
-  | '10.4' 
-  | '10.6' 
+export type AssistanceStatus =
+  | 'VISITA'
+  | '10.1'
+  | '10.2'
+  | '10.3'
+  | '10.4'
+  | '10.6'
   | 'CONCLUIDO';
 
 export interface AssistanceItem {
@@ -182,7 +186,7 @@ export interface AssistanceItem {
   photos?: string[];
   partNeeded?: string;
   observations?: string; // Added field
-  
+
   costType?: 'Custo Fábrica' | 'Custo Loja';
   itemType?: 'Compra' | 'Fabricação';
   supplier?: string;
