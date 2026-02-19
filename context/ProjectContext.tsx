@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo } from 'react';
 import { Project, Batch, WorkflowStep, Environment, Client, User, Role, Note, FactoryOrder, PermissionConfig, AssistanceTicket, CompanySettings, AssistanceWorkflowStep, Store } from '../types';
 import { db } from '../firebase'; // Import Firebase DB
-import { collection, onSnapshot, addDoc, setDoc, doc, updateDoc, query, where, getDoc } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, setDoc, doc, updateDoc, query, where, getDoc, Firestore } from "firebase/firestore";
 
 // Updated Workflow Config
 const INITIAL_WORKFLOW_CONFIG: Record<string, WorkflowStep> = {
