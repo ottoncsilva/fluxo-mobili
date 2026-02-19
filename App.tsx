@@ -108,8 +108,8 @@ const AppContent: React.FC = () => {
     if (canAccess(ViewState.KANBAN)) navItems.push({ icon: 'view_kanban', view: ViewState.KANBAN, label: 'Kanban' });
     navItems.push({ icon: 'calendar_month', view: ViewState.AGENDA, label: 'Agenda' });
     if (canAccess(ViewState.CLIENT_LIST)) navItems.push({ icon: 'groups', view: ViewState.CLIENT_LIST, label: 'Clientes' });
+    navItems.push({ icon: 'checklist', view: ViewState.POST_ASSEMBLY, label: 'Pós-Montagem' });
     navItems.push({ icon: 'handyman', view: ViewState.ASSISTANCE, label: 'Assistência' });
-    navItems.push({ icon: 'checklist', view: ViewState.POST_ASSEMBLY, label: 'Pós-Obra' });
     if (canAccess(ViewState.SETTINGS)) navItems.push({ icon: 'settings', view: ViewState.SETTINGS, label: 'Config' });
   }
 
