@@ -120,27 +120,48 @@ export const AgendaProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     };
 
     const addAppointment = async (apt: Omit<Appointment, 'id'>) => {
-        const newApt = { ...apt, id: generateId() };
-        if (useCloud && db) {
-            await setDoc(doc(db, "appointments", newApt.id), newApt);
-        } else {
-            setAppointments((prev: Appointment[]) => [...prev, newApt]);
+        try {
+            const newApt = { ...apt, id: generateId() };
+            if (useCloud && db) {
+                await setDoc(doc(db, "appointments", newApt.id), newApt);
+            } else {
+                const updated = [...appointments, newApt];
+                setAppointments(updated);
+                if (!useCloud) localStorage.setItem('fluxo_agenda_appointments', JSON.stringify(updated));
+            }
+        } catch (error) {
+            console.error("Error adding appointment:", error);
+            throw error;
         }
     };
 
     const updateAppointment = async (id: string, updates: Partial<Appointment>) => {
-        if (useCloud && db) {
-            await updateDoc(doc(db, "appointments", id), updates);
-        } else {
-            setAppointments((prev: Appointment[]) => prev.map((a: Appointment) => a.id === id ? { ...a, ...updates } : a));
+        try {
+            if (useCloud && db) {
+                await updateDoc(doc(db, "appointments", id), updates);
+            } else {
+                const updated = appointments.map((a: Appointment) => a.id === id ? { ...a, ...updates } : a);
+                setAppointments(updated);
+                if (!useCloud) localStorage.setItem('fluxo_agenda_appointments', JSON.stringify(updated));
+            }
+        } catch (error) {
+            console.error("Error updating appointment:", error);
+            throw error;
         }
     };
 
     const deleteAppointment = async (id: string) => {
-        if (useCloud && db) {
-            await deleteDoc(doc(db, "appointments", id));
-        } else {
-            setAppointments((prev: Appointment[]) => prev.filter((a: Appointment) => a.id !== id));
+        try {
+            if (useCloud && db) {
+                await deleteDoc(doc(db, "appointments", id));
+            } else {
+                const updated = appointments.filter((a: Appointment) => a.id !== id);
+                setAppointments(updated);
+                if (!useCloud) localStorage.setItem('fluxo_agenda_appointments', JSON.stringify(updated));
+            }
+        } catch (error) {
+            console.error("Error deleting appointment:", error);
+            throw error;
         }
     };
 

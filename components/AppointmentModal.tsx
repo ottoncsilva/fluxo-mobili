@@ -83,34 +83,56 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
         }
     }, [isOpen, editingAppointment, initialDate, initialTask, appointmentTypes, clients]);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!currentUser) return;
-
-        const startDateTime = new Date(`${date}T${time}`);
-        const endDateTime = new Date(startDateTime.getTime() + duration * 60000);
-
-        const client = clients.find((c: Client) => c.id === clientId);
-
-        const appointmentData: any = {
-            title,
-            start: startDateTime.toISOString(),
-            end: endDateTime.toISOString(),
-            durationMinutes: duration,
-            typeId,
-            clientId: client?.id,
-            clientName: client?.name,
-            userId: currentUser.id,
-            notes,
-            linkedTaskId: initialTask?.id || editingAppointment?.linkedTaskId
-        };
-
-        if (editingAppointment) {
-            updateAppointment(editingAppointment.id, appointmentData);
-        } else {
-            addAppointment(appointmentData);
+        if (!currentUser) {
+            alert("Sessão inválida. Por favor, faça login novamente.");
+            return;
         }
-        onClose();
+
+        if (!title || !date || !time || !typeId) {
+            alert("Por favor, preencha todos os campos obrigatórios.");
+            return;
+        }
+
+        try {
+            // Robust parsing
+            const [year, month, day] = date.split('-').map(Number);
+            const [hour, minute] = time.split(':').map(Number);
+
+            const startDateTime = new Date(year, month - 1, day, hour, minute);
+
+            if (isNaN(startDateTime.getTime())) {
+                throw new Error("Data ou horário inválido.");
+            }
+
+            const endDateTime = new Date(startDateTime.getTime() + duration * 60000);
+
+            const client = clients.find((c: Client) => c.id === clientId);
+
+            const appointmentData: any = {
+                title,
+                start: startDateTime.toISOString(),
+                end: endDateTime.toISOString(),
+                durationMinutes: duration,
+                typeId,
+                clientId: client?.id || null,
+                clientName: client?.name || null,
+                userId: currentUser.id,
+                notes: notes || '',
+                linkedTaskId: initialTask?.id || editingAppointment?.linkedTaskId || null
+            };
+
+            if (editingAppointment) {
+                await updateAppointment(editingAppointment.id, appointmentData);
+            } else {
+                await addAppointment(appointmentData);
+            }
+            onClose();
+        } catch (error: any) {
+            console.error("Erro ao agendar:", error);
+            alert(`Falha ao agendar: ${error.message || "Erro desconhecido"}`);
+        }
     };
 
     const handleDelete = () => {
