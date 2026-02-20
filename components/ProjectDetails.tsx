@@ -12,7 +12,7 @@ interface ProjectDetailsProps {
 }
 
 export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
-    const { currentProjectId, getProjectById, batches, workflowConfig, addNote, advanceBatch, moveBatchToStep, splitBatch, markProjectAsLost, reactivateProject, currentUser, updateEnvironmentDetails, updateProjectITPP, updateClientData, origins, isLastStep, canUserAdvanceStep, allUsers, permissions, updateProjectSeller } = useProjects();
+    const { currentProjectId, getProjectById, batches, workflowConfig, addNote, advanceBatch, moveBatchToStep, splitBatch, markProjectAsLost, reactivateProject, currentUser, updateEnvironmentDetails, updateProjectITPP, updateClientData, origins, isLastStep, canUserAdvanceStep, allUsers, permissions, updateProjectSeller, deleteProject } = useProjects();
     const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'ENVIRONMENTS' | 'ITPP' | 'TIMELINE'>('OVERVIEW');
     const [noteContent, setNoteContent] = useState('');
 
@@ -243,6 +243,14 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
     // Helper to check if current user can edit client data (Sales/Admin only usually)
     const canEditClient = currentUser?.role === 'Admin' || currentUser?.role === 'Vendedor' || currentUser?.role === 'Proprietario' || currentUser?.role === 'Gerente';
     const canChangeSeller = permissions.find((p: { role: Role }) => p.role === currentUser?.role)?.canChangeSeller || false;
+    const canDeleteProject = currentUser?.role === 'Admin' || currentUser?.role === 'Proprietario';
+
+    const handleDeleteProject = async () => {
+        if (confirm('TEM CERTEZA ABSOLUTA? Esta ação irá excluir o projeto inteiro e todo seu histórico. Não poderá ser desfeita.')) {
+            await deleteProject(project.id);
+            onBack();
+        }
+    };
 
     return (
         <div className="flex flex-col h-full bg-slate-50 dark:bg-[#101922] overflow-hidden">
@@ -271,6 +279,17 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                         >
                             <span className="material-symbols-outlined text-sm">restore</span>
                             Reativar Projeto
+                        </button>
+                    )}
+
+                    {canDeleteProject && (
+                        <button
+                            onClick={handleDeleteProject}
+                            className="px-3 py-2 text-xs font-bold text-rose-500 hover:text-white hover:bg-rose-600 rounded-lg transition-colors flex items-center gap-1 border border-rose-200 dark:border-rose-800"
+                            title="Deletar este projeto definitivamente"
+                        >
+                            <span className="material-symbols-outlined text-sm">delete_forever</span>
+                            Deletar
                         </button>
                     )}
 
@@ -330,10 +349,38 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                             const userCanAdvance = canUserAdvanceStep(batch.phase);
 
                             if (!step) {
-                                return <div key={batch.id} className="text-red-500 bg-red-50 p-4 rounded border border-red-200">
-                                    <p className="font-bold">Erro de Dados</p>
-                                    <p className="text-sm">A etapa '{batch.phase}' não foi encontrada na configuração.</p>
-                                </div>;
+                                return (
+                                    <div key={batch.id} className="text-rose-500 bg-rose-50 dark:bg-rose-900/20 p-6 rounded-lg border border-rose-200 dark:border-rose-800 shadow-sm">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="material-symbols-outlined">error</span>
+                                            <h3 className="font-bold text-lg">Erro de Dados no Fluxo</h3>
+                                        </div>
+                                        <p className="text-sm text-rose-700 dark:text-rose-300">
+                                            A etapa atual do projeto ('{batch.phase}') não foi encontrada na configuração do sistema.
+                                        </p>
+
+                                        {(currentUser?.role === 'Admin' || currentUser?.role === 'Proprietario') && (
+                                            <div className="mt-6 p-4 bg-white dark:bg-slate-900 rounded border border-rose-100 dark:border-rose-900">
+                                                <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Ação de Correção (Apenas Admin):</p>
+                                                <p className="text-xs text-slate-500 mb-3">Selecione uma etapa válida para reposicionar o projeto e corrigir este erro.</p>
+                                                <select
+                                                    className="w-full text-sm border-slate-300 dark:border-slate-700 dark:bg-slate-800 rounded p-2.5 focus:ring-rose-500 focus:border-rose-500"
+                                                    onChange={(e) => {
+                                                        if (e.target.value) {
+                                                            moveBatchToStep(batch.id, e.target.value);
+                                                        }
+                                                    }}
+                                                    value=""
+                                                >
+                                                    <option value="">-- Selecionar nova etapa --</option>
+                                                    {Object.values(workflowConfig).map(s => (
+                                                        <option key={s.id} value={s.id}>{s.id} - {s.label}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
                             }
 
                             return (
@@ -437,6 +484,32 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                                             </>
                                                         )}
                                                     </button>
+                                                </div>
+                                            )}
+
+                                            {/* Reposition Batch Dropdown (Admin Only) */}
+                                            {(currentUser?.role === 'Admin' || currentUser?.role === 'Proprietario') && !isFinished && !isLost && (
+                                                <div className="w-full mt-6 pt-6 border-t border-slate-100 dark:border-slate-800">
+                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg">
+                                                        <div>
+                                                            <p className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Ação Administrativa</p>
+                                                            <p className="text-xs text-slate-500 mt-1">Forçar reposicionamento no fluxo</p>
+                                                        </div>
+                                                        <select
+                                                            className="text-sm border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded-lg p-2.5 bg-white min-w-[250px]"
+                                                            onChange={(e) => {
+                                                                if (e.target.value && confirm(`Você está forçando a movimentação deste lote para a etapa ${e.target.value}. O responsável será alterado.\n\nTem certeza que deseja continuar?`)) {
+                                                                    moveBatchToStep(batch.id, e.target.value);
+                                                                }
+                                                            }}
+                                                            value=""
+                                                        >
+                                                            <option value="">Mover para etapa...</option>
+                                                            {Object.values(workflowConfig).map(s => (
+                                                                <option key={s.id} value={s.id}>{s.id} - {s.label}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
