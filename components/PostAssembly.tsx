@@ -62,7 +62,7 @@ const PostAssembly: React.FC = () => {
         const batch = getProjectBatch(p.id);
         if (!batch) return false;
 
-        const step = workflowConfig[batch.currentStepId];
+        const step = workflowConfig[batch.phase];
         return step && (step.id === '7.1' || step.id === '7.2');
     });
 
@@ -208,7 +208,7 @@ const PostAssembly: React.FC = () => {
         const batch = getProjectBatch(selectedProject.id);
         if (!batch) return;
 
-        const currentStep = batch.currentStepId;
+        const currentStep = batch.phase;
         const currentIndex = POST_ASSEMBLY_STEP_IDS.indexOf(currentStep);
 
         if (currentIndex !== -1 && currentIndex < POST_ASSEMBLY_STEP_IDS.length - 1) {
@@ -374,7 +374,7 @@ const PostAssembly: React.FC = () => {
                         // Filter logic
                         const columnProjects = projects.filter(p => {
                             const batch = getProjectBatch(p.id);
-                            if (!batch || batch.currentStepId !== stepId) return false;
+                            if (!batch || batch.phase !== stepId) return false;
 
                             const matchClient = p.client.name.toLowerCase().includes(filterClient.toLowerCase());
                             return matchClient;
@@ -451,7 +451,7 @@ const PostAssembly: React.FC = () => {
                                         {eligibleProjects.map((p: Project) => {
                                             const batch = getProjectBatch(p.id);
                                             return (
-                                                <option key={p.id} value={p.id}>{p.client.name} ({batch?.currentStepId})</option>
+                                                <option key={p.id} value={p.id}>{p.client.name} ({batch?.phase})</option>
                                             );
                                         })}
                                     </select>
@@ -566,7 +566,7 @@ const PostAssembly: React.FC = () => {
                                         Etapa: {
                                             (() => {
                                                 const batch = getProjectBatch(selectedProject.id);
-                                                return batch ? (workflowConfig[batch.currentStepId]?.label || batch.currentStepId) : 'N/A';
+                                                return batch ? (workflowConfig[batch.phase]?.label || batch.phase) : 'N/A';
                                             })()
                                         }
                                     </span>
@@ -756,7 +756,7 @@ const PostAssembly: React.FC = () => {
                                 <button onClick={() => { setIsInspectionOpen(false); setSelectedProject(null); }} className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 font-bold text-sm">Fechar</button>
                                 {(() => {
                                     const batch = getProjectBatch(selectedProject.id);
-                                    if (batch && batch.currentStepId !== '8.7') {
+                                    if (batch && batch.phase !== '8.7') {
                                         return (
                                             <button
                                                 onClick={handleAdvanceStep}

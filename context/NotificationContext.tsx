@@ -49,9 +49,9 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
             const now = new Date();
 
             batches.forEach(batch => {
-                const step = workflowConfig[batch.currentStepId];
+                const step = workflowConfig[batch.phase];
                 if (!step || step.sla === 0) return; // Skip no-SLA steps
-                if (batch.currentStepId === '9.0' || batch.currentStepId === '9.1') return; // Skip completed
+                if (batch.phase === '9.0' || batch.phase === '9.1') return; // Skip completed
 
                 const lastUpdate = new Date(batch.lastUpdated);
                 const daysSinceUpdate = (now.getTime() - lastUpdate.getTime()) / (1000 * 3600 * 24);

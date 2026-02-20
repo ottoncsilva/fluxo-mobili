@@ -69,7 +69,7 @@ describe('ProjectContext - Split Batch', () => {
 
         expect(newBatch).toBeDefined();
         expect(newBatch?.environmentIds).toEqual(envsToMove);
-        expect(newBatch?.currentStepId).toBe(batchToSplit.currentStepId); // Should stay in same step by default
+        expect(newBatch?.phase).toBe(batchToSplit.phase); // Should stay in same step by default
 
         expect(originalBatchUpdated).toBeDefined();
         expect(originalBatchUpdated?.environmentIds).toEqual(envsToStay);
@@ -92,7 +92,7 @@ describe('ProjectContext - Split Batch', () => {
         });
 
         const newBatchBefore = result.current.batches.find((b: any) => b.id === newBatchId)!;
-        const initialStep = newBatchBefore.currentStepId;
+        const initialStep = newBatchBefore.phase;
 
         // Advance
         act(() => {
@@ -100,7 +100,7 @@ describe('ProjectContext - Split Batch', () => {
         });
 
         const newBatchAfter = result.current.batches.find((b: any) => b.id === newBatchId)!;
-        expect(newBatchAfter.currentStepId).not.toBe(initialStep);
+        expect(newBatchAfter.phase).not.toBe(initialStep);
     });
 });
 

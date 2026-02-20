@@ -10,18 +10,18 @@ const Dashboard: React.FC = () => {
         if (!currentUser) return [];
         // Filter by role owner or admin
         const filtered = batches.filter(batch => {
-            const step = workflowConfig[batch.currentStepId];
+            const step = workflowConfig[batch.phase];
             if (!step) return false;
             // Hide Completed (9.0) and Lost (9.1) from Dashboard
-            if (batch.currentStepId === '9.0' || batch.currentStepId === '9.1') return false;
+            if (batch.phase === '9.0' || batch.phase === '9.1') return false;
 
             return currentUser.role === 'Admin' || currentUser.role === 'Proprietario' || step.ownerRole === currentUser.role;
         });
 
         // Sort by Deadline (SLA): Most delayed first (oldest deadline) to future deadlines
         return filtered.sort((a, b) => {
-            const stepA = workflowConfig[a.currentStepId];
-            const stepB = workflowConfig[b.currentStepId];
+            const stepA = workflowConfig[a.phase];
+            const stepB = workflowConfig[b.phase];
 
             const lastUpdateA = new Date(a.lastUpdated).getTime();
             const lastUpdateB = new Date(b.lastUpdated).getTime();
@@ -59,7 +59,7 @@ const Dashboard: React.FC = () => {
                         ) : (
                             myTasks.map(batch => {
                                 const project = projects.find(p => p.id === batch.projectId);
-                                const step = workflowConfig[batch.currentStepId];
+                                const step = workflowConfig[batch.phase];
 
                                 const lastUpdate = new Date(batch.lastUpdated);
                                 const deadline = new Date(lastUpdate.getTime() + (step.sla * 24 * 60 * 60 * 1000));
@@ -76,7 +76,7 @@ const Dashboard: React.FC = () => {
                                                 </div>
                                                 <div>
                                                     <h4 className="font-bold text-sm text-slate-800 dark:text-white line-clamp-1">{project?.client.name}</h4>
-                                                    <p className="text-[10px] text-slate-400">{batch.name}</p>
+                                                    <p className="text-[10px] text-slate-400">Ambientes</p>
                                                 </div>
                                             </div>
                                             <div className={`px-2 py-0.5 rounded text-[10px] font-bold ${diffDays < 0 ? 'bg-rose-100 text-rose-600' : diffDays <= 1 ? 'bg-orange-100 text-orange-600' : 'bg-emerald-100 text-emerald-600'}`}>

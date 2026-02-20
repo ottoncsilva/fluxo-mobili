@@ -192,8 +192,8 @@ const SEED_PROJECTS: Project[] = [
 ];
 
 const SEED_BATCHES: Batch[] = [
-    { id: 'b1', storeId: MASTER_STORE_ID, projectId: 'p1', name: 'Projeto Completo', currentStepId: '1.2', environmentIds: ['e1', 'e2'], createdAt: '2024-10-10', lastUpdated: '2024-10-12' },
-    { id: 'b2', storeId: MASTER_STORE_ID, projectId: 'p2', name: 'Lote 1', currentStepId: '4.5', environmentIds: ['e3'], createdAt: '2024-09-15', lastUpdated: '2024-10-18' },
+    { id: 'b1', storeId: MASTER_STORE_ID, projectId: 'p1', name: 'Projeto Completo', phase: '1.2', environmentIds: ['e1', 'e2'], createdAt: '2024-10-10', lastUpdated: '2024-10-12', status: 'Active' },
+    { id: 'b2', storeId: MASTER_STORE_ID, projectId: 'p2', name: 'Lote 1', phase: '4.5', environmentIds: ['e3'], createdAt: '2024-09-15', lastUpdated: '2024-10-18', status: 'Active' },
 ];
 
 const DEFAULT_PERMISSIONS: PermissionConfig[] = [
@@ -866,8 +866,9 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             storeId: currentUser.storeId,
             projectId: newProject.id,
             name: 'Projeto Geral',
-            currentStepId: workflowOrder[0] || '1.1',
+            phase: workflowOrder[0] || '1.1',
             environmentIds: newProject.environments.map(e => e.id),
+            status: 'Active',
             createdAt: new Date().toISOString(),
             lastUpdated: new Date().toISOString(),
         };
@@ -976,18 +977,18 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         if (!batch) return;
 
         // Permission check for the CURRENT step being finished
-        if (!canUserAdvanceStep(batch.currentStepId)) {
+        if (!canUserAdvanceStep(batch.phase)) {
             alert("Você não tem permissão para esta ação nesta etapa.");
             return;
         }
 
-        const currentStepLabel = workflowConfig[batch.currentStepId]?.label || batch.currentStepId;
+        const currentStepLabel = workflowConfig[batch.phase]?.label || batch.phase;
         const nextStepLabel = workflowConfig[targetStepId]?.label || targetStepId;
 
         addNote(batch.projectId, `Movimentação direta: ${currentStepLabel} → ${nextStepLabel}`, currentUser?.id || 'sys');
 
         const updateData = {
-            currentStepId: targetStepId,
+            phase: targetStepId,
             lastUpdated: new Date().toISOString()
         };
 
@@ -1011,13 +1012,13 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         const batch = allBatches.find(b => b.id === batchId);
         if (!batch) return;
 
-        if (!canUserAdvanceStep(batch.currentStepId)) {
+        if (!canUserAdvanceStep(batch.phase)) {
             alert("Você não tem permissão para concluir esta etapa.");
             return;
         }
 
         // 2. Calculate next step using dynamic order
-        let currentIndex = workflowOrder.indexOf(batch.currentStepId);
+        let currentIndex = workflowOrder.indexOf(batch.phase);
 
         if (currentIndex === -1) {
             currentIndex = 0;
@@ -1038,13 +1039,13 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             if (step90Index !== -1) finalNextStepId = '9.0';
         }
 
-        const currentStep = workflowConfig[batch.currentStepId];
+        const currentStep = workflowConfig[batch.phase];
         const nextStep = workflowConfig[finalNextStepId];
 
         addNote(batch.projectId, `Etapa concluída: ${currentStep.label} → ${nextStep?.label || 'Finalizado'}`, currentUser?.id || 'sys');
 
         const updateData = {
-            currentStepId: finalNextStepId,
+            phase: finalNextStepId,
             lastUpdated: new Date().toISOString()
         };
 
@@ -1066,7 +1067,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     const markProjectAsLost = (projectId: string, reason: string) => {
         // 1. Find batches for this project
         const projectBatches = allBatches.filter(b => b.projectId === projectId);
-        const batchUpdates = { currentStepId: '9.1', lastUpdated: new Date().toISOString() };
+        const batchUpdates = { phase: '9.1', lastUpdated: new Date().toISOString() };
 
         // 2. Update all batches to 9.1
         if (useCloud) {
@@ -1084,7 +1085,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     const reactivateProject = (projectId: string) => {
         // 1. Find batches for this project
         const projectBatches = allBatches.filter(b => b.projectId === projectId);
-        const batchUpdates = { currentStepId: '1.1', lastUpdated: new Date().toISOString() };
+        const batchUpdates = { phase: '1.1', lastUpdated: new Date().toISOString() };
 
         // 2. Update all batches to start from 1.1 (Briefing)
         if (useCloud) {
@@ -1104,15 +1105,16 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         if (!originalBatch || !currentUser) return;
 
         // Determine destination step: provided target OR current step (split in place)
-        const destinationStepId = targetStepId || originalBatch.currentStepId;
+        const destinationStepId = targetStepId || originalBatch.phase;
 
         const newBatch: Batch = {
             id: `b-${Date.now()}`,
             storeId: currentUser.storeId,
             projectId: originalBatch.projectId,
             name: `${originalBatch.name} (Parcial)`,
-            currentStepId: destinationStepId,
+            phase: destinationStepId,
             environmentIds: selectedEnvironmentIds,
+            status: 'Active',
             createdAt: new Date().toISOString(),
             lastUpdated: new Date().toISOString(),
         };
@@ -1390,9 +1392,9 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             for (const batch of allBatches) {
                 // Skip if already notified or if completed/lost
                 if (batch.slaNotificationSent) continue;
-                if (['9.0', '9.1'].includes(batch.currentStepId)) continue;
+                if (['9.0', '9.1'].includes(batch.phase)) continue;
 
-                const step = workflowConfig[batch.currentStepId];
+                const step = workflowConfig[batch.phase];
                 if (!step || !step.sla) continue; // No SLA for this step
 
                 const lastUpdate = new Date(batch.lastUpdated);

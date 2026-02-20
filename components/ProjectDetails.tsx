@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useProjects } from '../context/ProjectContext';
-import { Batch, ITPP, Client, Project, Note } from '../types';
+import { Batch, Client, Project, Note, WorkflowStep, Environment } from '../types';
 import { maskPhone, maskCPF } from '../utils/masks';
 import StepDecisionModal from './StepDecisionModal';
 import LotModal from './LotModal';
@@ -86,10 +86,10 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
     };
 
     const handleAdvance = (batch: Batch) => {
-        const step = workflowConfig[batch.currentStepId];
+        const step = workflowConfig[batch.phase];
 
         // CHECK FOR BRANCHING
-        if (['2.3', '2.5', '2.8', '4.3', '4.6'].includes(batch.currentStepId)) {
+        if (['2.3', '2.5', '2.8', '4.3', '4.6'].includes(batch.phase)) {
             setDecisionModalData({ batch, step });
             return;
         }
@@ -157,7 +157,8 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
     const handleSplitConfirmed = async (selectedIds: string[]) => {
         if (!splitModalBatch) return;
 
-        if (selectedIds.length === splitModalBatch.environmentIds.length) {
+        if (!project) return;
+        if (selectedIds.length === project.environments.length) {
             setIsUpdatingStep(splitModalBatch.id);
             await advanceBatch(splitModalBatch.id);
             setIsUpdatingStep(null);
@@ -297,15 +298,15 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                 {activeTab === 'OVERVIEW' && (
                     <div className="space-y-6">
                         {projectBatches.map((batch: Batch) => {
-                            const step = workflowConfig[batch.currentStepId];
-                            const isFinished = batch.currentStepId === '9.0';
-                            const isLost = batch.currentStepId === '9.1';
-                            const userCanAdvance = canUserAdvanceStep(batch.currentStepId);
+                            const step = workflowConfig[batch.phase];
+                            const isFinished = batch.phase === '9.0';
+                            const isLost = batch.phase === '9.1';
+                            const userCanAdvance = canUserAdvanceStep(batch.phase);
 
                             if (!step) {
                                 return <div key={batch.id} className="text-red-500 bg-red-50 p-4 rounded border border-red-200">
                                     <p className="font-bold">Erro de Dados</p>
-                                    <p className="text-sm">A etapa '{batch.currentStepId}' não foi encontrada na configuração.</p>
+                                    <p className="text-sm">A etapa '{batch.phase}' não foi encontrada na configuração.</p>
                                 </div>;
                             }
 
@@ -348,7 +349,7 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                                 {isFinished ? (
                                                     <>
                                                         <p className="text-slate-600 dark:text-slate-300 text-lg">
-                                                            O lote <span className="font-bold">"{batch.name}"</span> foi entregue com sucesso em <span className="font-bold">{new Date(batch.lastUpdated).toLocaleDateString()}</span>.
+                                                            O lote <span className="font-bold">"Lote {batch.id.substring(0, 4)}"</span> foi entregue com sucesso em <span className="font-bold">{new Date(batch.lastUpdated).toLocaleDateString()}</span>.
                                                         </p>
                                                         <p className="text-sm text-green-600 dark:text-green-400 mt-2 font-bold">Processo completo!</p>
                                                     </>
@@ -362,7 +363,7 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                                 ) : (
                                                     <>
                                                         <p className="text-slate-600 dark:text-slate-300 text-lg">
-                                                            O lote <span className="font-bold">"{batch.name}"</span> está pendente nesta etapa desde <span className="font-bold">{new Date(batch.lastUpdated).toLocaleDateString()}</span>.
+                                                            O lote <span className="font-bold">"Lote {batch.id.substring(0, 4)}"</span> está pendente nesta etapa desde <span className="font-bold">{new Date(batch.lastUpdated).toLocaleDateString()}</span>.
                                                         </p>
                                                         {!userCanAdvance && (
                                                             <p className="text-sm text-orange-500 mt-2 font-bold flex items-center justify-center gap-1">
@@ -374,7 +375,7 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                                 )}
                                             </div>
 
-                                            {!isLastStep(batch.currentStepId) && userCanAdvance && (
+                                            {!isLastStep(batch.phase) && userCanAdvance && (
                                                 <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
                                                     {/* Split button (only for specific stages 3, 4, 5) */}
                                                     {(step.stage === 3 || step.stage === 4 || step.stage === 5) && (
@@ -1007,9 +1008,9 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                 <StepDecisionModal
                     isOpen={!!decisionModalData}
                     onClose={() => setDecisionModalData(null)}
-                    batchName={decisionModalData.batch.name}
+                    batchName={`Lote ${decisionModalData.batch.id.substring(0, 4)}`}
                     currentStep={decisionModalData.step}
-                    options={getBranchingOptions(decisionModalData.batch.currentStepId)}
+                    options={getBranchingOptions(decisionModalData.batch.phase)}
                     onSelect={handleDecisionSelect}
                 />
             )}

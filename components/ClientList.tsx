@@ -29,7 +29,7 @@ const ClientList: React.FC = () => {
     // Calculate the "max" stage of the project
     let maxStage = 0;
     if (projectBatches.length > 0) {
-      maxStage = Math.max(...projectBatches.map(b => workflowConfig[b.currentStepId]?.stage || 1));
+      maxStage = Math.max(...projectBatches.map(b => workflowConfig[b.phase]?.stage || 1));
     } else {
       // If no batches (new project), assume stage 1
       maxStage = 1;
@@ -138,8 +138,8 @@ const ClientList: React.FC = () => {
 
                 // Determine display status/stage
                 const projectBatches = batches.filter(b => b.projectId === project.id);
-                const currentStepId = projectBatches.length > 0 ? projectBatches[0].currentStepId : '1.1';
-                const currentStep = workflowConfig[currentStepId];
+                const phase = projectBatches.length > 0 ? projectBatches[0].phase : '1.1';
+                const currentStep = workflowConfig[phase];
 
                 return (
                   <tr key={project.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">

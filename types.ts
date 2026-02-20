@@ -202,8 +202,11 @@ export interface Batch {
   id: string;
   storeId: string;
   projectId: string;
+  name?: string;
   phase: string;
+  environmentIds?: string[];
   status: 'Active' | 'Completed' | 'Lost' | 'Archived';
+  createdAt?: string; // Date
   lastUpdated: string; // Date
   slaNotificationSent?: boolean; // New flag for SLA
 }
@@ -277,7 +280,7 @@ export interface KanbanCard {
   daysDiff: number;
   date: string;
   environmentCount: number;
-  currentStepId: string;
+  phase: string;
   projectId: string;
 }
 

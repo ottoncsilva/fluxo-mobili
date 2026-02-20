@@ -45,14 +45,14 @@ export const DashboardKPIs: React.FC = () => {
 
         let activeProjects = 0;
         filteredBatches.forEach(b => {
-            if (b.currentStepId !== '9.0' && b.currentStepId !== '9.1') {
+            if (b.phase !== '9.0' && b.phase !== '9.1') {
                 activeProjects++;
             }
         });
 
         const totalSales = filteredProjects.reduce((acc, p) => {
             const projectBatch = filteredBatches.find(b => b.projectId === p.id);
-            const isDelivered = projectBatch?.currentStepId === '9.0';
+            const isDelivered = projectBatch?.phase === '9.0';
             const isWon = p.client.status === 'Concluido';
             if (isWon || isDelivered) {
                 return acc + (p.total_estimated_value || 0);
@@ -62,8 +62,8 @@ export const DashboardKPIs: React.FC = () => {
 
         // Conversion rate: projects that reached step 2.9+ vs total projects in the period
         const convertedCount = filteredBatches.filter(b => {
-            const stepNum = parseFloat(b.currentStepId);
-            return stepNum >= 2.9 && b.currentStepId !== '9.1';
+            const stepNum = parseFloat(b.phase);
+            return stepNum >= 2.9 && b.phase !== '9.1';
         }).length;
 
         const totalInPeriod = filteredProjects.length;
@@ -131,7 +131,7 @@ export const DashboardGraphs: React.FC = () => {
         Object.keys(stageNames).forEach(stage => stageCounts[stage] = 0);
 
         batches.forEach(batch => {
-            const step = workflowConfig[batch.currentStepId];
+            const step = workflowConfig[batch.phase];
             if (step) {
                 if (stageCounts[step.stage] !== undefined) {
                     stageCounts[step.stage]++;
@@ -151,7 +151,7 @@ export const DashboardGraphs: React.FC = () => {
         projects.forEach(project => {
             const isWon = project.client.status === 'Concluido';
             const projectBatch = batches.find(b => b.projectId === project.id);
-            const isDelivered = projectBatch?.currentStepId === '9.0';
+            const isDelivered = projectBatch?.phase === '9.0';
 
             if (isWon || isDelivered) {
                 const seller = project.sellerName || 'Sem Vendedor';

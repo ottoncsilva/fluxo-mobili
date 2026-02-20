@@ -17,7 +17,7 @@ const TaskSidebar: React.FC<TaskSidebarProps> = ({ onSchedule }) => {
 
         return batches.map(b => {
             const project = projects.find(p => p.id === b.projectId);
-            const step = workflowConfig[b.currentStepId];
+            const step = workflowConfig[b.phase];
             if (!step || !project) return null;
 
             const lastUpdate = new Date(b.lastUpdated);
