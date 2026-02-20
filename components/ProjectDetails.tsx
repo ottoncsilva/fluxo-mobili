@@ -109,44 +109,68 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
     };
 
     const getBranchingOptions = (stepId: string) => {
-        // 2.3 Orçamento
-        if (stepId === '2.3') {
+        if (stepId === '1.1') {
             return [
-                { label: 'Aprovar Orçamento', description: 'Cliente aprovou, seguir para apresentação.', targetStepId: '2.4', color: 'emerald', icon: 'check_circle' } as const,
-                { label: 'Revisar / Ajustar', description: 'Cliente pediu alterações no orçamento.', targetStepId: '2.1', color: 'orange', icon: 'edit' } as const,
-                { label: 'Cancelelar / Perdido', description: 'Cliente não aceitou. Marcar como perdido.', targetStepId: '9.1', color: 'rose', icon: 'cancel' } as const,
+                { label: 'Visita Showroom', description: 'Cliente fará visita presencial.', targetStepId: '1.2', color: 'emerald', icon: 'storefront' } as const,
+                { label: 'Follow Up', description: 'Manter contato ativo.', targetStepId: '1.3', color: 'primary', icon: 'phone_in_talk' } as const,
+                { label: 'Projetar Ambientes', description: 'Pular visita e ir direto para projeto.', targetStepId: '2.1', color: 'emerald', icon: 'architecture' } as const,
+            ];
+        }
+        if (stepId === '1.2') {
+            return [
+                { label: 'Follow Up', description: 'Manter contato ativo.', targetStepId: '1.3', color: 'primary', icon: 'phone_in_talk' } as const,
+                { label: 'Projetar Ambientes', description: 'Avançar para projeto.', targetStepId: '2.1', color: 'emerald', icon: 'architecture' } as const,
             ];
         }
 
+        if (stepId === '2.3') {
+            return [
+                { label: 'Aprovar Orçamento', description: 'Avançar para montagem da apresentação.', targetStepId: '2.4', color: 'emerald', icon: 'check_circle' } as const,
+                { label: 'Revisar / Ajustar', description: 'Retornar para rascunho (Projetar Mobiliário).', targetStepId: '2.2', color: 'orange', icon: 'edit' } as const,
+                { label: 'Cancelar / Perdido', description: 'Cliente não aceitou. Marcar como perdido.', targetStepId: '9.1', color: 'rose', icon: 'cancel' } as const
+            ];
+        }
         if (stepId === '2.5') {
             return [
-                { label: 'Aprovado', description: 'Prosseguir para negociação/fechamento', targetStepId: '2.8', color: 'emerald', icon: 'check_circle' } as const,
-                { label: 'Ajuste Solicitado', description: 'Retornar para ajustes de projeto', targetStepId: '2.6', color: 'orange', icon: 'edit' } as const,
-                { label: 'Follow Up', description: 'Manter em acompanhamento', targetStepId: '2.7', color: 'primary', icon: 'running_with_errors' } as const,
+                { label: 'Aprovado', description: 'Prosseguir para Detalhamento de Contrato.', targetStepId: '2.9', color: 'emerald', icon: 'verified' } as const,
+                { label: 'Ajuste Solicitado', description: 'Retornar para ajustes de proposta.', targetStepId: '2.6', color: 'orange', icon: 'edit' } as const,
+                { label: 'Follow Up', description: 'Manter em acompanhamento de vendas.', targetStepId: '2.7', color: 'primary', icon: 'running_with_errors' } as const,
+            ];
+        }
+        if (stepId === '2.6') {
+            return [
+                { label: 'Follow Up', description: 'Manter em acompanhamento de vendas.', targetStepId: '2.7', color: 'primary', icon: 'phone_in_talk' } as const,
+                { label: 'Reunião de Fechamento', description: 'Agendar fechamento.', targetStepId: '2.8', color: 'emerald', icon: 'handshake' } as const,
             ];
         }
         if (stepId === '2.8') {
             return [
-                { label: 'Venda Fechada', description: 'Assinatura do contrato e detalhamento', targetStepId: '2.9', color: 'emerald', icon: 'verified' } as const,
-                { label: 'Ajuste Solicitado', description: 'Retornar para ajustes na proposta', targetStepId: '2.6', color: 'orange', icon: 'edit_square' } as const,
-                { label: 'Ir para Follow-up', description: 'Manter contato para fechamento futuro', targetStepId: '2.7', color: 'primary', icon: 'event_repeat' } as const,
+                { label: 'Venda Fechada', description: 'Avançar para Contrato e Detalhamento.', targetStepId: '2.9', color: 'emerald', icon: 'verified' } as const,
+                { label: 'Ajuste Solicitado', description: 'Retornar para ajustes na proposta.', targetStepId: '2.6', color: 'orange', icon: 'edit_square' } as const,
+                { label: 'Ir para Follow-up', description: 'Manter contato para fechamento futuro.', targetStepId: '2.7', color: 'primary', icon: 'event_repeat' } as const,
             ];
         }
 
-        // 4.3 Aprovação Financeira
         if (stepId === '4.3') {
             return [
-                { label: 'Aprovado Financeiro', description: 'Pagamento confirmado/liberado.', targetStepId: '4.4', color: 'emerald', icon: 'verified' } as const,
-                { label: 'Pendência Financeira', description: 'Falta pagamento ou doc. Voltar para Negociação.', targetStepId: '2.9', color: 'rose', icon: 'payments' } as const,
+                { label: 'Aprovado Financeiro', description: 'Pagamento liberado. Avançar para detalhamento.', targetStepId: '4.4', color: 'emerald', icon: 'verified' } as const,
+                { label: 'Pendência Financeira', description: 'Retornar para Construção de Mobiliário.', targetStepId: '4.2', color: 'rose', icon: 'payments' } as const,
+            ];
+        }
+
+        if (stepId === '4.5') {
+            return [
+                { label: 'Tudo Certo (Implantação)', description: 'Projeto aprovado, ir para implantação.', targetStepId: '5.1', color: 'emerald', icon: 'check_circle' } as const,
+                { label: 'Solicitar Correção', description: 'Devolver para o liberador corrigir.', targetStepId: '4.6', color: 'rose', icon: 'build' } as const,
             ];
         }
 
         if (stepId === '4.6') {
             return [
-                { label: 'Tudo Certo', description: 'Prosseguir para aprovação financeira', targetStepId: '4.8', color: 'emerald', icon: 'verified' } as const,
-                { label: 'Precisa Correção', description: 'Retornar para o liberador corrigir', targetStepId: '4.7', color: 'rose', icon: 'build' } as const,
+                { label: 'Revisão Concluída', description: 'Retornar projeto revisado para o Vendedor.', targetStepId: '4.5', color: 'emerald', icon: 'check_circle' } as const,
             ];
         }
+
         return [];
     };
 

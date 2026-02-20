@@ -3,7 +3,7 @@ import { useProjects } from '../context/ProjectContext';
 import { ViewState } from '../types';
 
 const ClientList: React.FC = () => {
-  const { projects, batches, workflowConfig, setCurrentProjectId, currentUser, deleteProject } = useProjects();
+  const { projects, batches, workflowConfig, setCurrentProjectId, currentUser, deleteProject, assistanceTickets } = useProjects();
   const [filter, setFilter] = useState<'Todos' | 'Ativos' | 'EmAndamento' | 'Concluidos' | 'Perdidos'>('Todos');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -20,29 +20,43 @@ const ClientList: React.FC = () => {
     if (filter === 'Perdidos') return p.client.status === 'Perdido';
     if (filter === 'Concluidos') return p.client.status === 'Concluido';
 
-    // For 'Ativos' (Pre-Sales) vs 'EmAndamento' (Sold/In Progress)
-    // We check the stage of the project's batches
-    if (p.client.status !== 'Ativo') return false;
-
     const projectBatches = batches.filter(b => b.projectId === p.id);
 
     // Calculate the "max" stage of the project
     let maxStage = 0;
     if (projectBatches.length > 0) {
-      maxStage = Math.max(...projectBatches.map(b => workflowConfig[b.phase]?.stage || 1));
+      maxStage = Math.max(...projectBatches.map(b => {
+        const configStage = workflowConfig[b.phase]?.stage;
+        if (configStage !== undefined) return configStage;
+
+        // Fallback for phases like '10.1' that might be in legacy data
+        const fallbackStage = Math.floor(parseFloat(b.phase));
+        return isNaN(fallbackStage) ? 1 : fallbackStage;
+      }));
     } else {
       // If no batches (new project), assume stage 1
       maxStage = 1;
     }
 
+    // Checking if there are active assistance tickets for this client (Stage 10)
+    // Using simple lookup for assistanceTickets (needs to be destructured from useProjects if available)
+
     if (filter === 'Ativos') {
+      if (p.client.status !== 'Ativo') return false;
       // Active/Unsold: Max Stage <= 2 (Pre-Sales & Sales)
       return maxStage <= 2;
     }
 
     if (filter === 'EmAndamento') {
-      // Sold/In Progress: Max Stage > 2 (Measurement, Execution, etc.)
-      return maxStage > 2;
+      // Em Andamento implies sold, so it can be Ativo with Stage > 2
+      // OR it could be Concluído but has an ongoing Assistance ticket (if we decide to include them here)
+      // For now, if Ativo and > 2
+      if (p.client.status === 'Ativo') return maxStage > 2;
+
+      // If it's a legacy or strange phase > 9 and not explicitly "Perdido"
+      if (p.client.status !== 'Perdido' && maxStage > 9) return true;
+
+      return false;
     }
 
     return false;

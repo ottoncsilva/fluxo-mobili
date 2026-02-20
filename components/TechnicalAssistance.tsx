@@ -1,16 +1,8 @@
 import React, { useState } from 'react';
 import { useProjects } from '../context/ProjectContext';
-import { AssistanceTicket, AssistanceStatus, AssistanceItem, AssistanceEvent } from '../types';
+import { AssistanceTicket, AssistanceStatus, AssistanceItem, AssistanceEvent, AssistanceWorkflowStep } from '../types';
 
-const ASSISTANCE_COLUMNS_DEF: { id: AssistanceStatus, title: string }[] = [
-    { id: '10.1', title: '10.1 - Levantamento' },
-    { id: '10.2', title: '10.2 - Solicitação de Assistencia' },
-    { id: '10.3', title: '10.3 - Fabricação de Assistencia' },
-    { id: '10.4', title: '10.4 - Transporte de Assistencia' },
-    { id: '10.5', title: '10.5 - Montagem Assistencia' },
-    { id: '10.6', title: '10.6 - Vistoria de Assistencia' },
-    { id: '10.7', title: '10.7 - Concluido' },
-];
+
 
 const TechnicalAssistance: React.FC = () => {
     const { assistanceTickets, updateAssistanceTicket, addAssistanceTicket, projects, assistanceWorkflow, canUserEditAssistance, currentUser, companySettings } = useProjects();
@@ -155,10 +147,10 @@ const TechnicalAssistance: React.FC = () => {
 
     const handleAdvanceTicket = () => {
         if (!activeTicket) return;
-        const currentIdx = ASSISTANCE_COLUMNS_DEF.findIndex(c => c.id === activeTicket.status);
-        if (currentIdx < ASSISTANCE_COLUMNS_DEF.length - 1) {
-            const nextStatus = ASSISTANCE_COLUMNS_DEF[currentIdx + 1].id;
-            const nextStatusTitle = ASSISTANCE_COLUMNS_DEF[currentIdx + 1].title;
+        const currentIdx = assistanceWorkflow.findIndex((c: AssistanceWorkflowStep) => c.id === activeTicket.status);
+        if (currentIdx > -1 && currentIdx < assistanceWorkflow.length - 1) {
+            const nextStatus = assistanceWorkflow[currentIdx + 1].id;
+            const nextStatusTitle = assistanceWorkflow[currentIdx + 1].label;
 
             const newEvent: AssistanceEvent = {
                 id: `evt-${Date.now()}`,
@@ -374,11 +366,13 @@ const TechnicalAssistance: React.FC = () => {
             {/* Kanban */}
             <div className="flex-1 overflow-x-auto p-6 custom-scrollbar">
                 <div className="flex h-full gap-4 w-max">
-                    {ASSISTANCE_COLUMNS_DEF.map(col => {
-                        if (hideCompleted && col.id === '10.7') return null;
+                    {assistanceWorkflow.map((col: AssistanceWorkflowStep) => {
+                        // Assuming the last step is "Concluído"
+                        const isCompletedStep = col.id === assistanceWorkflow[assistanceWorkflow.length - 1].id;
+                        if (hideCompleted && isCompletedStep) return null;
 
                         // Filter logic
-                        const columnTickets = assistanceTickets.filter(t => {
+                        const columnTickets = assistanceTickets.filter((t: AssistanceTicket) => {
                             if (t.status !== col.id) return false;
                             const matchClient = t.clientName.toLowerCase().includes(filterClient.toLowerCase());
                             const matchAssembler = filterAssembler ? t.assemblerName?.toLowerCase().includes(filterAssembler.toLowerCase()) : true;
@@ -388,7 +382,7 @@ const TechnicalAssistance: React.FC = () => {
                         return (
                             <div key={col.id} className="flex flex-col w-80 h-full shrink-0">
                                 <div className="flex items-center justify-between mb-3 px-3 py-2 bg-slate-100 dark:bg-[#15202b] rounded-lg border border-slate-200 dark:border-slate-800">
-                                    <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm">{col.title}</h3>
+                                    <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm">{col.id} - {col.label}</h3>
                                     <span className="bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-600">
                                         {columnTickets.length}
                                     </span>
@@ -396,7 +390,7 @@ const TechnicalAssistance: React.FC = () => {
 
                                 <div className="flex-1 bg-slate-100/30 dark:bg-[#15202b]/50 rounded-xl p-2 border border-slate-200/50 dark:border-slate-800 overflow-y-auto custom-scrollbar flex flex-col gap-3">
                                     {columnTickets.map(ticket => {
-                                        const slaDays = assistanceWorkflow.find(s => s.id === ticket.status)?.sla || 0;
+                                        const slaDays = assistanceWorkflow.find((s: AssistanceWorkflowStep) => s.id === ticket.status)?.sla || 0;
                                         return (
                                             <div
                                                 key={ticket.id}
@@ -563,7 +557,7 @@ const TechnicalAssistance: React.FC = () => {
                             <div>
                                 <div className="flex items-center gap-2 mb-1">
                                     <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                                        Etapa: {ASSISTANCE_COLUMNS_DEF.find(c => c.id === activeTicket.status)?.title}
+                                        Etapa: {assistanceWorkflow.find((c: AssistanceWorkflowStep) => c.id === activeTicket.status)?.label}
                                     </span>
                                     {activeTicket.priority === 'Urgente' && <span className="px-2 py-0.5 bg-rose-100 text-rose-600 rounded text-[10px] font-bold uppercase">URGENTE</span>}
                                 </div>
@@ -750,7 +744,7 @@ const TechnicalAssistance: React.FC = () => {
                             </p>
                             <div className="flex gap-3">
                                 <button onClick={() => { setIsInspectionOpen(false); setActiveTicket(null); }} className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 font-bold text-sm">Fechar</button>
-                                {activeTicket.status !== '10.7' && canEdit && (
+                                {activeTicket.status !== assistanceWorkflow[assistanceWorkflow.length - 1].id && canEdit && (
                                     <button
                                         onClick={handleAdvanceTicket}
                                         className="px-6 py-2 rounded-lg bg-green-600 text-white font-bold text-sm hover:bg-green-700 flex items-center gap-2 shadow-lg shadow-green-600/20"

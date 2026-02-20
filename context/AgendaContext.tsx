@@ -43,18 +43,22 @@ export const AgendaProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const { currentUser } = useProjects();
     const useCloud = !!(currentUser && db);
 
-    // Default Types
-    const defaultTypes: AppointmentType[] = [
-        { id: '1', name: 'Visita A Obra', color: '#3b82f6', requireClient: false }, // Blue
-        { id: '2', name: 'Reunião de Fechamento', color: '#eab308', requireClient: false }, // Yellow
-        { id: '3', name: 'Medição', color: '#ec4899', requireClient: false }, // Pink
-        { id: '4', name: 'Telefonema', color: '#14b8a6', requireClient: false }, // Teal
-        { id: '5', name: 'Vistoria de Montagem', color: '#ef4444', requireClient: false }, // Red
-        { id: '6', name: 'Primeira Apresentacao', color: '#d946ef', requireClient: false }, // Magenta
+    // Default Types (Hardcoded as requested)
+    const HARDCODED_APPOINTMENT_TYPES: AppointmentType[] = [
+        { id: 'outro', name: 'Outro', color: '#64748b', requireClient: false }, // slate-500
+        { id: 'vistoria_assist', name: 'Vistoria Assistência', color: '#f59e0b', requireClient: true }, // amber-500
+        { id: 'ligacao', name: 'Ligação', color: '#3b82f6', requireClient: true }, // blue-500
+        { id: 'medicao', name: 'Medição', color: '#ec4899', requireClient: true }, // pink-500
+        { id: 'prospeccao', name: 'Prospecção', color: '#10b981', requireClient: false }, // emerald-500
+        { id: 'vistoria_montagem', name: 'Vistoria Montagem', color: '#f97316', requireClient: true }, // orange-500
+        { id: 'visita_comercial', name: 'Visita Comercial', color: '#8b5cf6', requireClient: false }, // violet-500
+        { id: 'enviar_mensagem', name: 'Enviar Mensagem', color: '#06b6d4', requireClient: true }, // cyan-500
+        { id: 'vistoria_pos', name: 'Vistoria Pós Montagem', color: '#eab308', requireClient: true }, // yellow-500
+        { id: 'visita_tecnica', name: 'Visita Técnica', color: '#ef4444', requireClient: true }, // red-500
     ];
 
     const [appointments, setAppointments] = useState<Appointment[]>([]);
-    const [appointmentTypes, setAppointmentTypes] = useState<AppointmentType[]>(defaultTypes);
+    const appointmentTypes = HARDCODED_APPOINTMENT_TYPES; // Fixed types
     const [agendaUsers, setAgendaUsers] = useState<string[]>([]); // User IDs allowed to have agenda
 
     // Load Data
@@ -68,20 +72,7 @@ export const AgendaProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                 setAppointments(loadedApts);
             });
 
-            // Appointment Types
-            const unsubTypes = onSnapshot(collection(db, "appointmentTypes"), (snapshot) => {
-                const loadedTypes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as AppointmentType[];
-                if (loadedTypes.length > 0) {
-                    setAppointmentTypes(loadedTypes);
-                } else {
-                    // Optionally seed defaults if empty, but for now let's keep defaults if nothing loads? 
-                    // Actually better to respect DB being empty if specifically deleted.
-                    // But for migration, if DB is empty, user might want defaults.
-                    // Let's stick to: if DB empty, keep defaultTypes (initial state). 
-                    // If DB has data, use it.
-                    if (snapshot.size > 0) setAppointmentTypes(loadedTypes);
-                }
-            });
+            // Apppointment Types are now hardcoded, no need to subscribe to DB for them
 
             // Agenda Users (Config)
             // Storing transparently in a 'configs' or similar? Or just a doc.
@@ -98,18 +89,14 @@ export const AgendaProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
             return () => {
                 unsubAppointments();
-                unsubTypes();
                 unsubSettings();
             };
 
         } else {
             // LocalStorage Fallback
             const savedApts = localStorage.getItem('fluxo_agenda_appointments');
-            const savedTypes = localStorage.getItem('fluxo_agenda_types');
             const savedUsers = localStorage.getItem('fluxo_agenda_users');
-
             if (savedApts) setAppointments(JSON.parse(savedApts));
-            if (savedTypes) setAppointmentTypes(JSON.parse(savedTypes));
             if (savedUsers) setAgendaUsers(JSON.parse(savedUsers));
         }
     }, [useCloud]);
@@ -118,10 +105,9 @@ export const AgendaProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     useEffect(() => {
         if (!useCloud) {
             localStorage.setItem('fluxo_agenda_appointments', JSON.stringify(appointments));
-            localStorage.setItem('fluxo_agenda_types', JSON.stringify(appointmentTypes));
             localStorage.setItem('fluxo_agenda_users', JSON.stringify(agendaUsers));
         }
-    }, [appointments, appointmentTypes, agendaUsers, useCloud]);
+    }, [appointments, agendaUsers, useCloud]);
 
 
     const addAppointment = async (apt: Omit<Appointment, 'id'>) => {
@@ -129,7 +115,7 @@ export const AgendaProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         if (useCloud && db) {
             await setDoc(doc(db, "appointments", newApt.id), newApt);
         } else {
-            setAppointments(prev => [...prev, newApt]);
+            setAppointments((prev: Appointment[]) => [...prev, newApt]);
         }
     };
 
@@ -137,7 +123,7 @@ export const AgendaProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         if (useCloud && db) {
             await updateDoc(doc(db, "appointments", id), updates);
         } else {
-            setAppointments(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
+            setAppointments((prev: Appointment[]) => prev.map((a: Appointment) => a.id === id ? { ...a, ...updates } : a));
         }
     };
 
@@ -145,33 +131,20 @@ export const AgendaProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         if (useCloud && db) {
             await deleteDoc(doc(db, "appointments", id));
         } else {
-            setAppointments(prev => prev.filter(a => a.id !== id));
+            setAppointments((prev: Appointment[]) => prev.filter((a: Appointment) => a.id !== id));
         }
     };
 
-    const addAppointmentType = async (type: Omit<AppointmentType, 'id'>) => {
-        const newType = { ...type, id: crypto.randomUUID() };
-        if (useCloud && db) {
-            await setDoc(doc(db, "appointmentTypes", newType.id), newType);
-        } else {
-            setAppointmentTypes(prev => [...prev, newType]);
-        }
+    const addAppointmentType = async (_type: Omit<AppointmentType, 'id'>) => {
+        // No-op since types are hardcoded
     };
 
-    const updateAppointmentType = async (id: string, updates: Partial<AppointmentType>) => {
-        if (useCloud && db) {
-            await updateDoc(doc(db, "appointmentTypes", id), updates);
-        } else {
-            setAppointmentTypes(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
-        }
+    const updateAppointmentType = async (_id: string, _updates: Partial<AppointmentType>) => {
+        // No-op since types are hardcoded
     };
 
-    const deleteAppointmentType = async (id: string) => {
-        if (useCloud && db) {
-            await deleteDoc(doc(db, "appointmentTypes", id));
-        } else {
-            setAppointmentTypes(prev => prev.filter(t => t.id !== id));
-        }
+    const deleteAppointmentType = async (_id: string) => {
+        // No-op since types are hardcoded
     };
 
     const toggleAgendaUser = async (userId: string) => {

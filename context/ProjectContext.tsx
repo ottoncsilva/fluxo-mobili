@@ -50,11 +50,12 @@ const INITIAL_WORKFLOW_CONFIG: Record<string, WorkflowStep> = {
     // 8 - Pós Montagem
     '8.1': { id: '8.1', label: 'Levantamento', ownerRole: 'Montador', sla: 2, stage: 8 },
     '8.2': { id: '8.2', label: 'Solicitação de Pós Montagem', ownerRole: 'Liberador', sla: 2, stage: 8 },
-    '8.3': { id: '8.3', label: 'Fabricação Pós Montagem', ownerRole: 'Industria', sla: 10, stage: 8 },
-    '8.4': { id: '8.4', label: 'Transporte Pós Montagem', ownerRole: 'Logistica', sla: 5, stage: 8 },
-    '8.5': { id: '8.5', label: 'Pós Montagem', ownerRole: 'Montador', sla: 5, stage: 8 },
-    '8.6': { id: '8.6', label: 'Vistoria Pós Montagem', ownerRole: 'Coordenador de Montagem', sla: 1, stage: 8 },
-    '8.7': { id: '8.7', label: 'Concluido', ownerRole: 'Gerente', sla: 0, stage: 8 },
+    '8.3': { id: '8.3', label: 'Aprovação Financeira e Implantação', ownerRole: 'Financeiro', sla: 2, stage: 8 },
+    '8.4': { id: '8.4', label: 'Fabricação Pós Montagem', ownerRole: 'Industria', sla: 10, stage: 8 },
+    '8.5': { id: '8.5', label: 'Transporte Pós Montagem', ownerRole: 'Logistica', sla: 5, stage: 8 },
+    '8.6': { id: '8.6', label: 'Pós Montagem', ownerRole: 'Montador', sla: 5, stage: 8 },
+    '8.7': { id: '8.7', label: 'Vistoria Pós Montagem', ownerRole: 'Coordenador de Montagem', sla: 1, stage: 8 },
+    '8.8': { id: '8.8', label: 'Concluído', ownerRole: 'Gerente', sla: 0, stage: 8 },
 
     // 9 - Conclusão
     '9.0': { id: '9.0', label: 'Projeto Entregue', ownerRole: 'Gerente', sla: 0, stage: 9 },
@@ -69,18 +70,19 @@ const INITIAL_WORKFLOW_ORDER = [
     '5.1', '5.2',
     '6.1', '6.2', '6.3',
     '7.1', '7.2',
-    '8.1', '8.2', '8.3', '8.4', '8.5', '8.6', '8.7',
+    '8.1', '8.2', '8.3', '8.4', '8.5', '8.6', '8.7', '8.8',
     '9.0', '9.1'
 ];
 
 const INITIAL_ASSISTANCE_WORKFLOW: AssistanceWorkflowStep[] = [
     { id: '10.1', label: 'Levantamento', sla: 3 },
-    { id: '10.2', label: 'Solicitação de Assistencia', sla: 2 },
-    { id: '10.3', label: 'Fabricação de Assistencia', sla: 15 },
-    { id: '10.4', label: 'Transporte de Assistencia', sla: 5 },
-    { id: '10.5', label: 'Montagem Assistencia', sla: 4 },
-    { id: '10.6', label: 'Vistoria de Assistencia', sla: 1 },
-    { id: '10.7', label: 'Concluido', sla: 0 },
+    { id: '10.2', label: 'Solicitação de Assistência Técnica', sla: 2 },
+    { id: '10.3', label: 'Aprovação Financeira e Implantação', sla: 2 },
+    { id: '10.4', label: 'Fabricação Assistência Técnica', sla: 15 },
+    { id: '10.5', label: 'Transporte Assistência Técnica', sla: 5 },
+    { id: '10.6', label: 'Assistência Técnica', sla: 4 },
+    { id: '10.7', label: 'Vistoria Assistência Técnica', sla: 1 },
+    { id: '10.8', label: 'Concluído', sla: 0 },
 ];
 
 const MASTER_STORE_ID = 'store-modelo';
@@ -1294,50 +1296,65 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
 
     const getBranchingOptions = (stepId: string): { label: string, description: string, targetStepId: string, color: 'primary' | 'rose' | 'orange' | 'emerald', icon: string }[] => {
-        // 2.3 Orçamento
-        if (stepId === '2.3') {
+        if (stepId === '1.1') {
             return [
-                {
-                    label: 'Aprovar Orçamento',
-                    description: 'Cliente aprovou, seguir para apresentação.',
-                    targetStepId: '2.4',
-                    color: 'emerald',
-                    icon: 'check_circle'
-                },
-                {
-                    label: 'Revisar / Ajustar',
-                    description: 'Cliente pediu alterações no orçamento.',
-                    targetStepId: '2.1', // Back to design
-                    color: 'orange',
-                    icon: 'edit'
-                },
-                {
-                    label: 'Cancelelar / Perdido',
-                    description: 'Cliente não aceitou. Marcar como perdido.',
-                    targetStepId: '9.1',
-                    color: 'rose',
-                    icon: 'cancel'
-                }
+                { label: 'Visita Showroom', description: 'Cliente fará visita presencial.', targetStepId: '1.2', color: 'emerald', icon: 'storefront' },
+                { label: 'Follow Up', description: 'Manter contato ativo.', targetStepId: '1.3', color: 'primary', icon: 'phone_in_talk' },
+                { label: 'Projetar Ambientes', description: 'Pular visita e ir direto para projeto.', targetStepId: '2.1', color: 'emerald', icon: 'architecture' },
+            ];
+        }
+        if (stepId === '1.2') {
+            return [
+                { label: 'Follow Up', description: 'Manter contato ativo.', targetStepId: '1.3', color: 'primary', icon: 'phone_in_talk' },
+                { label: 'Projetar Ambientes', description: 'Avançar para projeto.', targetStepId: '2.1', color: 'emerald', icon: 'architecture' },
             ];
         }
 
-        // 4.3 Aprovação Financeira (Executivo)
+        if (stepId === '2.3') {
+            return [
+                { label: 'Aprovar Orçamento', description: 'Avançar para montagem da apresentação.', targetStepId: '2.4', color: 'emerald', icon: 'check_circle' },
+                { label: 'Revisar / Ajustar', description: 'Retornar para rascunho (Projetar Mobiliário).', targetStepId: '2.2', color: 'orange', icon: 'edit' },
+                { label: 'Cancelar / Perdido', description: 'Cliente não aceitou. Marcar como perdido.', targetStepId: '9.1', color: 'rose', icon: 'cancel' }
+            ];
+        }
+        if (stepId === '2.5') {
+            return [
+                { label: 'Aprovado', description: 'Prosseguir para Detalhamento de Contrato.', targetStepId: '2.9', color: 'emerald', icon: 'verified' },
+                { label: 'Ajuste Solicitado', description: 'Retornar para ajustes de proposta.', targetStepId: '2.6', color: 'orange', icon: 'edit' },
+                { label: 'Follow Up', description: 'Manter em acompanhamento de vendas.', targetStepId: '2.7', color: 'primary', icon: 'running_with_errors' },
+            ];
+        }
+        if (stepId === '2.6') {
+            return [
+                { label: 'Follow Up', description: 'Manter em acompanhamento de vendas.', targetStepId: '2.7', color: 'primary', icon: 'phone_in_talk' },
+                { label: 'Reunião de Fechamento', description: 'Agendar fechamento.', targetStepId: '2.8', color: 'emerald', icon: 'handshake' },
+            ];
+        }
+        if (stepId === '2.8') {
+            return [
+                { label: 'Venda Fechada', description: 'Avançar para Contrato e Detalhamento.', targetStepId: '2.9', color: 'emerald', icon: 'verified' },
+                { label: 'Ajuste Solicitado', description: 'Retornar para ajustes na proposta.', targetStepId: '2.6', color: 'orange', icon: 'edit_square' },
+                { label: 'Ir para Follow-up', description: 'Manter contato para fechamento futuro.', targetStepId: '2.7', color: 'primary', icon: 'event_repeat' },
+            ];
+        }
+
         if (stepId === '4.3') {
             return [
-                {
-                    label: 'Aprovado Financeiro',
-                    description: 'Pagamento confirmado/liberado.',
-                    targetStepId: '4.4',
-                    color: 'emerald',
-                    icon: 'verified'
-                },
-                {
-                    label: 'Pendência Financeira',
-                    description: 'Falta pagamento ou doc. Voltar para Negociação.',
-                    targetStepId: '2.9', // Back to contract
-                    color: 'rose',
-                    icon: 'payments'
-                }
+                { label: 'Aprovado Financeiro', description: 'Pagamento liberado. Avançar para detalhamento.', targetStepId: '4.4', color: 'emerald', icon: 'verified' },
+                { label: 'Pendência Financeira', description: 'Retornar para Construção de Mobiliário.', targetStepId: '4.2', color: 'rose', icon: 'payments' },
+            ];
+        }
+
+        if (stepId === '4.5') {
+            return [
+                { label: 'Tudo Certo (Implantação)', description: 'Projeto aprovado, ir para implantação.', targetStepId: '5.1', color: 'emerald', icon: 'check_circle' },
+                { label: 'Solicitar Correção', description: 'Devolver para o liberador corrigir.', targetStepId: '4.6', color: 'rose', icon: 'build' },
+            ];
+        }
+
+        if (stepId === '4.6') {
+            return [
+                { label: 'Revisão Concluída', description: 'Retornar projeto revisado para o Vendedor.', targetStepId: '4.5', color: 'emerald', icon: 'check_circle' },
             ];
         }
 

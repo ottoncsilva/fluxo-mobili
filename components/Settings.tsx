@@ -372,12 +372,7 @@ const Settings: React.FC = () => {
                     >
                         Origem do Cliente
                     </button>
-                    <button
-                        onClick={() => setActiveTab('AGENDA')}
-                        className={`pb-4 px-2 font-bold text-sm transition-colors border-b-2 whitespace-nowrap ${activeTab === 'AGENDA' ? 'border-primary text-primary' : 'border-transparent text-slate-500'}`}
-                    >
-                        Agenda
-                    </button>
+
                     <button
                         onClick={() => setActiveTab('ASSISTANCE')}
                         className={`pb-4 px-2 font-bold text-sm transition-colors border-b-2 whitespace-nowrap ${activeTab === 'ASSISTANCE' ? 'border-primary text-primary' : 'border-transparent text-slate-500'}`}
@@ -392,90 +387,7 @@ const Settings: React.FC = () => {
                     </button>
                 </div>
 
-                {/* AGENDA TAB */}
-                {activeTab === 'AGENDA' && (
-                    <div className="space-y-8 animate-fade-in">
-                        <div className="bg-white dark:bg-[#1a2632] p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
-                            <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-6">Tipos de Compromisso</h3>
 
-                            <div className="flex flex-col md:flex-row gap-4 items-end mb-6">
-                                <div className="flex-1 w-full">
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Nome do Tipo</label>
-                                    <input
-                                        type="text"
-                                        value={newApptType}
-                                        onChange={e => setNewApptType(e.target.value)}
-                                        placeholder="Ex: Visita Técnica"
-                                        className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Cor</label>
-                                    <input
-                                        type="color"
-                                        value={newApptColor}
-                                        onChange={e => setNewApptColor(e.target.value)}
-                                        className="h-10 w-20 rounded-lg cursor-pointer"
-                                    />
-                                </div>
-                                <div className="pb-3 px-2">
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={newApptReqClient}
-                                            onChange={e => setNewApptReqClient(e.target.checked)}
-                                            className="rounded border-slate-300 text-primary focus:ring-primary"
-                                        />
-                                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Exige Cliente?</span>
-                                    </label>
-                                </div>
-                                <button
-                                    onClick={() => {
-                                        if (newApptType) {
-                                            addAppointmentType({ name: newApptType, color: newApptColor, requireClient: newApptReqClient });
-                                            setNewApptType('');
-                                            setNewApptColor('#3b82f6');
-                                            setNewApptReqClient(false);
-                                        }
-                                    }}
-                                    className="bg-primary text-white font-bold h-10 px-4 rounded-lg text-sm hover:bg-primary-600 w-full md:w-auto"
-                                >
-                                    Adicionar
-                                </button>
-                            </div>
-
-                            <div className="space-y-3">
-                                {appointmentTypes.map(type => (
-                                    <div key={type.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-800">
-                                        <div className="flex items-center gap-3">
-                                            <div className="size-4 rounded-full" style={{ backgroundColor: type.color }}></div>
-                                            <div>
-                                                <span className="font-bold text-slate-700 dark:text-slate-200 block">{type.name}</span>
-                                                <span className="text-xs text-slate-400">{type.requireClient ? 'Exige Cliente' : 'Livre'}</span>
-                                            </div>
-                                        </div>
-                                        <button onClick={() => deleteAppointmentType(type.id)} className="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition-colors" title="Excluir">
-                                            <span className="material-symbols-outlined text-lg">delete</span>
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Save Button for Agenda */}
-                        <div className="mt-6 flex items-center gap-4">
-                            <button
-                                onClick={handleSaveConfig}
-                                disabled={saving}
-                                className="bg-green-600 text-white font-bold py-3 px-8 rounded-lg text-sm hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 shadow-lg"
-                            >
-                                <span className="material-symbols-outlined text-sm">save</span>
-                                {saving ? 'Salvando...' : 'Salvar Alterações'}
-                            </button>
-                            {saveMessage && <span className="text-sm font-medium">{saveMessage}</span>}
-                        </div>
-                    </div>
-                )}
 
                 {/* COMPANY TAB */}
                 {activeTab === 'COMPANY' && (
@@ -818,6 +730,19 @@ const Settings: React.FC = () => {
                                 })}
                             </div>
                         </div>
+
+                        {/* Save Button */}
+                        <div className="mt-6 flex items-center gap-4">
+                            <button
+                                onClick={handleSaveConfig}
+                                disabled={saving}
+                                className="bg-green-600 text-white font-bold py-3 px-8 rounded-lg text-sm hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 shadow-lg"
+                            >
+                                <span className="material-symbols-outlined text-sm">save</span>
+                                {saving ? 'Salvando...' : 'Salvar Alterações'}
+                            </button>
+                            {saveMessage && <span className="text-sm font-medium">{saveMessage}</span>}
+                        </div>
                     </div>
                 )}
 
@@ -877,6 +802,19 @@ const Settings: React.FC = () => {
                                 })}
                             </div>
                         </div>
+
+                        {/* Save Button */}
+                        <div className="mt-6 flex items-center gap-4">
+                            <button
+                                onClick={handleSaveConfig}
+                                disabled={saving}
+                                className="bg-green-600 text-white font-bold py-3 px-8 rounded-lg text-sm hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 shadow-lg"
+                            >
+                                <span className="material-symbols-outlined text-sm">save</span>
+                                {saving ? 'Salvando...' : 'Salvar Alterações'}
+                            </button>
+                            {saveMessage && <span className="text-sm font-medium">{saveMessage}</span>}
+                        </div>
                     </div>
                 )}
 
@@ -921,21 +859,8 @@ const Settings: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Save Button */}
-                        <div className="mt-6 flex items-center gap-4">
-                            <button
-                                onClick={handleSaveConfig}
-                                disabled={saving}
-                                className="bg-green-600 text-white font-bold py-3 px-8 rounded-lg text-sm hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 shadow-lg"
-                            >
-                                <span className="material-symbols-outlined text-sm">save</span>
-                                {saving ? 'Salvando...' : 'Salvar Alterações'}
-                            </button>
-                            {saveMessage && <span className="text-sm font-medium">{saveMessage}</span>}
-                        </div>
                     </div>
-                )
-                }
+                )}
 
                 {/* INTEGRATIONS TAB */}
                 {
@@ -1103,9 +1028,9 @@ const Settings: React.FC = () => {
                                         <div className="col-span-6">
                                             <input
                                                 type="text"
+                                                readOnly
                                                 value={step.label}
-                                                onChange={(e) => updateAssistanceStep(step.id, { label: e.target.value })}
-                                                className="w-full text-sm font-bold bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded transition-colors focus:ring-primary"
+                                                className="w-full text-sm font-bold bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded transition-colors focus:ring-primary opacity-70 cursor-not-allowed"
                                             />
                                         </div>
                                         <div className="col-span-4">
@@ -1123,6 +1048,19 @@ const Settings: React.FC = () => {
                                     </div>
                                 ))}
                             </div>
+                        </div>
+
+                        {/* Save Button */}
+                        <div className="mt-6 flex items-center gap-4">
+                            <button
+                                onClick={handleSaveConfig}
+                                disabled={saving}
+                                className="bg-green-600 text-white font-bold py-3 px-8 rounded-lg text-sm hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 shadow-lg"
+                            >
+                                <span className="material-symbols-outlined text-sm">save</span>
+                                {saving ? 'Salvando...' : 'Salvar Alterações'}
+                            </button>
+                            {saveMessage && <span className="text-sm font-medium">{saveMessage}</span>}
                         </div>
                     </div>
                 )}

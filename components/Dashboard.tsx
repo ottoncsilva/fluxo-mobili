@@ -1,38 +1,84 @@
 import React, { useMemo } from 'react';
 import { useProjects } from '../context/ProjectContext';
 import { DashboardKPIs, DashboardGraphs } from './DashboardCharts';
+import { Batch, Project, AssistanceTicket, AssistanceWorkflowStep } from '../types';
+
+interface DashboardTask {
+    id: string;
+    projectId: string | null;
+    phase: string;
+    lastUpdated: Date;
+    sla: number;
+    stepLabel: string;
+    clientName: string;
+    type: 'project' | 'assistance';
+}
 
 const Dashboard: React.FC = () => {
-    const { batches, workflowConfig, currentUser, projects, setCurrentProjectId } = useProjects();
+    const { batches, workflowConfig, currentUser, projects, setCurrentProjectId, assistanceTickets, assistanceWorkflow } = useProjects();
 
     // Filter tasks relevant to the user's role AND exclude Completed/Lost
-    const myTasks = useMemo(() => {
+    const myTasks: DashboardTask[] = useMemo(() => {
         if (!currentUser) return [];
-        // Filter by role owner or admin
-        const filtered = batches.filter(batch => {
+
+        // 1. Process Batches (Projects)
+        const projectTasks = batches.filter((batch: Batch) => {
             const step = workflowConfig[batch.phase];
             if (!step) return false;
             // Hide Completed (9.0) and Lost (9.1) from Dashboard
             if (batch.phase === '9.0' || batch.phase === '9.1') return false;
 
             return currentUser.role === 'Admin' || currentUser.role === 'Proprietario' || step.ownerRole === currentUser.role;
+        }).map((batch: Batch) => {
+            const project = projects.find((p: Project) => p.id === batch.projectId);
+            const step = workflowConfig[batch.phase];
+            return {
+                id: batch.id,
+                projectId: batch.projectId,
+                phase: batch.phase,
+                lastUpdated: new Date(batch.lastUpdated),
+                sla: step.sla,
+                stepLabel: step.label,
+                clientName: project?.client.name || 'Desconhecido',
+                type: 'project' as const
+            };
         });
 
+        // 2. Process Assistance Tickets
+        // Filter tickets that are not completed (10.8 or 10.7 based on AssistanceWorkflow)
+        const assistanceTasks = (assistanceTickets || []).filter((ticket: AssistanceTicket) => {
+            // Let's assume 10.8 is the new Concluido, or 10.7
+            if (ticket.status === '10.8' || ticket.status === '10.7') return false;
+            // For assistance, perhaps everyone sees them or we filter by assemblerName?
+            // Since Assistance doesn't have strict ownerRole per sub-step, Admin/Proprietario see all
+            // Others only see if they are the assembler (maybe?) For now, show active assistance to all admins/owners
+            return currentUser.role === 'Admin' || currentUser.role === 'Proprietario' || currentUser.name === ticket.assemblerName;
+        }).map((ticket: AssistanceTicket) => {
+            const step = assistanceWorkflow.find((w: AssistanceWorkflowStep) => w.id === ticket.status);
+            const project = projects.find((p: Project) => p.client.id === ticket.clientId);
+            return {
+                id: ticket.id,
+                projectId: project?.id || null, // Map back to project for navigation if possible
+                phase: ticket.status,
+                lastUpdated: new Date(ticket.updatedAt || ticket.createdAt),
+                sla: step?.sla || 0,
+                stepLabel: step?.label || ticket.status,
+                clientName: ticket.clientName,
+                type: 'assistance' as const
+            };
+        });
+
+        const allTasks = [...projectTasks, ...assistanceTasks];
+
         // Sort by Deadline (SLA): Most delayed first (oldest deadline) to future deadlines
-        return filtered.sort((a, b) => {
-            const stepA = workflowConfig[a.phase];
-            const stepB = workflowConfig[b.phase];
-
-            const lastUpdateA = new Date(a.lastUpdated).getTime();
-            const lastUpdateB = new Date(b.lastUpdated).getTime();
-
-            const deadlineA = lastUpdateA + (stepA.sla * 24 * 60 * 60 * 1000);
-            const deadlineB = lastUpdateB + (stepB.sla * 24 * 60 * 60 * 1000);
+        return allTasks.sort((a, b) => {
+            const deadlineA = a.lastUpdated.getTime() + (a.sla * 24 * 60 * 60 * 1000);
+            const deadlineB = b.lastUpdated.getTime() + (b.sla * 24 * 60 * 60 * 1000);
 
             return deadlineA - deadlineB; // Ascending: Smaller (older) date first
         });
 
-    }, [batches, workflowConfig, currentUser]);
+    }, [batches, workflowConfig, currentUser, assistanceTickets, assistanceWorkflow, projects]);
 
 
 
@@ -57,26 +103,22 @@ const Dashboard: React.FC = () => {
                         {myTasks.length === 0 ? (
                             <div className="p-8 text-center text-slate-400">Tudo em dia!</div>
                         ) : (
-                            myTasks.map(batch => {
-                                const project = projects.find(p => p.id === batch.projectId);
-                                const step = workflowConfig[batch.phase];
-
-                                const lastUpdate = new Date(batch.lastUpdated);
-                                const deadline = new Date(lastUpdate.getTime() + (step.sla * 24 * 60 * 60 * 1000));
+                            myTasks.map(task => {
+                                const deadline = new Date(task.lastUpdated.getTime() + (task.sla * 24 * 60 * 60 * 1000));
                                 const now = new Date();
                                 const diffTime = deadline.getTime() - now.getTime();
                                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
                                 return (
-                                    <div key={batch.id} className="p-3 bg-white dark:bg-[#1e293b] border border-slate-100 dark:border-slate-700/50 rounded-xl hover:shadow-md transition-all group cursor-pointer" onClick={() => setCurrentProjectId(project?.id || null)}>
+                                    <div key={task.id} className="p-3 bg-white dark:bg-[#1e293b] border border-slate-100 dark:border-slate-700/50 rounded-xl hover:shadow-md transition-all group cursor-pointer" onClick={() => task.projectId && setCurrentProjectId(task.projectId)}>
                                         <div className="flex justify-between items-start mb-2">
                                             <div className="flex items-center gap-2">
-                                                <div className="size-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-500">
-                                                    {project?.client.name.charAt(0)}
+                                                <div className={`size-8 rounded-full flex items-center justify-center text-xs font-bold ${task.type === 'assistance' ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+                                                    {task.type === 'assistance' ? <span className="material-symbols-outlined text-[14px]">handyman</span> : task.clientName.charAt(0)}
                                                 </div>
                                                 <div>
-                                                    <h4 className="font-bold text-sm text-slate-800 dark:text-white line-clamp-1">{project?.client.name}</h4>
-                                                    <p className="text-[10px] text-slate-400">Ambientes</p>
+                                                    <h4 className="font-bold text-sm text-slate-800 dark:text-white line-clamp-1">{task.clientName}</h4>
+                                                    <p className="text-[10px] text-slate-400">{task.type === 'assistance' ? 'Assistência Técnica' : 'Projeto'}</p>
                                                 </div>
                                             </div>
                                             <div className={`px-2 py-0.5 rounded text-[10px] font-bold ${diffDays < 0 ? 'bg-rose-100 text-rose-600' : diffDays <= 1 ? 'bg-orange-100 text-orange-600' : 'bg-emerald-100 text-emerald-600'}`}>
@@ -84,7 +126,7 @@ const Dashboard: React.FC = () => {
                                             </div>
                                         </div>
                                         <div className="flex items-center justify-between">
-                                            <p className="text-xs font-medium text-primary bg-primary/5 px-2 py-0.5 rounded">{step.label}</p>
+                                            <p className="text-xs font-medium text-primary bg-primary/5 px-2 py-0.5 rounded">{task.stepLabel}</p>
                                             <span className="text-[10px] text-slate-400 group-hover:text-primary transition-colors">Abrir &rarr;</span>
                                         </div>
                                     </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useProjects } from '../context/ProjectContext';
 import { Project, Batch, AssistanceItem, AssistanceEvent } from '../types';
 
@@ -10,11 +10,14 @@ const PostAssembly: React.FC = () => {
         workflowConfig,
         currentUser,
         updateProjectPostAssemblyItems,
-        companySettings
+        companySettings,
+        workflowOrder
     } = useProjects();
 
-    // Define Post-Assembly Columns (Stage 8) based on IDs
-    const POST_ASSEMBLY_STEP_IDS = ['8.1', '8.2', '8.3', '8.4', '8.5', '8.6', '8.7'];
+    // Define Post-Assembly Columns (Stage 8) dynamically
+    const POST_ASSEMBLY_STEP_IDS = useMemo(() => {
+        return workflowOrder.filter((id: string) => id.startsWith('8.'));
+    }, [workflowOrder]);
 
     // Filters
     const [filterClient, setFilterClient] = useState('');
