@@ -25,7 +25,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, project 
     const [deliveryDeadlineDays, setDeliveryDeadlineDays] = useState(60);
 
     // Items (Default to environments)
-    const [items, setItems] = useState<{ id: string, name: string, value: number }[]>([]);
+    const [items, setItems] = useState<{ id: string, name: string, value: number, included: boolean }[]>([]);
 
     // Payment
     const [totalValue, setTotalValue] = useState(0);
@@ -37,11 +37,12 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, project 
             const initialItems = project.environments.map(env => ({
                 id: env.id,
                 name: env.name,
-                value: env.estimated_value || 0
+                value: env.final_value || env.estimated_value || 0,
+                included: env.status !== 'Lost'
             }));
             setItems(initialItems);
 
-            const total = initialItems.reduce((acc, item) => acc + item.value, 0);
+            const total = initialItems.filter(i => i.included).reduce((acc, item) => acc + item.value, 0);
             setTotalValue(total);
 
             // Default 1 parcel if none exist
@@ -59,6 +60,28 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, project 
     const handlePrint = () => {
         window.print();
     };
+
+    const handleFormalize = () => {
+        // Find matched environments to assign them the final values and statuses
+        const finalEnvironments = project.environments.map(env => {
+            const itemMatch = items.find(i => i.id === env.id);
+            if (itemMatch) {
+                return {
+                    ...env,
+                    name: itemMatch.name,
+                    final_value: itemMatch.value,
+                    estimated_value: itemMatch.value,
+                    status: (itemMatch.included ? env.status : 'Lost') as Environment['status']
+                };
+            }
+            return env;
+        });
+
+        // Use any to bypass TS context missing if it wasn't refreshed, but it will work
+        (useProjects() as any).formalizeContract?.(project.id, finalEnvironments, totalValue, contractDate);
+        onClose();
+    };
+
 
     if (!isOpen || !project) return null;
 
@@ -90,8 +113,19 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, project 
                     </h3>
                     <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
                         {items.map((item, index) => (
-                            <div key={item.id} className="flex gap-4 items-center">
+                            <div key={item.id} className={`flex gap-4 items-center ${!item.included ? 'opacity-50' : ''}`}>
                                 <span className="font-bold text-slate-400 w-6">#{index + 1}</span>
+                                <button
+                                    onClick={() => {
+                                        const newItems = [...items];
+                                        newItems[index].included = !newItems[index].included;
+                                        setItems(newItems);
+                                        setTotalValue(newItems.filter(i => i.included).reduce((acc, i) => acc + i.value, 0));
+                                    }}
+                                    className={`w-6 h-6 rounded border flex items-center justify-center shrink-0 ${item.included ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300'}`}
+                                >
+                                    {item.included && <span className="material-symbols-outlined text-[16px]">check</span>}
+                                </button>
                                 <input
                                     type="text"
                                     value={item.name}
@@ -102,6 +136,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, project 
                                     }}
                                     className="flex-1 rounded border-slate-300 text-sm"
                                     placeholder="Nome do Ambiente"
+                                    disabled={!item.included}
                                 />
                                 <input
                                     type="number"
@@ -110,10 +145,11 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, project 
                                         const newItems = [...items];
                                         newItems[index].value = Number(e.target.value);
                                         setItems(newItems);
-                                        setTotalValue(newItems.reduce((acc, i) => acc + i.value, 0));
+                                        setTotalValue(newItems.filter(i => i.included).reduce((acc, i) => acc + i.value, 0));
                                     }}
                                     className="w-32 rounded border-slate-300 text-sm"
                                     placeholder="0,00"
+                                    disabled={!item.included}
                                 />
                                 <button
                                     onClick={() => setItems(items.filter((_, i) => i !== index))}
@@ -124,7 +160,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, project 
                             </div>
                         ))}
                         <button
-                            onClick={() => setItems([...items, { id: `new-${Date.now()}`, name: '', value: 0 }])}
+                            onClick={() => setItems([...items, { id: `new-${Date.now()}`, name: '', value: 0, included: true }])}
                             className="text-sm text-emerald-600 font-bold hover:underline"
                         >
                             + Adicionar Item
@@ -260,13 +296,22 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, project 
                     Voltar e Editar
                 </button>
                 <h2 className="font-bold text-slate-800">Visualização de Impressão</h2>
-                <button
-                    onClick={handlePrint}
-                    className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2 rounded font-bold hover:bg-blue-700 shadow-lg"
-                >
-                    <span className="material-symbols-outlined">print</span>
-                    Imprimir / Salvar PDF
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        onClick={handlePrint}
+                        className="flex items-center gap-2 bg-slate-200 text-slate-700 px-6 py-2 rounded font-bold hover:bg-slate-300 shadow"
+                    >
+                        <span className="material-symbols-outlined">print</span>
+                        Imprimir / PDF
+                    </button>
+                    <button
+                        onClick={handleFormalize}
+                        className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-2 rounded font-bold hover:bg-emerald-700 shadow-lg"
+                    >
+                        <span className="material-symbols-outlined">verified</span>
+                        Formalizar Contrato
+                    </button>
+                </div>
             </div>
 
             {/* Contract "Paper" */}

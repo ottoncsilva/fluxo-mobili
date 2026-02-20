@@ -342,8 +342,9 @@ interface ProjectContextType {
     setCurrentProjectId: (id: string | null) => void;
     updateEnvironmentStatus: (projectId: string, envId: string, status: Environment['status']) => void;
     updateEnvironmentDetails: (projectId: string, envId: string, updates: Partial<Environment>) => void;
-    updateClientData: (projectId: string, updates: Partial<Client>) => void;
-    updateProjectITPP: (projectId: string, updates: Partial<Client>) => void;
+    updateClientData: (projectId: string, updates: Partial<Client>, noteMessage?: string | null) => void;
+    updateProjectBriefing: (projectId: string, updates: Partial<Client>) => void;
+    formalizeContract: (projectId: string, finalEnvironments: Environment[], contractValue: number, contractDate: string) => void;
     updateProjectSeller: (projectId: string, sellerId: string, sellerName: string) => void;
     requestFactoryPart: (projectId: string, envId: string, description: string) => void;
     updateProjectPostAssembly: (projectId: string, evaluation: PostAssemblyEvaluation) => void;
@@ -1169,7 +1170,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         }
     };
 
-    const updateClientData = (projectId: string, updates: Partial<Client>) => {
+    const updateClientData = (projectId: string, updates: Partial<Client>, noteMessage?: string | null) => {
         const project = allProjects.find(p => p.id === projectId);
         if (!project) return;
 
@@ -1180,13 +1181,66 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         } else {
             setAllProjects(prev => prev.map(p => p.id !== projectId ? p : { ...p, client: newClient }));
         }
-        addNote(projectId, 'Dados cadastrais do cliente atualizados.', currentUser?.id || 'sys');
+        if (noteMessage !== null) {
+            addNote(projectId, noteMessage || 'Dados cadastrais do cliente atualizados.', currentUser?.id || 'sys');
+        }
     };
 
-    const updateProjectITPP = (projectId: string, updates: Partial<Client>) => {
-        updateClientData(projectId, updates);
-        // Extra logic for notification note handled in updateClientData via addNote, can refine here
+    const updateProjectBriefing = (projectId: string, updates: Partial<Client>) => {
+        const project = allProjects.find(p => p.id === projectId);
+        if (!project) return;
+
+        const changedKeys = Object.keys(updates).filter(key => {
+            const k = key as keyof Client;
+            return updates[k] !== project.client[k];
+        });
+
+        const fieldNames: Record<string, string> = {
+            budget_expectation: 'Expectativa do Cliente',
+            payment_preference: 'Forma de Pagamento',
+            project_has_architect_project: 'Possui Projeto Arquitet.',
+            commissioned_specifier: 'Especificador Comissionado',
+            time_measurement_ready: 'Previsão Medição',
+            time_decision_expectation: 'Expectativa Decisão',
+            project_materials: 'Materiais',
+            specialNeeds: 'Necessidades Especiais',
+            appliances: 'Eletrodomésticos',
+            profile_residents: 'Quem vai morar',
+            profile_routine: 'Rotina da Casa',
+            profile_pains: 'Dores / Expectativas',
+            propertyType: 'Tipo de Imóvel',
+            property_location: 'Localização',
+            time_move_in: 'Mudança Prevista',
+            architect_name: 'Arquiteto'
+        };
+
+        const changedNames = changedKeys.map(k => fieldNames[k] || k);
+        const noteMsg = changedNames.length > 0
+            ? `Briefing atualizado (${changedNames.join(', ')})`
+            : 'Dados do Briefing atualizados.';
+
+        updateClientData(projectId, updates, noteMsg);
     };
+
+    const formalizeContract = (projectId: string, finalEnvironments: Environment[], contractValue: number, contractDate: string) => {
+        const project = allProjects.find(p => p.id === projectId);
+        if (!project) return;
+
+        const updates = {
+            environments: finalEnvironments,
+            contractValue,
+            contractDate,
+            contractSigned: true
+        };
+
+        if (useCloud) {
+            persist("projects", projectId, updates);
+        } else {
+            setAllProjects(prev => prev.map(p => p.id !== projectId ? p : { ...p, ...updates }));
+        }
+        addNote(projectId, `Contrato formalizado. Valor Final: R$ ${contractValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, currentUser?.id || 'sys');
+    };
+
 
     const updateProjectSeller = (projectId: string, sellerId: string, sellerName: string) => {
         const project = allProjects.find(p => p.id === projectId);
@@ -1519,7 +1573,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             addAssistanceStep, updateAssistanceStep, deleteAssistanceStep, reorderAssistanceSteps,
 
             addProject, deleteProject, advanceBatch, moveBatchToStep, markProjectAsLost, reactivateProject, isLastStep, splitBatch, getProjectById, addNote, updateWorkflowSla, setCurrentProjectId, updateEnvironmentStatus, requestFactoryPart,
-            updateEnvironmentDetails, updateClientData, updateProjectITPP, updateProjectSeller, updateProjectPostAssembly, updateProjectPostAssemblyItems,
+            updateEnvironmentDetails, updateClientData, updateProjectBriefing, formalizeContract, updateProjectSeller, updateProjectPostAssembly, updateProjectPostAssemblyItems,
             addAssistanceTicket, updateAssistanceTicket,
             canUserAdvanceStep, canUserViewStage, canUserEditAssistance,
             saveStoreConfig, resetStoreDefaults,

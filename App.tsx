@@ -114,7 +114,7 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col md:flex-row h-screen w-screen overflow-hidden bg-background-light dark:bg-background-dark font-display relative">
+    <div className="flex flex-col md:flex-row h-[100dvh] w-screen overflow-hidden bg-background-light dark:bg-background-dark font-display relative">
 
       {/* === Desktop Sidebar (hidden on mobile) === */}
       <aside className="hidden md:flex w-20 bg-white dark:bg-[#1a2632] border-r border-slate-200 dark:border-slate-800 flex-col items-center py-6 z-30 shrink-0">
@@ -262,11 +262,11 @@ const AppContent: React.FC = () => {
       {/* Project Details Modal Overlay */}
       {currentProjectId && currentUser.role !== 'SuperAdmin' && (
         <div
-          className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-2 md:p-4 animate-fade-in"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 md:p-6 animate-fade-in"
           onClick={handleBackToKanban}
         >
           <div
-            className="bg-white dark:bg-[#101922] w-full max-w-[90vw] h-[95vh] md:h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-scale-up"
+            className="bg-white dark:bg-[#101922] w-full max-w-[95vw] md:max-w-[90vw] lg:max-w-[1200px] h-[95dvh] md:h-[90dvh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-scale-up"
             onClick={(e) => e.stopPropagation()}
           >
             <ProjectDetails onBack={handleBackToKanban} />

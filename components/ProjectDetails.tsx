@@ -1,19 +1,42 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useProjects } from '../context/ProjectContext';
 import { Batch, Client, Project, Note, WorkflowStep, Environment, Role } from '../types';
-import { maskPhone, maskCPF } from '../utils/masks';
+import { maskPhone, maskCPF, maskCEP } from '../utils/masks';
 import StepDecisionModal from './StepDecisionModal';
 import LotModal from './LotModal';
 import SplitBatchModal from './SplitBatchModal';
 import ContractModal from './ContractModal';
+import EditableField from './EditableField'; // Assuming this component is available
 
 interface ProjectDetailsProps {
     onBack: () => void;
 }
 
 export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
-    const { currentProjectId, getProjectById, batches, workflowConfig, addNote, advanceBatch, moveBatchToStep, splitBatch, markProjectAsLost, reactivateProject, currentUser, updateEnvironmentDetails, updateProjectITPP, updateClientData, origins, isLastStep, canUserAdvanceStep, allUsers, permissions, updateProjectSeller, deleteProject } = useProjects();
-    const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'ENVIRONMENTS' | 'ITPP' | 'TIMELINE'>('OVERVIEW');
+    const {
+        currentProjectId,
+        getProjectById,
+        batches,
+        workflowConfig,
+        addNote,
+        advanceBatch,
+        moveBatchToStep,
+        splitBatch,
+        markProjectAsLost,
+        reactivateProject,
+        currentUser,
+        updateEnvironmentDetails,
+        updateProjectBriefing, // Changed from updateProjectITPP
+        updateClientData,
+        origins,
+        isLastStep,
+        canUserAdvanceStep,
+        allUsers,
+        permissions,
+        updateProjectSeller,
+        deleteProject
+    } = useProjects();
+    const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'ENVIRONMENTS' | 'BRIEFING' | 'TIMELINE'>('OVERVIEW'); // Changed 'ITPP' to 'BRIEFING'
     const [noteContent, setNoteContent] = useState('');
 
     // Loading state for button
@@ -25,9 +48,22 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
         name: '', email: '', phone: '', address: '', condominium: '', cpf: '', rg: '', cod_efinance: '', origin: '', consultant_name: '', sellerId: ''
     });
 
-    // ITPP Edit Mode
-    const [isEditingITPP, setIsEditingITPP] = useState(false);
-    const [itppForm, setItppForm] = useState<Partial<Client>>({});
+    const [addressFields, setAddressFields] = useState({
+        cep: '',
+        street: '',
+        number: '',
+        complement: '',
+        condominium: '',
+        neighborhood: '',
+        city: '',
+        state: '',
+        country: 'Brasil'
+    });
+    const [isSearchingCep, setIsSearchingCep] = useState(false);
+
+    // Briefing Edit Mode
+    const [isEditingBriefing, setIsEditingBriefing] = useState(false);
+    const [briefingForm, setBriefingForm] = useState<Partial<Client>>({});
 
     // Lost Project Modal
     const [isLostModalOpen, setIsLostModalOpen] = useState(false);
@@ -67,14 +103,27 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                 consultant_name: project.client.consultant_name || '',
                 sellerId: project.sellerId || ''
             });
+
+            // Try to pre-fill address fields if it's a legacy string, for now just reset or guess CEP
+            setAddressFields({
+                cep: '',
+                street: project.client.address || '',
+                number: '',
+                complement: '',
+                condominium: project.client.condominium || '',
+                neighborhood: '',
+                city: '',
+                state: '',
+                country: 'Brasil'
+            });
         }
     }, [project, isEditClientOpen]);
 
     useEffect(() => {
-        if (project && isEditingITPP) {
-            setItppForm({ ...project.client });
+        if (project && isEditingBriefing) { // Changed from isEditingITPP
+            setBriefingForm({ ...project.client }); // Changed from itppForm
         }
-    }, [project, isEditingITPP]);
+    }, [project, isEditingBriefing]); // Changed from isEditingITPP
 
     if (!project) return null;
 
@@ -84,6 +133,48 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
         if (!noteContent.trim() || !currentUser) return;
         addNote(project.id, noteContent, currentUser.id);
         setNoteContent('');
+    };
+
+    const updateAddressField = (field: keyof typeof addressFields, value: string) => {
+        let formattedValue = value;
+        if (field === 'cep') formattedValue = maskCEP(value);
+
+        setAddressFields((prev: typeof addressFields) => ({
+            ...prev,
+            [field]: formattedValue
+        }));
+    };
+
+    const searchCEP = async () => {
+        const cleanCep = addressFields.cep.replace(/\D/g, '');
+        if (cleanCep.length !== 8) {
+            alert('CEP inválido. Digite 8 números.');
+            return;
+        }
+
+        setIsSearchingCep(true);
+        try {
+            const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+            const data = await response.json();
+
+            if (data.erro) {
+                alert('CEP não encontrado.');
+            } else {
+                setAddressFields((prev: typeof addressFields) => ({
+                    ...prev,
+                    street: data.logradouro || '',
+                    neighborhood: data.bairro || '',
+                    city: data.localidade || '',
+                    state: data.uf || '',
+                    country: 'Brasil'
+                }));
+            }
+        } catch (error) {
+            console.error('Erro ao buscar CEP:', error);
+            alert('Erro ao buscar CEP. Tente novamente mais tarde.');
+        } finally {
+            setIsSearchingCep(false);
+        }
     };
 
     const handleAdvance = (batch: Batch) => {
@@ -200,12 +291,24 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
     };
 
     const handleSaveClientData = () => {
+        const parts = [
+            addressFields.street,
+            addressFields.number,
+            addressFields.complement,
+            addressFields.neighborhood,
+            addressFields.city,
+            addressFields.state,
+            addressFields.country,
+            addressFields.cep ? `CEP: ${addressFields.cep}` : ''
+        ].filter(Boolean);
+        const fullAddress = parts.join(', ') || editClientForm.address; // Fallback to raw address if new fields are empty
+
         updateClientData(project.id, {
             name: editClientForm.name,
             email: editClientForm.email,
             phone: editClientForm.phone,
-            address: editClientForm.address,
-            condominium: editClientForm.condominium,
+            address: fullAddress,
+            condominium: addressFields.condominium || editClientForm.condominium,
             cpf: editClientForm.cpf,
             rg: editClientForm.rg,
             cod_efinance: editClientForm.cod_efinance,
@@ -219,9 +322,9 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
         setIsEditClientOpen(false);
     };
 
-    const handleSaveITPP = () => {
-        updateProjectITPP(project.id, itppForm);
-        setIsEditingITPP(false);
+    const handleSaveBriefing = () => { // Renamed from handleSaveITPP
+        updateProjectBriefing(project.id, briefingForm);
+        setIsEditingBriefing(false);
     };
 
     const handleConfirmLost = () => {
@@ -241,7 +344,8 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
     };
 
     // Helper to check if current user can edit client data (Sales/Admin only usually)
-    const canEditClient = currentUser?.role === 'Admin' || currentUser?.role === 'Vendedor' || currentUser?.role === 'Proprietario' || currentUser?.role === 'Gerente';
+    const isContractLocked = project.contractSigned || project.client.status === 'Fechado';
+    const canEditClient = !isContractLocked && (currentUser?.role === 'Admin' || currentUser?.role === 'Vendedor' || currentUser?.role === 'Proprietario' || currentUser?.role === 'Gerente');
     const canChangeSeller = permissions.find((p: { role: Role }) => p.role === currentUser?.role)?.canChangeSeller || false;
     const canDeleteProject = currentUser?.role === 'Admin' || currentUser?.role === 'Proprietario';
 
@@ -321,7 +425,7 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
             {/* Tabs */}
             <div className="px-6 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1a2632] shrink-0">
                 <div className="flex gap-8">
-                    {(['OVERVIEW', 'ENVIRONMENTS', 'ITPP', 'TIMELINE'] as const).map((tab) => (
+                    {(['OVERVIEW', 'ENVIRONMENTS', 'BRIEFING', 'TIMELINE'] as const).map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab as any)}
@@ -329,8 +433,11 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                         >
                             {tab === 'OVERVIEW' && 'Visão Geral'}
                             {tab === 'ENVIRONMENTS' && 'Ambientes'}
-                            {tab === 'ITPP' && 'Detalhes ITPP'}
+                            {tab === 'BRIEFING' && 'Detalhes do Briefing'}
                             {tab === 'TIMELINE' && 'Histórico & Notas'}
+                            {isContractLocked && tab === 'BRIEFING' && (
+                                <span className="material-symbols-outlined text-[10px] ml-1 text-slate-400" title="Bloqueado (Contrato Fechado)">lock</span>
+                            )}
                         </button>
                     ))}
                 </div>
@@ -412,7 +519,8 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <p className="text-xs text-slate-500 font-bold uppercase">Responsável</p>
+                                                {project.client.propertyType && <p><strong className="text-slate-500">Imóvel:</strong> {project.client.propertyType}</p>}
+                                                {project.client.budget && <p><strong className="text-slate-500">Orçamento:</strong> {project.client.budget}</p>}
                                                 <p className="text-sm font-medium text-slate-800 dark:text-white">{step.ownerRole}</p>
                                             </div>
                                         </div>
@@ -580,21 +688,27 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                     </div>
                 )}
 
-                {/* ITPP TAB */}
-                {activeTab === 'ITPP' && (
+                {/* BRIEFING TAB */}
+                {activeTab === 'BRIEFING' && (
                     <div className="relative">
-                        {canEditClient && (
+                        {canEditClient ? (
                             <div className="flex justify-end mb-4">
-                                {isEditingITPP ? (
+                                {isEditingBriefing ? (
                                     <div className="flex gap-2">
-                                        <button onClick={() => setIsEditingITPP(false)} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 font-bold text-sm">Cancelar</button>
-                                        <button onClick={handleSaveITPP} className="px-4 py-2 bg-primary text-white rounded-lg font-bold text-sm shadow-lg">Salvar Alterações</button>
+                                        <button onClick={() => setIsEditingBriefing(false)} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 font-bold text-sm">Cancelar</button>
+                                        <button onClick={handleSaveBriefing} className="px-4 py-2 bg-primary text-white rounded-lg font-bold text-sm shadow-lg">Salvar Alterações</button>
                                     </div>
                                 ) : (
-                                    <button onClick={() => setIsEditingITPP(true)} className="px-4 py-2 bg-slate-800 text-white rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-slate-700">
-                                        <span className="material-symbols-outlined text-sm">edit</span> Editar ITPP
+                                    <button onClick={() => setIsEditingBriefing(true)} className="px-4 py-2 bg-slate-800 text-white rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-slate-700">
+                                        <span className="material-symbols-outlined text-sm">edit</span> Editar Briefing
                                     </button>
                                 )}
+                            </div>
+                        ) : isContractLocked && (
+                            <div className="flex justify-end mb-4">
+                                <div className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-lg text-sm flex items-center gap-2 border border-slate-200 dark:border-slate-700">
+                                    <span className="material-symbols-outlined text-sm">lock</span> Dados bloqueados por contrato
+                                </div>
                             </div>
                         )}
 
@@ -608,18 +722,13 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                                     <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800">
                                         <p className="text-xs font-bold text-slate-400 uppercase mb-1">Expectativa do Cliente</p>
-                                        {isEditingITPP ? (
-                                            <input
-                                                type="number"
-                                                className="w-full rounded-lg border-slate-200 text-sm"
-                                                value={itppForm.budget_expectation || 0}
-                                                onChange={e => setItppForm({ ...itppForm, budget_expectation: Number(e.target.value) })}
-                                            />
-                                        ) : (
-                                            <p className="text-2xl font-light text-slate-600 dark:text-slate-300">
-                                                R$ {project.client.budget_expectation?.toLocaleString() || '0,00'}
-                                            </p>
-                                        )}
+                                        <EditableField
+                                            label="Expectativa do Cliente"
+                                            value={project.client.budget_expectation || 0}
+                                            isEditing={isEditingBriefing}
+                                            onChange={(val) => setBriefingForm({ ...briefingForm, budget_expectation: Number(val) })}
+                                            type="number"
+                                        />
                                     </div>
 
                                     <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-100 dark:border-emerald-800">
@@ -631,11 +740,11 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
 
                                     <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800">
                                         <p className="text-xs font-bold text-slate-400 uppercase mb-1">Forma de Pagamento</p>
-                                        {isEditingITPP ? (
+                                        {isEditingBriefing ? ( // Changed from isEditingITPP
                                             <select
                                                 className="w-full rounded-lg border-slate-200 text-sm h-9"
-                                                value={itppForm.payment_preference || ''}
-                                                onChange={e => setItppForm({ ...itppForm, payment_preference: e.target.value as any })}
+                                                value={briefingForm.payment_preference || ''} // Changed from itppForm
+                                                onChange={e => setBriefingForm({ ...briefingForm, payment_preference: e.target.value as any })} // Changed from itppForm
                                             >
                                                 <option value="À vista">À vista</option>
                                                 <option value="Parcelado">Parcelado</option>
@@ -656,11 +765,11 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
                                         <p className="text-xs font-bold text-slate-400 uppercase mb-1">Possui Projeto Arquitetônico?</p>
-                                        {isEditingITPP ? (
+                                        {isEditingBriefing ? ( // Changed from isEditingITPP
                                             <select
                                                 className="w-full rounded-lg border-slate-200 text-sm"
-                                                value={itppForm.project_has_architect_project || ''}
-                                                onChange={e => setItppForm({ ...itppForm, project_has_architect_project: e.target.value as any })}
+                                                value={briefingForm.project_has_architect_project || ''} // Changed from itppForm
+                                                onChange={e => setBriefingForm({ ...briefingForm, project_has_architect_project: e.target.value as any })} // Changed from itppForm
                                             >
                                                 <option value="">Selecione...</option>
                                                 <option value="Sim">Sim</option>
@@ -673,11 +782,11 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                     </div>
                                     <div>
                                         <p className="text-xs font-bold text-slate-400 uppercase mb-1">Especificador Comissionado?</p>
-                                        {isEditingITPP ? (
+                                        {isEditingBriefing ? ( // Changed from isEditingITPP
                                             <input
                                                 className="w-full rounded-lg border-slate-200 text-sm"
-                                                value={itppForm.commissioned_specifier || ''}
-                                                onChange={e => setItppForm({ ...itppForm, commissioned_specifier: e.target.value })}
+                                                value={briefingForm.commissioned_specifier || ''} // Changed from itppForm
+                                                onChange={e => setBriefingForm({ ...briefingForm, commissioned_specifier: e.target.value })} // Changed from itppForm
                                                 placeholder="Nome do Especificador"
                                             />
                                         ) : (
@@ -686,12 +795,12 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                     </div>
                                     <div>
                                         <p className="text-xs font-bold text-slate-400 uppercase mb-1">Previsão Medição</p>
-                                        {isEditingITPP ? (
+                                        {isEditingBriefing ? ( // Changed from isEditingITPP
                                             <input
                                                 type="date"
                                                 className="w-full rounded-lg border-slate-200 text-sm"
-                                                value={itppForm.time_measurement_ready || ''}
-                                                onChange={e => setItppForm({ ...itppForm, time_measurement_ready: e.target.value })}
+                                                value={briefingForm.time_measurement_ready || ''} // Changed from itppForm
+                                                onChange={e => setBriefingForm({ ...briefingForm, time_measurement_ready: e.target.value })} // Changed from itppForm
                                             />
                                         ) : (
                                             <p className="text-slate-800 dark:text-slate-200">{project.client.time_measurement_ready ? new Date(project.client.time_measurement_ready).toLocaleDateString() : '-'}</p>
@@ -699,12 +808,12 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                     </div>
                                     <div>
                                         <p className="text-xs font-bold text-slate-400 uppercase mb-1">Expectativa de Decisão</p>
-                                        {isEditingITPP ? (
+                                        {isEditingBriefing ? ( // Changed from isEditingITPP
                                             <input
                                                 type="date"
                                                 className="w-full rounded-lg border-slate-200 text-sm"
-                                                value={itppForm.time_decision_expectation || ''}
-                                                onChange={e => setItppForm({ ...itppForm, time_decision_expectation: e.target.value })}
+                                                value={briefingForm.time_decision_expectation || ''} // Changed from itppForm
+                                                onChange={e => setBriefingForm({ ...briefingForm, time_decision_expectation: e.target.value })} // Changed from itppForm
                                             />
                                         ) : (
                                             <p className="text-slate-800 dark:text-slate-200">{project.client.time_decision_expectation ? new Date(project.client.time_decision_expectation).toLocaleDateString() : '-'}</p>
@@ -712,11 +821,11 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                     </div>
                                     <div className="md:col-span-2">
                                         <p className="text-xs font-bold text-slate-400 uppercase mb-1">Materiais de Preferência</p>
-                                        {isEditingITPP ? (
+                                        {isEditingBriefing ? ( // Changed from isEditingITPP
                                             <textarea
                                                 className="w-full rounded-lg border-slate-200 text-sm"
-                                                value={itppForm.project_materials || ''}
-                                                onChange={e => setItppForm({ ...itppForm, project_materials: e.target.value })}
+                                                value={briefingForm.project_materials || ''} // Changed from itppForm
+                                                onChange={e => setBriefingForm({ ...briefingForm, project_materials: e.target.value })} // Changed from itppForm
                                                 rows={2}
                                             />
                                         ) : (
@@ -725,16 +834,24 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                     </div>
                                     <div className="md:col-span-2">
                                         <p className="text-xs font-bold text-slate-400 uppercase mb-1">Requisitos Especiais</p>
-                                        {isEditingITPP ? (
-                                            <textarea
-                                                className="w-full rounded-lg border-slate-200 text-sm"
-                                                value={itppForm.project_special_reqs || ''}
-                                                onChange={e => setItppForm({ ...itppForm, project_special_reqs: e.target.value })}
-                                                rows={2}
-                                            />
-                                        ) : (
-                                            <p className="text-slate-800 dark:text-slate-200">{project.client.project_special_reqs || '-'}</p>
-                                        )}
+                                        <EditableField
+                                            label="Necessidades Especiais/Acessibilidade"
+                                            value={project.client.specialNeeds || ''}
+                                            isEditing={isEditingBriefing}
+                                            onChange={(val) => setBriefingForm({ ...briefingForm, specialNeeds: val })}
+                                            multiline
+                                            rows={2}
+                                        />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <p className="text-xs font-bold text-slate-400 uppercase mb-1">Eletrodomésticos Específicos</p>
+                                        <EditableField
+                                            value={project.client.appliances || ''}
+                                            isEditing={isEditingBriefing}
+                                            onChange={(val) => setBriefingForm({ ...briefingForm, appliances: val })}
+                                            multiline
+                                            rows={2}
+                                        />
                                     </div>
                                 </div>
                             </div>
@@ -748,11 +865,11 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                 <div className="space-y-4">
                                     <div>
                                         <p className="text-xs font-bold text-slate-400 uppercase mb-1">Quem vai morar</p>
-                                        {isEditingITPP ? (
+                                        {isEditingBriefing ? ( // Changed from isEditingITPP
                                             <input
                                                 className="w-full rounded-lg border-slate-200 text-sm"
-                                                value={itppForm.profile_residents || ''}
-                                                onChange={e => setItppForm({ ...itppForm, profile_residents: e.target.value })}
+                                                value={briefingForm.profile_residents || ''} // Changed from itppForm
+                                                onChange={e => setBriefingForm({ ...briefingForm, profile_residents: e.target.value })} // Changed from itppForm
                                             />
                                         ) : (
                                             <p className="text-slate-800 dark:text-slate-200">{project.client.profile_residents || '-'}</p>
@@ -760,11 +877,11 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                     </div>
                                     <div>
                                         <p className="text-xs font-bold text-slate-400 uppercase mb-1">Rotina da Casa</p>
-                                        {isEditingITPP ? (
+                                        {isEditingBriefing ? ( // Changed from isEditingITPP
                                             <textarea
                                                 className="w-full rounded-lg border-slate-200 text-sm"
-                                                value={itppForm.profile_routine || ''}
-                                                onChange={e => setItppForm({ ...itppForm, profile_routine: e.target.value })}
+                                                value={briefingForm.profile_routine || ''} // Changed from itppForm
+                                                onChange={e => setBriefingForm({ ...briefingForm, profile_routine: e.target.value })} // Changed from itppForm
                                             />
                                         ) : (
                                             <p className="text-slate-800 dark:text-slate-200">{project.client.profile_routine || '-'}</p>
@@ -772,11 +889,11 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                     </div>
                                     <div>
                                         <p className="text-xs font-bold text-slate-400 uppercase mb-1">Dores / Expectativas</p>
-                                        {isEditingITPP ? (
+                                        {isEditingBriefing ? ( // Changed from isEditingITPP
                                             <textarea
                                                 className="w-full rounded-lg border-slate-200 text-sm"
-                                                value={itppForm.profile_pains || ''}
-                                                onChange={e => setItppForm({ ...itppForm, profile_pains: e.target.value })}
+                                                value={briefingForm.profile_pains || ''} // Changed from itppForm
+                                                onChange={e => setBriefingForm({ ...briefingForm, profile_pains: e.target.value })} // Changed from itppForm
                                             />
                                         ) : (
                                             <p className="text-slate-800 dark:text-slate-200 italic">"{project.client.profile_pains || '-'}"</p>
@@ -794,26 +911,25 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <p className="text-xs font-bold text-slate-400 uppercase mb-1">Tipo</p>
-                                        {isEditingITPP ? (
-                                            <select
-                                                className="w-full rounded-lg border-slate-200 text-sm"
-                                                value={itppForm.property_type || ''}
-                                                onChange={e => setItppForm({ ...itppForm, property_type: e.target.value as any })}
-                                            >
-                                                <option value="Reforma">Reforma</option>
-                                                <option value="Construção Nova">Construção Nova</option>
-                                            </select>
-                                        ) : (
-                                            <p className="text-slate-800 dark:text-slate-200">{project.client.property_type || '-'}</p>
-                                        )}
+                                        <EditableField
+                                            label="Tipo de Imóvel"
+                                            value={project.client.propertyType || ''}
+                                            isEditing={isEditingBriefing}
+                                            onChange={(val) => setBriefingForm({ ...briefingForm, propertyType: val })}
+                                            type="select"
+                                            options={[
+                                                { value: "Reforma", label: "Reforma" },
+                                                { value: "Construção Nova", label: "Construção Nova" }
+                                            ]}
+                                        />
                                     </div>
                                     <div>
                                         <p className="text-xs font-bold text-slate-400 uppercase mb-1">Localização</p>
-                                        {isEditingITPP ? (
+                                        {isEditingBriefing ? ( // Changed from isEditingITPP
                                             <input
                                                 className="w-full rounded-lg border-slate-200 text-sm"
-                                                value={itppForm.property_location || ''}
-                                                onChange={e => setItppForm({ ...itppForm, property_location: e.target.value })}
+                                                value={briefingForm.property_location || ''} // Changed from itppForm
+                                                onChange={e => setBriefingForm({ ...briefingForm, property_location: e.target.value })} // Changed from itppForm
                                             />
                                         ) : (
                                             <p className="text-slate-800 dark:text-slate-200">{project.client.property_location || '-'}</p>
@@ -821,12 +937,12 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                     </div>
                                     <div>
                                         <p className="text-xs font-bold text-slate-400 uppercase mb-1">Mudança Prevista</p>
-                                        {isEditingITPP ? (
+                                        {isEditingBriefing ? ( // Changed from isEditingITPP
                                             <input
                                                 type="date"
                                                 className="w-full rounded-lg border-slate-200 text-sm"
-                                                value={itppForm.time_move_in || ''}
-                                                onChange={e => setItppForm({ ...itppForm, time_move_in: e.target.value })}
+                                                value={briefingForm.time_move_in || ''} // Changed from itppForm
+                                                onChange={e => setBriefingForm({ ...briefingForm, time_move_in: e.target.value })} // Changed from itppForm
                                             />
                                         ) : (
                                             <p className="text-slate-800 dark:text-slate-200">{project.client.time_move_in || '-'}</p>
@@ -834,11 +950,11 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                     </div>
                                     <div>
                                         <p className="text-xs font-bold text-slate-400 uppercase mb-1">Arquiteto</p>
-                                        {isEditingITPP ? (
+                                        {isEditingBriefing ? ( // Changed from isEditingITPP
                                             <input
                                                 className="w-full rounded-lg border-slate-200 text-sm"
-                                                value={itppForm.architect_name || ''}
-                                                onChange={e => setItppForm({ ...itppForm, architect_name: e.target.value })}
+                                                value={briefingForm.architect_name || ''} // Changed from itppForm
+                                                onChange={e => setBriefingForm({ ...briefingForm, architect_name: e.target.value })} // Changed from itppForm
                                             />
                                         ) : (
                                             <p className="text-slate-800 dark:text-slate-200">{project.client.architect_name || '-'}</p>
@@ -898,21 +1014,21 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
             {/* EDIT CLIENT DATA MODAL */}
             {isEditClientOpen && (
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fade-in"
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 md:p-6 animate-fade-in"
                     onClick={() => setIsEditClientOpen(false)}
                 >
                     <div
-                        className="bg-white dark:bg-[#1e2936] w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-scale-in"
+                        className="bg-white dark:bg-[#1e2936] w-full max-w-2xl flex flex-col max-h-[90dvh] rounded-2xl shadow-2xl overflow-hidden animate-scale-in"
                         onClick={e => e.stopPropagation()}
                     >
-                        <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                        <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center shrink-0">
                             <h3 className="text-xl font-bold text-slate-800 dark:text-white">Editar Dados do Cliente</h3>
                             <button onClick={() => setIsEditClientOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
                                 <span className="material-symbols-outlined">close</span>
                             </button>
                         </div>
 
-                        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 overflow-y-auto">
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cód. EFinance</label>
                                 <input
@@ -962,26 +1078,117 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                     onChange={e => setEditClientForm({ ...editClientForm, rg: e.target.value })}
                                 />
                             </div>
-                            <div className="md:col-span-2">
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Endereço Completo</label>
-                                <textarea
-                                    className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm"
-                                    value={editClientForm.address}
-                                    onChange={e => setEditClientForm({ ...editClientForm, address: e.target.value })}
-                                    rows={3}
+                            <div className="md:col-span-2 mt-2">
+                                <h4 className="font-bold text-slate-800 dark:text-white mb-2 border-b border-slate-100 dark:border-slate-800 pb-2">Endereço</h4>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">CEP</label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={addressFields.cep}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateAddressField('cep', e.target.value)}
+                                        className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm focus:ring-primary"
+                                        placeholder="00000-000"
+                                        maxLength={9}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={searchCEP}
+                                        disabled={isSearchingCep || addressFields.cep.length < 9}
+                                        className="px-3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-200 disabled:opacity-50 flex items-center justify-center shrink-0 border border-slate-200 dark:border-slate-700"
+                                        title="Buscar CEP"
+                                    >
+                                        <span className="material-symbols-outlined text-sm">
+                                            {isSearchingCep ? 'sync' : 'search'}
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="md:col-span-1">
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Rua / Logradouro</label>
+                                <input
+                                    type="text"
+                                    value={addressFields.street}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateAddressField('street', e.target.value)}
+                                    className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm focus:ring-primary"
+                                    placeholder="Ex: Rua das Flores"
                                 />
                             </div>
-                            <div className="md:col-span-2">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Número</label>
+                                <input
+                                    type="text"
+                                    value={addressFields.number}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateAddressField('number', e.target.value)}
+                                    className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm focus:ring-primary"
+                                    placeholder="Ex: 123"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Complemento</label>
+                                <input
+                                    type="text"
+                                    value={addressFields.complement}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateAddressField('complement', e.target.value)}
+                                    className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm focus:ring-primary"
+                                    placeholder="Ex: Apto 101, Bloco B"
+                                />
+                            </div>
+                            <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Condomínio</label>
                                 <input
-                                    className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm"
-                                    value={editClientForm.condominium}
-                                    onChange={e => setEditClientForm({ ...editClientForm, condominium: e.target.value })}
+                                    type="text"
+                                    value={addressFields.condominium || editClientForm.condominium}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                        updateAddressField('condominium', e.target.value);
+                                        setEditClientForm({ ...editClientForm, condominium: e.target.value });
+                                    }}
+                                    className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm focus:ring-primary"
+                                    placeholder="Nome do Condomínio (se houver)"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Bairro</label>
+                                <input
+                                    type="text"
+                                    value={addressFields.neighborhood}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateAddressField('neighborhood', e.target.value)}
+                                    className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm focus:ring-primary"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cidade</label>
+                                <input
+                                    type="text"
+                                    value={addressFields.city}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateAddressField('city', e.target.value)}
+                                    className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm focus:ring-primary"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Estado (UF)</label>
+                                <input
+                                    type="text"
+                                    value={addressFields.state}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateAddressField('state', e.target.value)}
+                                    className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm uppercase focus:ring-primary"
+                                    maxLength={2}
+                                />
+                            </div>
+                            <div className="md:col-span-2 pt-2">
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Endereço Legado (Temporário / Consulta)</label>
+                                <textarea
+                                    className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm opacity-60 focus:ring-primary"
+                                    value={editClientForm.address}
+                                    onChange={e => setEditClientForm({ ...editClientForm, address: e.target.value })}
+                                    rows={1}
+                                    title="Mostra o endereço de clientes antigos que ainda não foram separados."
                                 />
                             </div>
                         </div>
 
-                        <div className="p-6 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-[#1a2632]">
+                        <div className="p-6 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-[#1a2632] shrink-0">
                             <button
                                 onClick={() => setIsEditClientOpen(false)}
                                 className="px-4 py-2 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white font-medium"

@@ -415,7 +415,7 @@ const KanbanBoard: React.FC = () => {
                                                         </span>
                                                     </div>
                                                     <div className="flex gap-1.5">
-                                                        {card.phase !== '9.0' && card.phase !== '9.1' ? (
+                                                        {workflowConfig[card.phase]?.stage >= 4 && card.phase !== '9.0' && card.phase !== '9.1' ? (
                                                             <button
                                                                 onClick={(e: React.MouseEvent) => {
                                                                     e.stopPropagation();

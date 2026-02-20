@@ -106,8 +106,9 @@ export interface Environment {
   urgency_level?: 'Baixa' | 'Média' | 'Alta';
   estimated_value?: number;
   observations: string;
-  status: 'Pending' | 'InBatch' | 'PostAssembly' | 'Completed';
+  status: 'Pending' | 'InBatch' | 'PostAssembly' | 'Completed' | 'Lost';
   version?: number;
+  final_value?: number; // Added to store the finalized value of the environment
 }
 
 export interface StoreConfig {
@@ -196,6 +197,9 @@ export interface Project {
 
   factoryOrders: FactoryOrder[];
   total_estimated_value?: number;
+  contractValue?: number; // The closed total value
+  contractSigned?: boolean; // Flag to lock client edits
+  contractDate?: string;
 }
 
 export interface Batch {
