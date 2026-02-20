@@ -43,14 +43,14 @@ describe('ProjectContext - Split Batch', () => {
 
         let batchToSplit = result.current.batches[0];
         // Ensure we have a batch with multiple environments
-        if (batchToSplit.environmentIds.length < 2) {
+        if (!batchToSplit.environmentIds || batchToSplit.environmentIds.length < 2) {
             // Find one or assume seed data has one. 
             // SEED_BATCHES[0] has 'e1', 'e2'.
-            batchToSplit = result.current.batches.find((b: any) => b.environmentIds.includes('e1') && b.environmentIds.includes('e2')) || result.current.batches[0];
+            batchToSplit = result.current.batches.find((b: any) => b.environmentIds?.includes('e1') && b.environmentIds?.includes('e2')) || result.current.batches[0];
         }
 
-        const envsToMove = [batchToSplit.environmentIds[0]];
-        const envsToStay = batchToSplit.environmentIds.filter((id: any) => !envsToMove.includes(id));
+        const envsToMove = [batchToSplit.environmentIds![0]];
+        const envsToStay = batchToSplit.environmentIds!.filter((id: any) => !envsToMove.includes(id));
 
         const originalId = batchToSplit.id;
 
@@ -83,8 +83,8 @@ describe('ProjectContext - Split Batch', () => {
         const { result } = renderHook(() => useProjects(), { wrapper });
 
         // Setup: Split first
-        const batchToSplit = result.current.batches.find((b: any) => b.environmentIds.length >= 1)!;
-        const envsToMove = [batchToSplit.environmentIds[0]];
+        const batchToSplit = result.current.batches.find((b: any) => (b.environmentIds?.length || 0) >= 1)!;
+        const envsToMove = [batchToSplit.environmentIds![0]];
 
         let newBatchId: string | undefined;
         act(() => {

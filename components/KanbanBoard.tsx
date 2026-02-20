@@ -53,7 +53,7 @@ const KanbanBoard: React.FC = () => {
 
     const handleDecisionSelect = async (nextStepId: string) => {
         if (!decisionModalData) return;
-        await moveBatchToStep(decisionModalData.batch.id, decisionModalData.step.id, nextStepId);
+        await moveBatchToStep(decisionModalData.batch.id, nextStepId);
         setDecisionModalData(null);
     };
 
@@ -165,7 +165,7 @@ const KanbanBoard: React.FC = () => {
                     return {
                         id: b.id,
                         title: b.name,
-                        subtitle: project?.name || 'Projeto Desconhecido',
+                        subtitle: project?.client?.name || 'Projeto Desconhecido',
                         clientName: project?.client.name || 'Cliente',
                         stepLabel: step?.label || 'Desconhecido',
                         owner: step?.ownerRole || 'N/A',

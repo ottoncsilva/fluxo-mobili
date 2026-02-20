@@ -17,7 +17,7 @@ interface PaymentParcel {
 }
 
 const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, project }) => {
-    const { currentUser } = useProjects();
+    const { currentUser, companySettings } = useProjects();
     const [step, setStep] = useState<'EDIT' | 'PREVIEW'>('EDIT');
 
     // Form Data
@@ -62,7 +62,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, project 
 
     if (!isOpen || !project) return null;
 
-    const company = store?.settings || {
+    const company = companySettings || {
         name: 'Empresa Modelo',
         corporateName: 'Razão Social Modelo',
         cnpj: '00.000.000/0001-00',

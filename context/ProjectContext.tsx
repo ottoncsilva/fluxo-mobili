@@ -354,6 +354,7 @@ interface ProjectContextType {
     canUserViewStage: (stageId: number) => boolean;
     canUserEditAssistance: () => boolean;
     resetStoreDefaults: (type: 'origins' | 'assistance' | 'all') => Promise<boolean>;
+    getBranchingOptions: (stepId: string) => any[];
 }
 
 export const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -1120,7 +1121,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         };
 
         const originalBatchUpdate = {
-            environmentIds: originalBatch.environmentIds.filter(id => !selectedEnvironmentIds.includes(id)),
+            environmentIds: (originalBatch.environmentIds || []).filter(id => !selectedEnvironmentIds.includes(id)),
             lastUpdated: new Date().toISOString()
         };
 
@@ -1135,7 +1136,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
                 ...prev.filter(b => b.id !== originalBatchId),
                 newBatch,
                 updatedOriginalBatch
-            ].filter(b => b.environmentIds.length > 0));
+            ].filter(b => (b.environmentIds || []).length > 0));
         }
 
         // Add Note

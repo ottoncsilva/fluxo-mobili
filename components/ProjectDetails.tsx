@@ -21,8 +21,8 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
 
     // Edit Client Modal
     const [isEditClientOpen, setIsEditClientOpen] = useState(false);
-    const [editClientForm, setEditClientForm] = useState<{ name: string, email: string, phone: string, address: string, condominium: string, cpf: string, rg: string, origin: string, consultant_name: string, sellerId: string }>({
-        name: '', email: '', phone: '', address: '', condominium: '', cpf: '', rg: '', origin: '', consultant_name: '', sellerId: ''
+    const [editClientForm, setEditClientForm] = useState<{ name: string, email: string, phone: string, address: string, condominium: string, cpf: string, rg: string, cod_efinance?: string, origin: string, consultant_name: string, sellerId: string }>({
+        name: '', email: '', phone: '', address: '', condominium: '', cpf: '', rg: '', cod_efinance: '', origin: '', consultant_name: '', sellerId: ''
     });
 
     // ITPP Edit Mode
@@ -62,6 +62,7 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                 condominium: project.client.condominium || '',
                 cpf: project.client.cpf || '',
                 rg: project.client.rg || '',
+                cod_efinance: project.client.cod_efinance || '',
                 origin: project.client.origin || '',
                 consultant_name: project.client.consultant_name || '',
                 sellerId: project.sellerId || ''
@@ -183,6 +184,7 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
             condominium: editClientForm.condominium,
             cpf: editClientForm.cpf,
             rg: editClientForm.rg,
+            cod_efinance: editClientForm.cod_efinance,
             origin: editClientForm.origin,
             consultant_name: editClientForm.consultant_name
         });

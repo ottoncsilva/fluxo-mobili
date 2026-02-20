@@ -90,6 +90,7 @@ const Settings: React.FC = () => {
         setSaving(true);
         setSaveMessage(null);
         await updateCompanySettings({
+            ...companySettings,
             evolutionApi: {
                 instanceUrl: evoInstanceUrl,
                 token: evoToken,
