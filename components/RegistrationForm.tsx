@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useProjects } from '../context/ProjectContext';
 import { Environment, Client } from '../types';
+import { maskPhone, maskCPF, maskCEP, unmask } from '../utils/masks';
 
 interface RegistrationFormProps {
     onComplete?: () => void;
@@ -10,12 +11,22 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onComplete }) => {
     const { addProject, currentUser, origins } = useProjects();
     const [currentStep, setCurrentStep] = useState(1); // 1: Lead, 2: Briefing (ITPP), 3: Ambientes
 
+    // Address Separation State
+    const [addressFields, setAddressFields] = useState({
+        cep: '',
+        street: '',
+        number: '',
+        neighborhood: '',
+        city: '',
+        state: ''
+    });
+
     // Consolidated Client State
     const [formData, setFormData] = useState<Partial<Client>>({
         name: '',
         email: '',
         phone: '',
-        address: '',
+        address: '', // Will be constructed on save
         condominium: '',
         cpf: '',
         rg: '',
@@ -48,14 +59,30 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onComplete }) => {
     const [envName, setEnvName] = useState('');
 
     const updateField = (field: keyof Client, value: any) => {
+        let formattedValue = value;
+
+        // Apply Masks
+        if (field === 'phone') formattedValue = maskPhone(value);
+        if (field === 'cpf') formattedValue = maskCPF(value);
+
         // Special validation for cod_efinance
         if (field === 'cod_efinance') {
-            // Only allow numbers and max 5 digits
-            const numericValue = value.replace(/\D/g, '').slice(0, 5);
-            setFormData(prev => ({ ...prev, [field]: numericValue }));
-            return;
+            formattedValue = value.replace(/\D/g, '').slice(0, 5);
         }
-        setFormData(prev => ({ ...prev, [field]: value }));
+
+        setFormData(prev => ({ ...prev, [field]: formattedValue }));
+    };
+
+    const updateAddressField = (field: keyof typeof addressFields, value: string) => {
+        let formattedValue = value;
+        if (field === 'cep') formattedValue = maskCEP(value);
+
+        setAddressFields(prev => {
+            const newFields = { ...prev, [field]: formattedValue };
+            // Auto-update legacy address field for preview validation if needed
+            // But we will construct it on save.
+            return newFields;
+        });
     };
 
     const handleAddEnvironment = () => {
@@ -76,10 +103,17 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onComplete }) => {
     };
 
     const validateStep1 = () => {
-        if (!formData.name || !formData.phone || !formData.address) {
-            alert("Por favor, preencha Nome, WhatsApp e Endereço.");
+        if (!formData.name || !formData.phone) {
+            alert("Por favor, preencha Nome e WhatsApp.");
             return false;
         }
+
+        // Validate Address Fields
+        if (!addressFields.street || !addressFields.number || !addressFields.neighborhood || !addressFields.city || !addressFields.state) {
+            alert("Por favor, preencha todos os campos do endereço.");
+            return false;
+        }
+
         // Validate Cod. EFinance
         if (!formData.cod_efinance || formData.cod_efinance.length !== 5) {
             alert("O Cód. EFinance é obrigatório e deve ter 5 dígitos numéricos.");
@@ -99,13 +133,20 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onComplete }) => {
 
     const handleSave = async () => {
         if (environments.length === 0) {
-            if (!window.confirm("Nenhum ambiente adicionado. Deseja continuar mesmo assim?")) {
-                return;
-            }
+            alert("Adicione pelo menos um ambiente.");
+            return;
         }
 
+        // Construct full address
+        const fullAddress = `${addressFields.street}, ${addressFields.number} - ${addressFields.neighborhood}, ${addressFields.city} - ${addressFields.state}, CEP: ${addressFields.cep}`;
+
+        const clientData = {
+            ...formData,
+            address: fullAddress
+        } as Client;
+
         try {
-            await addProject(formData as Client, environments);
+            await addProject(clientData, environments);
             alert("Cliente cadastrado com sucesso!");
             if (onComplete) onComplete();
         } catch (error) {
@@ -115,32 +156,24 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onComplete }) => {
     };
 
     return (
-        <div className="bg-white dark:bg-[#1a2632] rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 flex flex-col h-[calc(100vh-120px)] overflow-hidden">
-            {/* Header Steps */}
-            <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
-                <div className="flex items-center justify-between max-w-3xl mx-auto">
-                    {[
-                        { num: 1, label: 'Dados do Cliente' },
-                        { num: 2, label: 'Briefing Inicial' },
-                        { num: 3, label: 'Ambientes' }
-                    ].map(step => (
-                        <div key={step.num} className="flex items-center gap-3">
-                            <div className={`
-                                size-10 rounded-full flex items-center justify-center font-bold text-lg transition-all
-                                ${currentStep === step.num
-                                    ? 'bg-primary text-white shadow-lg shadow-primary/30 scale-110'
-                                    : currentStep > step.num
-                                        ? 'bg-green-500 text-white'
-                                        : 'bg-slate-200 dark:bg-slate-700 text-slate-400'}
-                            `}>
-                                {currentStep > step.num ? '✓' : step.num}
-                            </div>
-                            <span className={`text-sm font-medium ${currentStep === step.num ? 'text-primary' : 'text-slate-500'}`}>
-                                {step.label}
-                            </span>
-                            {step.num < 3 && <div className="w-12 h-0.5 bg-slate-200 dark:bg-slate-700 mx-2" />}
-                        </div>
-                    ))}
+        <div className="bg-white dark:bg-[#1a2632] rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Novo Projeto</h2>
+
+            {/* Stepper */}
+            <div className="flex items-center mb-8">
+                <div className={`flex items-center gap-2 ${currentStep >= 1 ? 'text-primary' : 'text-slate-400'}`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${currentStep >= 1 ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-800'}`}>1</div>
+                    <span className="text-sm font-bold">Cliente</span>
+                </div>
+                <div className="w-12 h-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
+                <div className={`flex items-center gap-2 ${currentStep >= 2 ? 'text-primary' : 'text-slate-400'}`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${currentStep >= 2 ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-800'}`}>2</div>
+                    <span className="text-sm font-bold">Briefing</span>
+                </div>
+                <div className="w-12 h-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
+                <div className={`flex items-center gap-2 ${currentStep >= 3 ? 'text-primary' : 'text-slate-400'}`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${currentStep >= 3 ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-800'}`}>3</div>
+                    <span className="text-sm font-bold">Ambientes</span>
                 </div>
             </div>
 
@@ -149,97 +182,51 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onComplete }) => {
                 <div className="max-w-3xl mx-auto">
                     {/* STEP 1: LEAD */}
                     {currentStep === 1 && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-4">
+                        <div className="space-y-4 animate-fade-in">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">Cód. EFinance *</label>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cód. EFinance*</label>
                                     <input
                                         type="text"
                                         value={formData.cod_efinance || ''}
                                         onChange={e => updateField('cod_efinance', e.target.value)}
-                                        className="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 focus:ring-primary font-mono tracking-widest"
+                                        className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm focus:ring-primary"
                                         placeholder="00000"
                                         maxLength={5}
                                     />
-                                    <p className="text-xs text-slate-400 mt-1">Código único do cliente (5 dígitos)</p>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">Nome Completo *</label>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome Completo*</label>
                                     <input
                                         type="text"
                                         value={formData.name}
                                         onChange={e => updateField('name', e.target.value)}
-                                        className="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 focus:ring-primary"
+                                        className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm focus:ring-primary"
                                         placeholder="Ex: Ana Silva"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">WhatsApp / Telefone *</label>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">WhatsApp*</label>
                                     <input
-                                        type="tel"
+                                        type="text"
                                         value={formData.phone}
                                         onChange={e => updateField('phone', e.target.value)}
-                                        className="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 focus:ring-primary"
+                                        className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm focus:ring-primary"
                                         placeholder="(00) 00000-0000"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">E-mail</label>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email</label>
                                     <input
                                         type="email"
                                         value={formData.email}
                                         onChange={e => updateField('email', e.target.value)}
-                                        className="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 focus:ring-primary"
+                                        className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm focus:ring-primary"
                                         placeholder="cliente@email.com"
                                     />
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">CPF</label>
-                                        <input
-                                            type="text"
-                                            value={formData.cpf}
-                                            onChange={e => updateField('cpf', e.target.value)}
-                                            className="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 focus:ring-primary"
-                                            placeholder="000.000.000-00"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">RG</label>
-                                        <input
-                                            type="text"
-                                            value={formData.rg}
-                                            onChange={e => updateField('rg', e.target.value)}
-                                            className="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 focus:ring-primary"
-                                            placeholder="00.000.000-0"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">Endereço Completo *</label>
-                                    <textarea
-                                        value={formData.address}
-                                        onChange={e => updateField('address', e.target.value)}
-                                        className="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 focus:ring-primary"
-                                        rows={3}
-                                        placeholder="Rua, Número, Bairro, Cidade..."
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">Condomínio</label>
-                                    <input
-                                        type="text"
-                                        value={formData.condominium}
-                                        onChange={e => updateField('condominium', e.target.value)}
-                                        className="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 focus:ring-primary"
-                                        placeholder="Nome do Condomínio (se houver)"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">Origem do Cliente</label>
+                                <div className="md:col-span-2">
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Origem</label>
                                     <select
                                         value={formData.origin}
                                         onChange={e => updateField('origin', e.target.value)}
@@ -247,6 +234,69 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onComplete }) => {
                                     >
                                         {origins.map(o => <option key={o} value={o}>{o}</option>)}
                                     </select>
+                                </div>
+                            </div>
+
+                            {/* Address Section */}
+                            <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-3">Endereço</h3>
+                                <div className="grid grid-cols-6 gap-4">
+                                    <div className="col-span-2">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">CEP</label>
+                                        <input
+                                            type="text"
+                                            className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm focus:ring-primary"
+                                            value={addressFields.cep}
+                                            onChange={e => updateAddressField('cep', e.target.value)}
+                                            onBlur={handleCepBlur}
+                                            placeholder="00000-000"
+                                        />
+                                    </div>
+                                    <div className="col-span-3">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Rua</label>
+                                        <input
+                                            type="text"
+                                            className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm focus:ring-primary"
+                                            value={addressFields.street}
+                                            onChange={e => updateAddressField('street', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="col-span-1">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Número</label>
+                                        <input
+                                            type="text"
+                                            className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm focus:ring-primary"
+                                            value={addressFields.number}
+                                            onChange={e => updateAddressField('number', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="col-span-2">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Bairro</label>
+                                        <input
+                                            type="text"
+                                            className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm focus:ring-primary"
+                                            value={addressFields.neighborhood}
+                                            onChange={e => updateAddressField('neighborhood', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="col-span-3">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cidade</label>
+                                        <input
+                                            type="text"
+                                            className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm focus:ring-primary"
+                                            value={addressFields.city}
+                                            onChange={e => updateAddressField('city', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="col-span-1">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Estado</label>
+                                        <input
+                                            type="text"
+                                            className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm focus:ring-primary"
+                                            value={addressFields.state}
+                                            onChange={e => updateAddressField('state', e.target.value)}
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -507,10 +557,10 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onComplete }) => {
                         </div>
                     )}
                 </div>
-            </div>
+            </div >
 
             {/* Action Footer */}
-            <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-[#1a2632] flex items-center justify-between">
+            < div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-[#1a2632] flex items-center justify-between" >
                 <button
                     onClick={() => { if (currentStep > 1) setCurrentStep(prev => prev - 1) }}
                     className={`px-6 py-2.5 font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors ${currentStep === 1 ? 'invisible' : ''}`}
@@ -537,8 +587,8 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onComplete }) => {
                         </button>
                     )}
                 </div>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 };
 

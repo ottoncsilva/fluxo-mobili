@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useProjects } from '../context/ProjectContext';
 import { useAgenda } from '../context/AgendaContext';
 import { Role, User, PermissionConfig, AssistanceStatus, WorkflowStep, AssistanceWorkflowStep } from '../types';
@@ -16,7 +16,7 @@ const Settings: React.FC = () => {
 
     const { appointmentTypes, addAppointmentType, updateAppointmentType, deleteAppointmentType, agendaUsers, toggleAgendaUser } = useAgenda();
 
-    const [activeTab, setActiveTab] = useState<'COMPANY' | 'USERS' | 'PERMISSIONS' | 'ORIGINS' | 'AGENDA' | 'APPEARANCE' | 'ASSISTANCE' | 'WORKFLOW' | 'POST_ASSEMBLY'>('COMPANY');
+    const [activeTab, setActiveTab] = useState<'COMPANY' | 'USERS' | 'PERMISSIONS' | 'ORIGINS' | 'AGENDA' | 'APPEARANCE' | 'ASSISTANCE' | 'WORKFLOW' | 'POST_ASSEMBLY' | 'INTEGRATIONS'>('COMPANY');
 
     // Dark Mode State
     const [theme, setTheme] = useState<'light' | 'dark' | 'auto'>(() => {
@@ -89,6 +89,15 @@ const Settings: React.FC = () => {
     const handleSaveConfig = async () => {
         setSaving(true);
         setSaveMessage(null);
+        await updateCompanySettings({
+            evolutionApi: {
+                instanceUrl: evoInstanceUrl,
+                token: evoToken,
+                notifyLead: evoNotifyLead,
+                notifyStatus: evoNotifyStatus,
+                notifySla: evoNotifySla
+            }
+        });
         const success = await saveStoreConfig();
         setSaving(false);
         if (success) {
@@ -106,6 +115,23 @@ const Settings: React.FC = () => {
     const [companyPhone, setCompanyPhone] = useState(companySettings.phone);
     const [companyLogo, setCompanyLogo] = useState(companySettings.logoUrl || '');
     const [companySocial, setCompanySocial] = useState(companySettings.socialMedia || '');
+
+    // Evolution API State
+    const [evoInstanceUrl, setEvoInstanceUrl] = useState(companySettings.evolutionApi?.instanceUrl || '');
+    const [evoToken, setEvoToken] = useState(companySettings.evolutionApi?.token || '');
+    const [evoNotifyLead, setEvoNotifyLead] = useState(companySettings.evolutionApi?.notifyLead || false);
+    const [evoNotifyStatus, setEvoNotifyStatus] = useState(companySettings.evolutionApi?.notifyStatus || false);
+    const [evoNotifySla, setEvoNotifySla] = useState(companySettings.evolutionApi?.notifySla || false);
+    const [testConnectionStatus, setTestConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+
+    const handleTestConnection = async () => {
+        setTestConnectionStatus('testing');
+        // Dynamic import to avoid SSR issues if any, though likely client side.
+        const { EvolutionApi } = await import('../services/evolutionApi');
+        const success = await EvolutionApi.checkConnection(evoInstanceUrl, evoToken);
+        setTestConnectionStatus(success ? 'success' : 'error');
+        setTimeout(() => setTestConnectionStatus('idle'), 3000);
+    };
 
     const openUserModal = (user?: User) => {
         if (user) {
@@ -908,6 +934,106 @@ const Settings: React.FC = () => {
                         </div>
                     </div>
                 )
+                }
+
+                {/* INTEGRATIONS TAB */}
+                {
+                    activeTab === 'INTEGRATIONS' && (
+                        <div className="space-y-6 animate-fade-in">
+                            <div className="bg-white dark:bg-[#1a2632] p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+                                <div className="flex items-center gap-4 mb-6">
+                                    <span className="material-symbols-outlined text-4xl text-green-500">chat</span>
+                                    <div>
+                                        <h3 className="font-bold text-slate-800 dark:text-white text-lg">Evolution API (WhatsApp)</h3>
+                                        <p className="text-sm text-slate-500">Configure a conexão com a Evolution API para envio de mensagens automáticas.</p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="md:col-span-2">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">URL da Instância</label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-3 text-slate-400 material-symbols-outlined text-sm">link</span>
+                                            <input
+                                                type="text"
+                                                value={evoInstanceUrl}
+                                                onChange={e => setEvoInstanceUrl(e.target.value)}
+                                                className="w-full pl-9 rounded-lg border-slate-200 dark:bg-slate-800 text-sm"
+                                                placeholder="https://api.evolution.com/instance/minha-empresa"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="md:col-span-2">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">API Token (API Key)</label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-3 text-slate-400 material-symbols-outlined text-sm">key</span>
+                                            <input
+                                                type="password"
+                                                value={evoToken}
+                                                onChange={e => setEvoToken(e.target.value)}
+                                                className="w-full pl-9 rounded-lg border-slate-200 dark:bg-slate-800 text-sm"
+                                                placeholder="Ex: 4E8Q..."
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="md:col-span-2">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-4">Automações Ativas</label>
+                                        <div className="space-y-3">
+                                            <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer">
+                                                <input type="checkbox" checked={evoNotifyStatus} onChange={e => setEvoNotifyStatus(e.target.checked)} className="rounded text-primary focus:ring-primary" />
+                                                <div>
+                                                    <p className="font-bold text-sm text-slate-700 dark:text-slate-200">Notificar Cliente sobre Mudança de Status</p>
+                                                    <p className="text-xs text-slate-400">Envia mensagem quando o projeto avança de etapa.</p>
+                                                </div>
+                                            </label>
+                                            <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer">
+                                                <input type="checkbox" checked={evoNotifyLead} onChange={e => setEvoNotifyLead(e.target.checked)} className="rounded text-primary focus:ring-primary" />
+                                                <div>
+                                                    <p className="font-bold text-sm text-slate-700 dark:text-slate-200">Notificar Vendedor sobre Novo Lead [Em Breve]</p>
+                                                    <p className="text-xs text-slate-400">Envia mensagem quando um novo projeto entra no funil.</p>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                                    <button
+                                        onClick={handleTestConnection}
+                                        disabled={testConnectionStatus === 'testing' || !evoInstanceUrl || !evoToken}
+                                        className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors ${testConnectionStatus === 'success' ? 'bg-green-100 text-green-700' : testConnectionStatus === 'error' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                    >
+                                        {testConnectionStatus === 'testing' ? (
+                                            <>
+                                                <span className="material-symbols-outlined animate-spin text-sm">refresh</span>
+                                                Testando...
+                                            </>
+                                        ) : testConnectionStatus === 'success' ? (
+                                            <>
+                                                <span className="material-symbols-outlined text-sm">check_circle</span>
+                                                Conectado!
+                                            </>
+                                        ) : testConnectionStatus === 'error' ? (
+                                            <>
+                                                <span className="material-symbols-outlined text-sm">error</span>
+                                                Falha na Conexão
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span className="material-symbols-outlined text-sm">wifi_tethering</span>
+                                                Testar Conexão
+                                            </>
+                                        )}
+                                    </button>
+                                    <button onClick={handleSaveConfig} className="bg-primary text-white font-bold py-2.5 px-6 rounded-lg text-sm hover:bg-primary-600 shadow-lg shadow-primary/20">
+                                        Salvar Integrações
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )
                 }
 
                 {/* APPEARANCE TAB */}

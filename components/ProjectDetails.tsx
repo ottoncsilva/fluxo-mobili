@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useProjects } from '../context/ProjectContext';
-import { Client, Environment, Batch, WorkflowStep, Role } from '../types';
+import { Batch, ITPP, Client, Project, Note } from '../types';
+import { maskPhone, maskCPF } from '../utils/masks';
 import StepDecisionModal from './StepDecisionModal';
 import LotModal from './LotModal';
 import SplitBatchModal from './SplitBatchModal';
+import ContractModal from './ContractModal';
 
 interface ProjectDetailsProps {
     onBack: () => void;
@@ -37,6 +39,10 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
     const [isLotModalOpen, setIsLotModalOpen] = useState(false);
     const [splitModalBatch, setSplitModalBatch] = useState<Batch | null>(null);
     const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
+
+    // Contract Modal
+    const [isContractOpen, setIsContractOpen] = useState(false);
+
 
     const project = currentProjectId ? getProjectById(currentProjectId) : null;
 
@@ -83,7 +89,7 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
         const step = workflowConfig[batch.currentStepId];
 
         // CHECK FOR BRANCHING
-        if (batch.currentStepId === '2.5' || batch.currentStepId === '2.8' || batch.currentStepId === '4.6') {
+        if (['2.3', '2.5', '2.8', '4.3', '4.6'].includes(batch.currentStepId)) {
             setDecisionModalData({ batch, step });
             return;
         }
@@ -102,6 +108,15 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
     };
 
     const getBranchingOptions = (stepId: string) => {
+        // 2.3 Orçamento
+        if (stepId === '2.3') {
+            return [
+                { label: 'Aprovar Orçamento', description: 'Cliente aprovou, seguir para apresentação.', targetStepId: '2.4', color: 'emerald', icon: 'check_circle' } as const,
+                { label: 'Revisar / Ajustar', description: 'Cliente pediu alterações no orçamento.', targetStepId: '2.1', color: 'orange', icon: 'edit' } as const,
+                { label: 'Cancelelar / Perdido', description: 'Cliente não aceitou. Marcar como perdido.', targetStepId: '9.1', color: 'rose', icon: 'cancel' } as const,
+            ];
+        }
+
         if (stepId === '2.5') {
             return [
                 { label: 'Aprovado', description: 'Prosseguir para negociação/fechamento', targetStepId: '2.8', color: 'emerald', icon: 'check_circle' } as const,
@@ -116,6 +131,15 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                 { label: 'Ir para Follow-up', description: 'Manter contato para fechamento futuro', targetStepId: '2.7', color: 'primary', icon: 'event_repeat' } as const,
             ];
         }
+
+        // 4.3 Aprovação Financeira
+        if (stepId === '4.3') {
+            return [
+                { label: 'Aprovado Financeiro', description: 'Pagamento confirmado/liberado.', targetStepId: '4.4', color: 'emerald', icon: 'verified' } as const,
+                { label: 'Pendência Financeira', description: 'Falta pagamento ou doc. Voltar para Negociação.', targetStepId: '2.9', color: 'rose', icon: 'payments' } as const,
+            ];
+        }
+
         if (stepId === '4.6') {
             return [
                 { label: 'Tudo Certo', description: 'Prosseguir para aprovação financeira', targetStepId: '4.8', color: 'emerald', icon: 'verified' } as const,
@@ -770,75 +794,114 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                 )}
             </div>
 
-            {/* EDIT CLIENT DATA MODAL - NOW COMPLETE */}
+
+            {/* EDIT CLIENT DATA MODAL */}
             {isEditClientOpen && (
                 <div
-                    className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fade-in"
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fade-in"
                     onClick={() => setIsEditClientOpen(false)}
                 >
                     <div
-                        className="bg-white dark:bg-[#1a2632] w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden p-6 animate-scale-up flex flex-col max-h-[90vh]"
-                        onClick={(e) => e.stopPropagation()}
+                        className="bg-white dark:bg-[#1e2936] w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-scale-in"
+                        onClick={e => e.stopPropagation()}
                     >
-                        <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 border-b border-slate-100 dark:border-slate-800 pb-4">Editar Cadastro Completo</h3>
+                        <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                            <h3 className="text-xl font-bold text-slate-800 dark:text-white">Editar Dados do Cliente</h3>
+                            <button onClick={() => setIsEditClientOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
 
-                        <div className="flex-1 overflow-y-auto pr-2 space-y-6">
-                            {/* Contact Info */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="md:col-span-2">
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome Completo</label>
-                                    <input
-                                        type="text"
-                                        value={editClientForm.name}
-                                        onChange={e => setEditClientForm({ ...editClientForm, name: e.target.value })}
-                                        className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email</label>
-                                    <input
-                                        type="email"
-                                        value={editClientForm.email}
-                                        onChange={e => setEditClientForm({ ...editClientForm, email: e.target.value })}
-                                        className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Telefone / WhatsApp</label>
-                                    <input
-                                        type="text"
-                                        value={editClientForm.phone}
-                                        onChange={e => setEditClientForm({ ...editClientForm, phone: e.target.value })}
-                                        className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">CPF</label>
-                                    <input
-                                        type="text"
-                                        value={editClientForm.cpf}
-                                        onChange={e => setEditClientForm({ ...editClientForm, cpf: e.target.value })}
-                                        className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm"
-                                        placeholder="000.000.000-00"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">RG</label>
-                                    <input
-                                        type="text"
-                                        value={editClientForm.rg}
-                                        onChange={e => setEditClientForm({ ...editClientForm, rg: e.target.value })}
-                                        className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm"
-                                        placeholder="00.000.000-0"
-                                    />
-                                </div>
+                        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cód. EFinance</label>
+                                <input
+                                    className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm"
+                                    value={editClientForm.cod_efinance || ''}
+                                    onChange={e => setEditClientForm({ ...editClientForm, cod_efinance: e.target.value.replace(/\D/g, '').slice(0, 5) })}
+                                    maxLength={5}
+                                />
                             </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome Completo</label>
+                                <input
+                                    className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm"
+                                    value={editClientForm.name}
+                                    onChange={e => setEditClientForm({ ...editClientForm, name: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">WhatsApp</label>
+                                <input
+                                    className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm"
+                                    value={editClientForm.phone}
+                                    onChange={e => setEditClientForm({ ...editClientForm, phone: maskPhone(e.target.value) })}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email</label>
+                                <input
+                                    className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm"
+                                    value={editClientForm.email}
+                                    onChange={e => setEditClientForm({ ...editClientForm, email: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">CPF</label>
+                                <input
+                                    className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm"
+                                    value={editClientForm.cpf}
+                                    onChange={e => setEditClientForm({ ...editClientForm, cpf: maskCPF(e.target.value) })}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">RG</label>
+                                <input
+                                    className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm"
+                                    value={editClientForm.rg}
+                                    onChange={e => setEditClientForm({ ...editClientForm, rg: e.target.value })}
+                                />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Endereço Completo</label>
+                                <textarea
+                                    className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm"
+                                    value={editClientForm.address}
+                                    onChange={e => setEditClientForm({ ...editClientForm, address: e.target.value })}
+                                    rows={3}
+                                />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Condomínio</label>
+                                <input
+                                    className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm"
+                                    value={editClientForm.condominium}
+                                    onChange={e => setEditClientForm({ ...editClientForm, condominium: e.target.value })}
+                                />
+                            </div>
+                        </div>
 
-                            {/* Address, Origin & Consultant */}
+                        <div className="p-6 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-[#1a2632]">
+                            <button
+                                onClick={() => setIsEditClientOpen(false)}
+                                className="px-4 py-2 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white font-medium"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleSaveClientData}
+                                className="px-6 py-2 bg-primary text-white font-bold rounded-lg hover:bg-primary-600 shadow-lg shadow-primary/20"
+                            >
+                                Salvar Alterações
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* The following section was part of the original modal but is now removed as per the update */}
+            {/*
                             <div className="grid grid-cols-1 gap-4">
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Endereço Completo</label>
-                                    <textarea
                                         value={editClientForm.address}
                                         onChange={e => setEditClientForm({ ...editClientForm, address: e.target.value })}
                                         className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm"
@@ -965,6 +1028,12 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                     batchId={selectedBatchIdForSplit}
                 />
             )}
+            {/* Contract Modal */}
+            <ContractModal
+                isOpen={isContractOpen}
+                onClose={() => setIsContractOpen(false)}
+                project={project}
+            />
         </div>
     );
 }

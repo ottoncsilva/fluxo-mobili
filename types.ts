@@ -51,6 +51,13 @@ export interface CompanySettings {
   phone: string;
   socialMedia?: string;
   primaryColor?: string;
+  evolutionApi?: {
+    instanceUrl: string;
+    token: string;
+    notifyLead: boolean;
+    notifyStatus: boolean;
+    notifySla: boolean;
+  };
 }
 
 export interface PermissionConfig {
@@ -195,11 +202,10 @@ export interface Batch {
   id: string;
   storeId: string;
   projectId: string;
-  name: string;
-  currentStepId: string;
-  environmentIds: string[];
-  createdAt: string;
-  lastUpdated: string;
+  phase: string;
+  status: 'Active' | 'Completed' | 'Lost' | 'Archived';
+  lastUpdated: string; // Date
+  slaNotificationSent?: boolean; // New flag for SLA
 }
 
 // Assistance Types

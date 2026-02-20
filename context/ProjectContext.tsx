@@ -888,6 +888,9 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         // However, addNote also handles local state update efficiently if needed.
         // Let's stick to the generated code which uses `addNote` in previous version, but here I included it in `newProject.notes`.
         // So I'll SKIP calling addNote again to avoid duplicate notes.
+
+        // Notify Sales about new lead
+        notifySalesNewLead(client);
     };
 
     const deleteProject = async (projectId: string) => {
@@ -993,6 +996,15 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         } else {
             setAllBatches((prev: Batch[]) => prev.map(b => b.id !== batchId ? b : { ...b, ...updateData }));
         }
+
+        // Trigger Notification
+        const nextStep = workflowConfig[targetStepId];
+        if (nextStep) {
+            const project = allProjects.find(p => p.id === batch.projectId);
+            if (project) {
+                notifyClientStatusChange(project, nextStep.label);
+            }
+        }
     };
 
     const advanceBatch = (batchId: string) => {
@@ -1026,10 +1038,10 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             if (step90Index !== -1) finalNextStepId = '9.0';
         }
 
-        const currentStepLabel = workflowConfig[batch.currentStepId]?.label || batch.currentStepId;
-        const nextStepLabel = workflowConfig[finalNextStepId]?.label || finalNextStepId;
+        const currentStep = workflowConfig[batch.currentStepId];
+        const nextStep = workflowConfig[finalNextStepId];
 
-        addNote(batch.projectId, `Etapa concluída: ${currentStepLabel} → ${nextStepLabel}`, currentUser?.id || 'sys');
+        addNote(batch.projectId, `Etapa concluída: ${currentStep.label} → ${nextStep?.label || 'Finalizado'}`, currentUser?.id || 'sys');
 
         const updateData = {
             currentStepId: finalNextStepId,
@@ -1040,6 +1052,14 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             persist("batches", batchId, updateData);
         } else {
             setAllBatches(prev => prev.map(b => b.id !== batchId ? b : { ...b, ...updateData }));
+        }
+
+        // Trigger Notification
+        if (nextStep) {
+            const project = allProjects.find(p => p.id === batch.projectId);
+            if (project) {
+                notifyClientStatusChange(project, nextStep.label);
+            }
         }
     };
 
@@ -1270,6 +1290,205 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         return true;
     };
 
+    const getBranchingOptions = (stepId: string): { label: string, description: string, targetStepId: string, color: 'primary' | 'rose' | 'orange' | 'emerald', icon: string }[] => {
+        // 2.3 Orçamento
+        if (stepId === '2.3') {
+            return [
+                {
+                    label: 'Aprovar Orçamento',
+                    description: 'Cliente aprovou, seguir para apresentação.',
+                    targetStepId: '2.4',
+                    color: 'emerald',
+                    icon: 'check_circle'
+                },
+                {
+                    label: 'Revisar / Ajustar',
+                    description: 'Cliente pediu alterações no orçamento.',
+                    targetStepId: '2.1', // Back to design
+                    color: 'orange',
+                    icon: 'edit'
+                },
+                {
+                    label: 'Cancelelar / Perdido',
+                    description: 'Cliente não aceitou. Marcar como perdido.',
+                    targetStepId: '9.1',
+                    color: 'rose',
+                    icon: 'cancel'
+                }
+            ];
+        }
+
+        // 4.3 Aprovação Financeira (Executivo)
+        if (stepId === '4.3') {
+            return [
+                {
+                    label: 'Aprovado Financeiro',
+                    description: 'Pagamento confirmado/liberado.',
+                    targetStepId: '4.4',
+                    color: 'emerald',
+                    icon: 'verified'
+                },
+                {
+                    label: 'Pendência Financeira',
+                    description: 'Falta pagamento ou doc. Voltar para Negociação.',
+                    targetStepId: '2.9', // Back to contract
+                    color: 'rose',
+                    icon: 'payments'
+                }
+            ];
+        }
+
+        return [];
+    };
+
+    // Helper to send notifications
+    const notifyClientStatusChange = async (project: Project, newStepLabel: string) => {
+        if (!companySettings.evolutionApi?.notifyStatus || !companySettings.evolutionApi?.instanceUrl) return;
+
+        const message = `Olá ${project.client.name}, seu projeto *${project.environments.map(e => e.name).join(', ')}* mudou de status para: *${newStepLabel}*. \n\nAcompanhe o progresso com a gente! 🚀\n*${companySettings.name}*`;
+
+        await import('../services/evolutionApi').then(({ EvolutionApi }) => {
+            EvolutionApi.sendText({
+                instanceUrl: companySettings.evolutionApi!.instanceUrl,
+                token: companySettings.evolutionApi!.token,
+                phone: project.client.phone,
+                message
+            });
+        });
+    }
+
+
+    const notifySalesNewLead = async (client: Client) => {
+        // Notify Sales (Company Phone) when a new lead is created
+        if (!companySettings.evolutionApi?.notifyLead || !companySettings.evolutionApi?.instanceUrl || !companySettings.phone) return;
+
+        const message = `🔔 *Novo Lead Cadastrado*\n\n👤 Nome: ${client.name}\n📱 Telefone: ${client.phone}\n📍 Origem: ${client.origin || 'Não informado'}\n\nAcesse o sistema para mais detalhes.`;
+
+        await import('../services/evolutionApi').then(({ EvolutionApi }) => {
+            EvolutionApi.sendText({
+                instanceUrl: companySettings.evolutionApi!.instanceUrl,
+                token: companySettings.evolutionApi!.token,
+                phone: companySettings.phone,
+                message
+            });
+        });
+    };
+
+    // --- SLA Checker Logic ---
+    useEffect(() => {
+        if (!process.browser && typeof window === 'undefined') return; // Client-side only check
+
+        const checkSlaBreaches = async () => {
+            if (!companySettings.evolutionApi?.instanceUrl || !companySettings.evolutionApi.token) return;
+
+            // Iterate over batches to check for SLA violations
+            // We use a functional update pattern or just local checks to avoid infinite loops
+            // But here we might need to update the batch in DB/State if a notification is sent.
+
+            const now = new Date();
+
+            for (const batch of allBatches) {
+                // Skip if already notified or if completed/lost
+                if (batch.slaNotificationSent) continue;
+                if (['9.0', '9.1'].includes(batch.currentStepId)) continue;
+
+                const step = workflowConfig[batch.currentStepId];
+                if (!step || !step.sla) continue; // No SLA for this step
+
+                const lastUpdate = new Date(batch.lastUpdated);
+                const deadline = new Date(lastUpdate.getTime() + (step.sla * 24 * 60 * 60 * 1000));
+
+                if (now > deadline) {
+                    // SLA BREACHED!
+                    console.log(`SLA Breach detected for Batch ${batch.name} (Project ${batch.projectId}) in step ${step.label}`);
+
+                    // 1. Find Responsible Users (by Role)
+                    // We define "Responsible" as users in the current store with the 'ownerRole' of the step.
+                    // If ownerRole is 'Vendedor', we specifically look for the project's seller if possible, otherwise all sellers.
+
+                    const project = allProjects.find(p => p.id === batch.projectId);
+                    if (!project) continue;
+
+                    let targetUsers: User[] = [];
+
+                    if (step.ownerRole === 'Vendedor' && project.sellerId) {
+                        const seller = allUsers.find(u => u.id === project.sellerId);
+                        if (seller) targetUsers.push(seller);
+                    }
+
+                    if (targetUsers.length === 0) {
+                        // Fallback: Notify all users with the role
+                        targetUsers = allUsers.filter(u => u.storeId === batch.storeId && u.role === step.ownerRole);
+                    }
+
+                    // 2. Send Notification(s)
+                    if (targetUsers.length > 0) {
+                        let notificationSent = false;
+                        const { EvolutionApi } = await import('../services/evolutionApi');
+
+                        for (const user of targetUsers) {
+                            if (!user.phone) continue; // Needs phone to notify via WhatsApp
+
+                            // Format phone for API (assuming it needs just numbers)
+                            const cleanPhone = user.phone.replace(/\D/g, '');
+                            // Basic validation for BR number (10 or 11 digits)
+                            // if (cleanPhone.length < 10) continue; 
+                            // EvolutionAPI usually handles '55' prefix check, but assuming stored phones might need '55' if not present?
+                            // Let's assume user.phone is stored mostly correctly or mask handles it.
+                            // Ideally we prepend 55 if missing.
+                            const finalPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+
+                            const message = `⚠️ *Alerta de Atraso (SLA)*\n\nO projeto *${project.client.name}* - *${batch.name}* está atrasado na etapa: *${step.label}*.\n\nPrazo era: ${deadline.toLocaleDateString()}\nDias de atraso: ${Math.floor((now.getTime() - deadline.getTime()) / (1000 * 3600 * 24))}\n\nPor favor, verifique!`;
+
+                            try {
+                                await EvolutionApi.sendText({
+                                    instanceUrl: companySettings.evolutionApi!.instanceUrl,
+                                    token: companySettings.evolutionApi!.token,
+                                    phone: finalPhone,
+                                    message
+                                });
+                                notificationSent = true;
+                                console.log(`SLA Notification sent to ${user.name} (${finalPhone})`);
+                            } catch (err) {
+                                console.error(`Failed to send SLA notification to ${user.name}`, err);
+                            }
+                        }
+
+                        // 3. Mark as notified to prevent spam
+                        if (notificationSent) {
+                            const updateData = { slaNotificationSent: true };
+                            if (useCloud && db) {
+                                // We use persist helper or updateDoc directly
+                                // using the existing internal helper if accessible or direct firebase
+                                // persist is defined in scope
+                                persist("batches", batch.id, updateData);
+                            } else {
+                                setAllBatches(prev => prev.map(b => b.id === batch.id ? { ...b, ...updateData } : b));
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        // Run check every 1 hour (3600000 ms) or just on mount/updates?
+        // If we only run on mount/dependency change, it runs whenever 'allBatches' changes (which includes the update we just made).
+        // To avoid rapid loops if something goes wrong, maybe we stick to a simplified check or use a ref to track last check?
+        // For now, let's trust 'slaNotificationSent' prevents loops.
+        // We also want to check periodically even if no data changes (e.g. time passes).
+        const intervalId = setInterval(checkSlaBreaches, 60 * 60 * 1000); // Check every hour
+
+        // Also run immediately on data change (debounced slightly?)
+        const timeoutId = setTimeout(checkSlaBreaches, 5000); // Run 5s after data load/change to let things settle
+
+        return () => {
+            clearInterval(intervalId);
+            clearTimeout(timeoutId);
+        };
+
+    }, [allBatches, allProjects, allUsers, workflowConfig, companySettings, useCloud]); // Dependencies: if any of these change, re-run checks
+
+
     return (
         <ProjectContext.Provider value={{
             currentUser, currentStore, users, stores, allUsers, projects, batches, workflowConfig, workflowOrder, permissions, currentProjectId, origins, assistanceTickets, companySettings, assistanceWorkflow,
@@ -1283,7 +1502,8 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             updateEnvironmentDetails, updateClientData, updateProjectITPP, updateProjectSeller, updateProjectPostAssembly, updateProjectPostAssemblyItems,
             addAssistanceTicket, updateAssistanceTicket,
             canUserAdvanceStep, canUserViewStage, canUserEditAssistance,
-            saveStoreConfig, resetStoreDefaults
+            saveStoreConfig, resetStoreDefaults,
+            getBranchingOptions
         }}>
             {children}
         </ProjectContext.Provider>
