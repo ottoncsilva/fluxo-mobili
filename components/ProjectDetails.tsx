@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useProjects } from '../context/ProjectContext';
-import { Batch, Client, Project, Note, WorkflowStep, Environment } from '../types';
+import { Batch, Client, Project, Note, WorkflowStep, Environment, Role } from '../types';
 import { maskPhone, maskCPF } from '../utils/masks';
 import StepDecisionModal from './StepDecisionModal';
 import LotModal from './LotModal';

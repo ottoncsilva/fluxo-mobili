@@ -22,7 +22,7 @@ const SplitBatchModal: React.FC<SplitBatchModalProps> = ({ isOpen, onClose, batc
 
     const batchEnvironments = useMemo(() => {
         if (!project || !batch) return [];
-        return project.environments.filter(env => batch.environmentIds.includes(env.id));
+        return project.environments.filter(env => (batch.environmentIds || []).includes(env.id));
     }, [project, batch]);
 
     // Reset selection when modal opens or batch changes

@@ -248,7 +248,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onComplete }) => {
                                             className="w-full rounded-lg border-slate-200 dark:bg-slate-900 dark:border-slate-700 text-sm focus:ring-primary"
                                             value={addressFields.cep}
                                             onChange={e => updateAddressField('cep', e.target.value)}
-                                            onBlur={handleCepBlur}
                                             placeholder="00000-000"
                                         />
                                     </div>

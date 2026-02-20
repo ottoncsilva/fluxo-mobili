@@ -14,7 +14,7 @@ const MobileInspection: React.FC = () => {
         return <div className="flex-1 flex items-center justify-center text-slate-500">Nenhuma vistoria pendente.</div>;
     }
 
-    const batchEnvironments = project.environments.filter(e => activeBatch.environmentIds.includes(e.id));
+    const batchEnvironments = project.environments.filter(e => (activeBatch.environmentIds || []).includes(e.id));
 
     const handleSimulateUpload = () => {
         setPhotoUploaded(true);

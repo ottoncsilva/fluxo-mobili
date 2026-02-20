@@ -1378,7 +1378,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     // --- SLA Checker Logic ---
     useEffect(() => {
-        if (!process.browser && typeof window === 'undefined') return; // Client-side only check
+        if (typeof window === 'undefined') return; // Client-side only check
 
         const checkSlaBreaches = async () => {
             if (!companySettings.evolutionApi?.instanceUrl || !companySettings.evolutionApi.token) return;

@@ -17,7 +17,7 @@ interface PaymentParcel {
 }
 
 const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, project }) => {
-    const { currentUser, store, getProjectBatch } = useProjects();
+    const { currentUser } = useProjects();
     const [step, setStep] = useState<'EDIT' | 'PREVIEW'>('EDIT');
 
     // Form Data
