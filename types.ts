@@ -159,6 +159,7 @@ export interface Client {
   project_has_architect_project?: 'Sim' | 'Não' | 'Cliente Irá Fornecer';
   project_materials?: string;
   project_special_reqs?: string;
+  project_appliances?: string;
 
   budget_expectation?: number;
   payment_preference?: 'À vista' | 'Parcelado' | '';

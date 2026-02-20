@@ -344,7 +344,7 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
     };
 
     // Helper to check if current user can edit client data (Sales/Admin only usually)
-    const isContractLocked = project.contractSigned || project.client.status === 'Fechado';
+    const isContractLocked = project.contractSigned || project.client.status === 'Concluido';
     const canEditClient = !isContractLocked && (currentUser?.role === 'Admin' || currentUser?.role === 'Vendedor' || currentUser?.role === 'Proprietario' || currentUser?.role === 'Gerente');
     const canChangeSeller = permissions.find((p: { role: Role }) => p.role === currentUser?.role)?.canChangeSeller || false;
     const canDeleteProject = currentUser?.role === 'Admin' || currentUser?.role === 'Proprietario';
@@ -519,8 +519,8 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                {project.client.propertyType && <p><strong className="text-slate-500">Imóvel:</strong> {project.client.propertyType}</p>}
-                                                {project.client.budget && <p><strong className="text-slate-500">Orçamento:</strong> {project.client.budget}</p>}
+                                                {project.client.property_type && <p><strong className="text-slate-500">Imóvel:</strong> {project.client.property_type}</p>}
+                                                {project.client.budget_expectation && <p><strong className="text-slate-500">Orçamento:</strong> {project.client.budget_expectation}</p>}
                                                 <p className="text-sm font-medium text-slate-800 dark:text-white">{step.ownerRole}</p>
                                             </div>
                                         </div>
@@ -836,9 +836,9 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                         <p className="text-xs font-bold text-slate-400 uppercase mb-1">Requisitos Especiais</p>
                                         <EditableField
                                             label="Necessidades Especiais/Acessibilidade"
-                                            value={project.client.specialNeeds || ''}
+                                            value={project.client.project_special_reqs || ''}
                                             isEditing={isEditingBriefing}
-                                            onChange={(val) => setBriefingForm({ ...briefingForm, specialNeeds: val })}
+                                            onChange={(val) => setBriefingForm({ ...briefingForm, project_special_reqs: val })}
                                             multiline
                                             rows={2}
                                         />
@@ -846,9 +846,9 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                     <div className="md:col-span-2">
                                         <p className="text-xs font-bold text-slate-400 uppercase mb-1">Eletrodomésticos Específicos</p>
                                         <EditableField
-                                            value={project.client.appliances || ''}
+                                            value={project.client.project_appliances || ''}
                                             isEditing={isEditingBriefing}
-                                            onChange={(val) => setBriefingForm({ ...briefingForm, appliances: val })}
+                                            onChange={(val) => setBriefingForm({ ...briefingForm, project_appliances: val })}
                                             multiline
                                             rows={2}
                                         />
@@ -913,9 +913,9 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                         <p className="text-xs font-bold text-slate-400 uppercase mb-1">Tipo</p>
                                         <EditableField
                                             label="Tipo de Imóvel"
-                                            value={project.client.propertyType || ''}
+                                            value={project.client.property_type || ''}
                                             isEditing={isEditingBriefing}
-                                            onChange={(val) => setBriefingForm({ ...briefingForm, propertyType: val })}
+                                            onChange={(val) => setBriefingForm({ ...briefingForm, property_type: val })}
                                             type="select"
                                             options={[
                                                 { value: "Reforma", label: "Reforma" },

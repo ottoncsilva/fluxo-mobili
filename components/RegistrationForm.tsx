@@ -4,7 +4,7 @@ import { Environment, Client } from '../types';
 import { maskPhone, maskCPF, maskCEP, unmask } from '../utils/masks';
 
 interface RegistrationFormProps {
-    onComplete?: (clientId: string) => void;
+    onComplete?: (clientId?: string) => void;
 }
 
 const RegistrationForm: React.FC<RegistrationFormProps> = ({ onComplete }) => {
