@@ -980,8 +980,10 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         const batch = allBatches.find(b => b.id === batchId);
         if (!batch) return;
 
+        const isHighLevelRole = currentUser && ['Admin', 'Proprietario', 'Gerente'].includes(currentUser.role);
+
         // Permission check for the CURRENT step being finished
-        if (!canUserAdvanceStep(batch.phase)) {
+        if (!isHighLevelRole && !canUserAdvanceStep(batch.phase)) {
             alert("Você não tem permissão para esta ação nesta etapa.");
             return;
         }
@@ -1016,7 +1018,9 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         const batch = allBatches.find(b => b.id === batchId);
         if (!batch) return;
 
-        if (!canUserAdvanceStep(batch.phase)) {
+        const isHighLevelRole = currentUser && ['Admin', 'Proprietario', 'Gerente'].includes(currentUser.role);
+
+        if (!isHighLevelRole && !canUserAdvanceStep(batch.phase)) {
             alert("Você não tem permissão para concluir esta etapa.");
             return;
         }
