@@ -75,14 +75,14 @@ const INITIAL_WORKFLOW_ORDER = [
 ];
 
 const INITIAL_ASSISTANCE_WORKFLOW: AssistanceWorkflowStep[] = [
-    { id: '10.1', label: 'Levantamento', sla: 3 },
-    { id: '10.2', label: 'Solicitação de Assistência Técnica', sla: 2 },
-    { id: '10.3', label: 'Aprovação Financeira e Implantação', sla: 2 },
-    { id: '10.4', label: 'Fabricação Assistência Técnica', sla: 15 },
-    { id: '10.5', label: 'Transporte Assistência Técnica', sla: 5 },
-    { id: '10.6', label: 'Assistência Técnica', sla: 4 },
-    { id: '10.7', label: 'Vistoria Assistência Técnica', sla: 1 },
-    { id: '10.8', label: 'Concluído', sla: 0 },
+    { id: '10.1', label: 'Levantamento', sla: 3, ownerRole: 'Montador' },
+    { id: '10.2', label: 'Solicitação de Assistência Técnica', sla: 2, ownerRole: 'Liberador' },
+    { id: '10.3', label: 'Aprovação Financeira e Implantação', sla: 2, ownerRole: 'Financeiro' },
+    { id: '10.4', label: 'Fabricação Assistência Técnica', sla: 15, ownerRole: 'Industria' },
+    { id: '10.5', label: 'Transporte Assistência Técnica', sla: 5, ownerRole: 'Logistica' },
+    { id: '10.6', label: 'Assistência Técnica', sla: 4, ownerRole: 'Montador' },
+    { id: '10.7', label: 'Vistoria Assistência Técnica', sla: 1, ownerRole: 'Coordenador de Montagem' },
+    { id: '10.8', label: 'Concluído', sla: 0, ownerRole: 'Gerente' },
 ];
 
 const MASTER_STORE_ID = 'store-modelo';

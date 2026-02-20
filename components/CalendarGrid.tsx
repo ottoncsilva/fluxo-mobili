@@ -196,58 +196,86 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
             {view === 'week' && (
                 <div className="flex-1 flex flex-col overflow-hidden">
                     {/* Day headers */}
-                    <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 shrink-0">
-                        <div className="py-2" /> {/* spacer for hour column */}
-                        {weekDays.map(day => {
-                            const isToday = isSameDay(day, new Date());
-                            return (
-                                <div key={day.toISOString()} className="py-2 text-center border-l border-slate-200 dark:border-slate-800">
-                                    <div className="text-[10px] font-bold text-slate-500 uppercase">{format(day, 'EEE', { locale: ptBR })}</div>
-                                    <div className={`text-sm font-extrabold mt-0.5 w-7 h-7 flex items-center justify-center rounded-full mx-auto ${isToday ? 'bg-primary text-white' : 'text-slate-700 dark:text-slate-300'}`}>
-                                        {format(day, 'd')}
+                    <div className="grid grid-cols-[60px_1fr] border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 shrink-0">
+                        <div className="py-2" />
+                        <div className="grid grid-cols-7">
+                            {weekDays.map(day => {
+                                const isToday = isSameDay(day, new Date());
+                                return (
+                                    <div key={day.toISOString()} className="py-2 text-center border-l border-slate-200 dark:border-slate-800">
+                                        <div className="text-[10px] font-bold text-slate-500 uppercase">{format(day, 'EEE', { locale: ptBR })}</div>
+                                        <div className={`text-sm font-extrabold mt-0.5 w-7 h-7 flex items-center justify-center rounded-full mx-auto ${isToday ? 'bg-primary text-white' : 'text-slate-700 dark:text-slate-300'}`}>
+                                            {format(day, 'd')}
+                                        </div>
                                     </div>
-                                </div>
-                            );
-                        })}
+                                );
+                            })}
+                        </div>
                     </div>
 
-                    {/* Time slots */}
-                    <div className="flex-1 overflow-y-auto">
-                        <div className="grid grid-cols-[60px_repeat(7,1fr)]">
-                            {HOURS.map(hour => (
-                                <React.Fragment key={hour}>
-                                    {/* Hour label */}
-                                    <div className="h-16 border-b border-slate-100 dark:border-slate-800 flex items-start justify-end pr-2 pt-1">
+                    {/* Time slots and Appointments */}
+                    <div className="flex-1 overflow-y-auto relative bg-white dark:bg-[#1a2632]">
+                        <div className="grid grid-cols-[60px_1fr] min-h-full">
+                            {/* Hour labels sidebar */}
+                            <div className="relative">
+                                {HOURS.map(hour => (
+                                    <div key={hour} className="h-16 border-b border-slate-100 dark:border-slate-800 flex items-start justify-end pr-2 pt-1">
                                         <span className="text-[10px] font-bold text-slate-400">{String(hour).padStart(2, '0')}:00</span>
                                     </div>
-                                    {/* Day cells */}
-                                    {weekDays.map(day => {
-                                        const hourApts = getHourAppointments(day, hour);
-                                        return (
-                                            <div
-                                                key={`${day.toISOString()}-${hour}`}
-                                                className="h-16 border-b border-l border-slate-100 dark:border-slate-800 p-0.5 hover:bg-slate-50 dark:hover:bg-slate-800/30 cursor-pointer transition-colors"
-                                                onClick={() => {
-                                                    const slot = new Date(day);
-                                                    slot.setHours(hour, 0, 0, 0);
-                                                    onSelectSlot(slot);
-                                                }}
-                                            >
-                                                {hourApts.map(apt => (
+                                ))}
+                            </div>
+
+                            {/* Day columns */}
+                            <div className="grid grid-cols-7 relative">
+                                {/* Grid background lines */}
+                                {HOURS.map(hour => (
+                                    <div key={hour} className="absolute left-0 right-0 h-16 border-b border-slate-100 dark:border-slate-800 pointer-events-none" style={{ top: (hour - HOURS[0]) * 64 }} />
+                                ))}
+
+                                {weekDays.map((day, dayIndex) => {
+                                    const dayApts = getDayAppointments(day);
+                                    return (
+                                        <div
+                                            key={day.toISOString()}
+                                            className="relative h-full border-l border-slate-100 dark:border-slate-800 hover:bg-slate-50/30 dark:hover:bg-slate-800/10 cursor-pointer"
+                                            onClick={(e) => {
+                                                const rect = e.currentTarget.getBoundingClientRect();
+                                                const offsetY = e.clientY - rect.top;
+                                                const hour = Math.floor(offsetY / 64) + HOURS[0];
+                                                const slot = new Date(day);
+                                                slot.setHours(hour, 0, 0, 0);
+                                                onSelectSlot(slot);
+                                            }}
+                                        >
+                                            {dayApts.map(apt => {
+                                                const startTime = new Date(apt.start);
+                                                const hourProp = startTime.getHours() + startTime.getMinutes() / 60;
+                                                const top = (hourProp - HOURS[0]) * 64;
+                                                const height = (apt.durationMinutes / 60) * 64;
+
+                                                return (
                                                     <button
                                                         key={apt.id}
                                                         onClick={(e) => { e.stopPropagation(); onSelectAppointment(apt); }}
-                                                        className="w-full text-left px-1.5 py-0.5 rounded text-[10px] font-bold text-white truncate hover:brightness-110 active:scale-95 transition-all"
-                                                        style={{ backgroundColor: getTypeColor(apt.typeId) }}
+                                                        className="absolute left-0.5 right-0.5 z-10 p-1.5 rounded-lg text-[10px] font-bold text-white shadow-md hover:brightness-110 active:scale-[0.98] transition-all overflow-hidden border border-white/20 flex flex-col items-start"
+                                                        style={{
+                                                            top: Math.max(0, top),
+                                                            height,
+                                                            backgroundColor: getTypeColor(apt.typeId),
+                                                        }}
                                                     >
-                                                        {format(new Date(apt.start), 'HH:mm')} {apt.title}
+                                                        <div className="flex items-center gap-1 mb-0.5 opacity-90">
+                                                            <span className="material-symbols-outlined text-[12px]">schedule</span>
+                                                            {format(startTime, 'HH:mm')}
+                                                        </div>
+                                                        <div className="font-extrabold leading-tight break-words text-left">{apt.title}</div>
                                                     </button>
-                                                ))}
-                                            </div>
-                                        );
-                                    })}
-                                </React.Fragment>
-                            ))}
+                                                );
+                                            })}
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -255,37 +283,65 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
 
             {/* ===== DAY VIEW ===== */}
             {view === 'day' && (
-                <div className="flex-1 overflow-y-auto">
-                    <div className="grid grid-cols-[60px_1fr]">
-                        {HOURS.map(hour => {
-                            const hourApts = getHourAppointments(date, hour);
-                            return (
-                                <React.Fragment key={hour}>
-                                    <div className="h-20 border-b border-slate-100 dark:border-slate-800 flex items-start justify-end pr-2 pt-1">
-                                        <span className="text-xs font-bold text-slate-400">{String(hour).padStart(2, '0')}:00</span>
+                <div className="flex-1 flex flex-col overflow-hidden">
+                    <div className="flex-1 overflow-y-auto relative bg-white dark:bg-[#1a2632]">
+                        <div className="grid grid-cols-[60px_1fr] min-h-full">
+                            {/* Hour labels sidebar */}
+                            <div className="relative">
+                                {HOURS.map(hour => (
+                                    <div key={hour} className="h-24 border-b border-slate-100 dark:border-slate-800 flex items-start justify-end pr-2 pt-1 pt-2">
+                                        <span className="text-xs font-extrabold text-slate-400">{String(hour).padStart(2, '0')}:00</span>
                                     </div>
-                                    <div
-                                        className="h-20 border-b border-slate-100 dark:border-slate-800 p-1 hover:bg-slate-50 dark:hover:bg-slate-800/30 cursor-pointer transition-colors"
-                                        onClick={() => {
-                                            const slot = new Date(date);
-                                            slot.setHours(hour, 0, 0, 0);
-                                            onSelectSlot(slot);
-                                        }}
-                                    >
-                                        {hourApts.map(apt => (
-                                            <button
-                                                key={apt.id}
-                                                onClick={(e) => { e.stopPropagation(); onSelectAppointment(apt); }}
-                                                className="w-full text-left px-2 py-1 rounded text-xs font-bold text-white truncate hover:brightness-110 active:scale-95 transition-all mb-1"
-                                                style={{ backgroundColor: getTypeColor(apt.typeId) }}
-                                            >
-                                                {format(new Date(apt.start), 'HH:mm')} — {apt.title}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </React.Fragment>
-                            );
-                        })}
+                                ))}
+                            </div>
+
+                            {/* Single Day Column */}
+                            <div
+                                className="relative border-l border-slate-100 dark:border-slate-800 hover:bg-slate-50/30 dark:hover:bg-slate-800/10 cursor-pointer"
+                                onClick={(e) => {
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    const offsetY = e.clientY - rect.top;
+                                    const hour = Math.floor(offsetY / 96) + HOURS[0];
+                                    const slot = new Date(date);
+                                    slot.setHours(hour, 0, 0, 0);
+                                    onSelectSlot(slot);
+                                }}
+                            >
+                                {/* Grid lines */}
+                                {HOURS.map(hour => (
+                                    <div key={hour} className="absolute left-0 right-0 h-24 border-b border-slate-100 dark:border-slate-800 pointer-events-none" style={{ top: (hour - HOURS[0]) * 96 }} />
+                                ))}
+
+                                {getDayAppointments(date).map(apt => {
+                                    const startTime = new Date(apt.start);
+                                    const hourProp = startTime.getHours() + startTime.getMinutes() / 60;
+                                    const top = (hourProp - HOURS[0]) * 96;
+                                    const height = (apt.durationMinutes / 60) * 96;
+
+                                    return (
+                                        <button
+                                            key={apt.id}
+                                            onClick={(e) => { e.stopPropagation(); onSelectAppointment(apt); }}
+                                            className="absolute left-2 right-2 z-10 p-3 rounded-xl text-xs font-bold text-white shadow-lg hover:brightness-110 active:scale-[0.99] transition-all overflow-hidden border border-white/20 flex flex-col items-start gap-1"
+                                            style={{
+                                                top: Math.max(0, top),
+                                                height,
+                                                backgroundColor: getTypeColor(apt.typeId),
+                                            }}
+                                        >
+                                            <div className="flex items-center gap-1.5 opacity-90 px-1.5 py-0.5 bg-black/10 rounded-full text-[10px]">
+                                                <span className="material-symbols-outlined text-sm">schedule</span>
+                                                {format(startTime, 'HH:mm')} — {apt.durationMinutes}min
+                                            </div>
+                                            <div className="text-sm font-black leading-tight break-words text-left">{apt.title}</div>
+                                            {height > 60 && apt.notes && (
+                                                <p className="text-[10px] opacity-80 mt-1 line-clamp-2 text-left font-normal">{apt.notes}</p>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}

@@ -274,6 +274,7 @@ export interface AssistanceWorkflowStep {
   id: AssistanceStatus;
   label: string;
   sla: number;
+  ownerRole?: Role;
 }
 
 // UI Types

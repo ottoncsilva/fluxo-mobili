@@ -19,6 +19,10 @@ const TechnicalAssistance: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'DETAILS' | 'HISTORY'>('DETAILS');
     const [historyNote, setHistoryNote] = useState('');
 
+    const activeStep = activeTicket
+        ? assistanceWorkflow.find((s: AssistanceWorkflowStep) => s.id === activeTicket.status)
+        : null;
+
     const handleAddHistoryNote = () => {
         if (!activeTicket || !historyNote.trim()) return;
 
@@ -407,11 +411,19 @@ const TechnicalAssistance: React.FC = () => {
 
                         return (
                             <div key={col.id} className="flex flex-col w-80 h-full shrink-0">
-                                <div className="flex items-center justify-between mb-3 px-3 py-2 bg-slate-100 dark:bg-[#15202b] rounded-lg border border-slate-200 dark:border-slate-800">
-                                    <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm">{col.id} - {col.label}</h3>
-                                    <span className="bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-600">
-                                        {columnTickets.length}
-                                    </span>
+                                <div className="flex flex-col gap-1 mb-3 px-3 py-2 bg-slate-100 dark:bg-[#15202b] rounded-lg border border-slate-200 dark:border-slate-800">
+                                    <div className="flex items-center justify-between">
+                                        <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm">{col.id} - {col.label}</h3>
+                                        <span className="bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-600">
+                                            {columnTickets.length}
+                                        </span>
+                                    </div>
+                                    {col.ownerRole && (
+                                        <div className="flex items-center gap-1.5 opacity-60">
+                                            <span className="material-symbols-outlined text-xs">account_circle</span>
+                                            <span className="text-[10px] font-bold uppercase tracking-wider">{col.ownerRole}</span>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="flex-1 bg-slate-100/30 dark:bg-[#15202b]/50 rounded-xl p-2 border border-slate-200/50 dark:border-slate-800 overflow-y-auto custom-scrollbar flex flex-col gap-3">
@@ -591,10 +603,16 @@ const TechnicalAssistance: React.FC = () => {
                         {/* Modal Header */}
                         <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-900">
                             <div>
-                                <div className="flex items-center gap-2 mb-1">
+                                <div className="flex flex-wrap items-center gap-2 mb-1">
                                     <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                                        Etapa: {assistanceWorkflow.find((c: AssistanceWorkflowStep) => c.id === activeTicket.status)?.label}
+                                        Etapa: {activeStep?.label}
                                     </span>
+                                    {activeStep?.ownerRole && (
+                                        <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                                            <span className="material-symbols-outlined text-[10px]">account_circle</span>
+                                            Resp: {activeStep.ownerRole}
+                                        </span>
+                                    )}
                                     {activeTicket.priority === 'Urgente' && <span className="px-2 py-0.5 bg-rose-100 text-rose-600 rounded text-[10px] font-bold uppercase">URGENTE</span>}
                                     {activeTicket.code && (
                                         <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-[10px] font-bold tracking-wider">

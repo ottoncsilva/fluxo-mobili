@@ -1022,10 +1022,11 @@ const Settings: React.FC = () => {
                             <div className="space-y-2">
                                 {assistanceWorkflow.map((step) => (
                                     <div key={step.id} className="grid grid-cols-12 gap-4 items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-800">
-                                        <div className="col-span-2">
+                                        <div className="col-span-1">
                                             <span className="font-mono text-xs font-bold text-slate-400 bg-slate-200 dark:bg-slate-700 px-2 py-1 rounded">{step.id}</span>
                                         </div>
-                                        <div className="col-span-6">
+                                        <div className="col-span-4">
+                                            <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Nome da Etapa</label>
                                             <input
                                                 type="text"
                                                 readOnly
@@ -1033,9 +1034,22 @@ const Settings: React.FC = () => {
                                                 className="w-full text-sm font-bold bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded transition-colors focus:ring-primary opacity-70 cursor-not-allowed"
                                             />
                                         </div>
-                                        <div className="col-span-4">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-xs text-slate-500 whitespace-nowrap">SLA (Dias):</span>
+                                        <div className="col-span-3">
+                                            <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Responsável</label>
+                                            <select
+                                                value={step.ownerRole || ''}
+                                                onChange={(e) => updateAssistanceStep(step.id, { ownerRole: e.target.value as Role })}
+                                                className="w-full text-sm bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded transition-colors focus:ring-primary"
+                                            >
+                                                <option value="">Selecione...</option>
+                                                {permissions.map(p => (
+                                                    <option key={p.role} value={p.role}>{p.role}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="col-span-3">
+                                            <div className="flex flex-col">
+                                                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">SLA (Dias):</label>
                                                 <input
                                                     type="number"
                                                     min="0"
