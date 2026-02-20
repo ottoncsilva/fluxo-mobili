@@ -110,8 +110,17 @@ export const AgendaProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }, [appointments, agendaUsers, useCloud]);
 
 
+    const generateId = () => {
+        try {
+            if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+                return crypto.randomUUID();
+            }
+        } catch (e) { }
+        return Date.now().toString(36) + Math.random().toString(36).substring(2);
+    };
+
     const addAppointment = async (apt: Omit<Appointment, 'id'>) => {
-        const newApt = { ...apt, id: crypto.randomUUID() };
+        const newApt = { ...apt, id: generateId() };
         if (useCloud && db) {
             await setDoc(doc(db, "appointments", newApt.id), newApt);
         } else {

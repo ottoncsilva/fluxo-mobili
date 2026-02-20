@@ -18,6 +18,7 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
         getProjectById,
         batches,
         workflowConfig,
+        workflowOrder,
         addNote,
         advanceBatch,
         moveBatchToStep,
@@ -480,9 +481,10 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                                     value=""
                                                 >
                                                     <option value="">-- Selecionar nova etapa --</option>
-                                                    {Object.values(workflowConfig).map(s => (
-                                                        <option key={s.id} value={s.id}>{s.id} - {s.label}</option>
-                                                    ))}
+                                                    {workflowOrder.filter((id: string) => workflowConfig[id]).map((id: string) => {
+                                                        const s = workflowConfig[id];
+                                                        return <option key={s.id} value={s.id}>{s.id} - {s.label}</option>;
+                                                    })}
                                                 </select>
                                             </div>
                                         )}
@@ -613,9 +615,10 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                                             value=""
                                                         >
                                                             <option value="">Mover para etapa...</option>
-                                                            {Object.values(workflowConfig).map(s => (
-                                                                <option key={s.id} value={s.id}>{s.id} - {s.label}</option>
-                                                            ))}
+                                                            {workflowOrder.filter((id: string) => workflowConfig[id]).map((id: string) => {
+                                                                const s = workflowConfig[id];
+                                                                return <option key={s.id} value={s.id}>{s.id} - {s.label}</option>;
+                                                            })}
                                                         </select>
                                                     </div>
                                                 </div>

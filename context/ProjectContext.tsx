@@ -481,6 +481,20 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
                 const loadedBatches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Batch[];
                 setAllBatches(loadedBatches);
             });
+
+            // 4. ASSISTANCE TICKETS
+            let qAssistance = query(collection(db, "assistance_tickets"), where("storeId", "==", currentUser.storeId));
+            const unsubAssistance = onSnapshot(qAssistance, (snapshot) => {
+                const loadedTickets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as AssistanceTicket[];
+                setAssistanceTickets(loadedTickets);
+            });
+            return () => {
+                unsubStores();
+                unsubUsers();
+                unsubProjects();
+                unsubBatches();
+                unsubAssistance();
+            };
         } else {
             // If logged out, clear sensitive data
             setAllProjects([]);
@@ -502,6 +516,8 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     const [permissions, setPermissions] = useState<PermissionConfig[]>(DEFAULT_PERMISSIONS);
     const [origins, setOrigins] = useState<string[]>(DEFAULT_ORIGINS);
     const [assistanceWorkflow, setAssistanceWorkflow] = useState<AssistanceWorkflowStep[]>(INITIAL_ASSISTANCE_WORKFLOW);
+    const [lastPostAssemblyNumber, setLastPostAssemblyNumber] = useState<number>(0);
+    const [lastAssistanceNumber, setLastAssistanceNumber] = useState<number>(0);
 
     const currentStore = useMemo(() => {
         if (!currentUser) return null;
@@ -522,6 +538,8 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
                 assistanceWorkflow,
                 origins,
                 permissions,
+                lastPostAssemblyNumber,
+                lastAssistanceNumber,
                 updatedAt: new Date().toISOString()
             }, { merge: true });
             return true;
@@ -547,6 +565,8 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
                 if (data.permissions) {
                     setPermissions(data.permissions);
                 }
+                if (data.lastPostAssemblyNumber !== undefined) setLastPostAssemblyNumber(data.lastPostAssemblyNumber);
+                if (data.lastAssistanceNumber !== undefined) setLastAssistanceNumber(data.lastAssistanceNumber);
             } else {
                 console.log("No remote config found, using defaults.");
             }
@@ -563,6 +583,8 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             setPermissions(DEFAULT_PERMISSIONS);
             setOrigins(DEFAULT_ORIGINS);
             setAssistanceWorkflow(INITIAL_ASSISTANCE_WORKFLOW);
+            setLastPostAssemblyNumber(0);
+            setLastAssistanceNumber(0);
         }
     }, [currentUser]);
 
@@ -869,7 +891,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             id: `b-${Date.now()}`,
             storeId: currentUser.storeId,
             projectId: newProject.id,
-            name: 'Projeto Geral',
+            name: 'Projeto Completo',
             phase: workflowOrder[0] || '1.1',
             environmentIds: newProject.environments.map(e => e.id),
             status: 'Active',
@@ -1115,11 +1137,21 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         // Determine destination step: provided target OR current step (split in place)
         const destinationStepId = targetStepId || originalBatch.phase;
 
+        const projectBatchesCount = batches.filter(b => b.projectId === originalBatch.projectId).length;
+
+        let newName = `Lote ${projectBatchesCount + 1}`;
+        let originalNameUpdate = originalBatch.name;
+
+        if (originalBatch.name === 'Projeto Completo' || originalBatch.name === 'Projeto Geral') {
+            originalNameUpdate = 'Lote 1';
+            newName = 'Lote 2';
+        }
+
         const newBatch: Batch = {
             id: `b-${Date.now()}`,
             storeId: currentUser.storeId,
             projectId: originalBatch.projectId,
-            name: `${originalBatch.name} (Parcial)`,
+            name: newName,
             phase: destinationStepId,
             environmentIds: selectedEnvironmentIds,
             status: 'Active',
@@ -1129,6 +1161,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
         const originalBatchUpdate = {
             environmentIds: (originalBatch.environmentIds || []).filter(id => !selectedEnvironmentIds.includes(id)),
+            name: originalNameUpdate,
             lastUpdated: new Date().toISOString()
         };
 
@@ -1294,35 +1327,71 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
 
 
-    const updateProjectPostAssemblyItems = (projectId: string, data: { items?: AssistanceItem[], events?: AssistanceEvent[], priority?: 'Normal' | 'Urgente' }) => {
-        setAllProjects(prev => prev.map(p => {
-            if (p.id !== projectId) return p;
-            return {
-                ...p,
-                postAssemblyItems: data.items !== undefined ? data.items : p.postAssemblyItems,
-                postAssemblyEvents: data.events !== undefined ? data.events : p.postAssemblyEvents,
-                postAssemblyPriority: data.priority !== undefined ? data.priority : p.postAssemblyPriority
-            };
-        }));
-        // TODO: Persist if cloud enabled
+    const updateProjectPostAssemblyItems = async (projectId: string, data: { items?: AssistanceItem[], events?: AssistanceEvent[], priority?: 'Normal' | 'Urgente' }) => {
+        const project = allProjects.find(p => p.id === projectId);
+        if (!project) return;
+
+        const updates: any = {
+            postAssemblyItems: data.items !== undefined ? data.items : project.postAssemblyItems,
+            postAssemblyEvents: data.events !== undefined ? data.events : project.postAssemblyEvents,
+            postAssemblyPriority: data.priority !== undefined ? data.priority : project.postAssemblyPriority
+        };
+
+        // Geração automática de código POS se ainda não existir
+        if (!project.postAssemblyCode && currentStore) {
+            const nextNum = lastPostAssemblyNumber + 1;
+            const code = `POS-${String(nextNum).padStart(5, '0')}`;
+            updates.postAssemblyCode = code;
+
+            setLastPostAssemblyNumber(nextNum);
+
+            // Incrementa o contador global da loja no Firestore (config)
+            const configRef = doc(db, 'store_configs', currentStore.id);
+            await setDoc(configRef, { lastPostAssemblyNumber: nextNum }, { merge: true });
+        }
+
+        if (useCloud) {
+            persist("projects", projectId, updates);
+        } else {
+            setAllProjects(prev => prev.map(p => p.id === projectId ? { ...p, ...updates } : p));
+        }
     };
 
     // Assistance
-    const addAssistanceTicket = (ticketData: Omit<AssistanceTicket, 'id' | 'createdAt' | 'updatedAt' | 'storeId'>) => {
-        if (!currentUser) return;
+    const addAssistanceTicket = async (ticketData: Omit<AssistanceTicket, 'id' | 'createdAt' | 'updatedAt' | 'storeId'>) => {
+        if (!currentUser || !currentStore) return;
+
+        const nextNum = lastAssistanceNumber + 1;
+        const code = `ASS-${String(nextNum).padStart(5, '0')}`;
+
         const newTicket: AssistanceTicket = {
             id: `t-${Date.now()}`,
             storeId: currentUser.storeId,
+            code,
             ...ticketData,
-            events: ticketData.events || [], // Ensure events array exists
+            events: ticketData.events || [],
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
         };
-        setAssistanceTickets(prev => [...prev, newTicket]);
+
+        if (useCloud) {
+            await setDoc(doc(db, "assistance_tickets", newTicket.id), newTicket);
+            // Incrementa contador
+            setLastAssistanceNumber(nextNum);
+            const configRef = doc(db, 'store_configs', currentStore.id);
+            await setDoc(configRef, { lastAssistanceNumber: nextNum }, { merge: true });
+        } else {
+            setAssistanceTickets(prev => [...prev, newTicket]);
+        }
     };
 
-    const updateAssistanceTicket = (ticket: AssistanceTicket) => {
-        setAssistanceTickets(prev => prev.map(t => t.id === ticket.id ? { ...ticket, updatedAt: new Date().toISOString() } : t));
+    const updateAssistanceTicket = async (ticket: AssistanceTicket) => {
+        const updatedTicket = { ...ticket, updatedAt: new Date().toISOString() };
+        if (useCloud) {
+            await setDoc(doc(db, "assistance_tickets", ticket.id), updatedTicket);
+        } else {
+            setAssistanceTickets(prev => prev.map(t => t.id === ticket.id ? updatedTicket : t));
+        }
     };
 
     const resetStoreDefaults = async (type: 'origins' | 'assistance' | 'all') => {

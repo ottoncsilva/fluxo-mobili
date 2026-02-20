@@ -55,13 +55,13 @@ const TaskSidebar: React.FC<TaskSidebarProps> = ({ onSchedule }) => {
                             </span>
                         </div>
 
-                        <h4 className="font-bold text-slate-800 dark:text-white text-sm mb-1 leading-tight">{batch.name}</h4>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{project.client.name}</p>
+                        <h4 className="font-bold text-slate-800 dark:text-white text-lg mb-1 leading-tight">{project.client.name}</h4>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">{batch.name === 'Projeto Geral' ? 'Projeto Completo' : batch.name}</p>
 
                         <button
                             onClick={() => onSchedule({
                                 id: batch.id,
-                                title: `${step.label} - ${batch.name}`,
+                                title: `${step.label} - ${batch.name === 'Projeto Geral' ? 'Projeto Completo' : batch.name}`,
                                 clientName: project.client.name,
                                 projectId: project.id
                             })}

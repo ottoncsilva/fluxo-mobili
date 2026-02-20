@@ -118,6 +118,8 @@ export interface StoreConfig {
   assistanceWorkflow: AssistanceWorkflowStep[];
   origins: string[];
   permissions: PermissionConfig[];
+  lastPostAssemblyNumber?: number; // Counter for POS-XXXXX
+  lastAssistanceNumber?: number; // Counter for ASS-XXXXX
   updatedAt: string;
 }
 
@@ -195,6 +197,7 @@ export interface Project {
   postAssemblyItems?: AssistanceItem[]; // Reusing AssistanceItem for consistency
   postAssemblyEvents?: AssistanceEvent[];
   postAssemblyPriority?: 'Normal' | 'Urgente';
+  postAssemblyCode?: string; // Example: POS-00001
 
   factoryOrders: FactoryOrder[];
   total_estimated_value?: number;
@@ -256,6 +259,7 @@ export interface AssistanceTicket {
   clientId: string;
   clientName: string;
   title: string;
+  code?: string; // Example: ASS-00001
   status: AssistanceStatus;
   priority: 'Normal' | 'Urgente';
   createdAt: string;

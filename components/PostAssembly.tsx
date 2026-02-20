@@ -237,6 +237,27 @@ const PostAssembly: React.FC = () => {
         }
     };
 
+    const [historyNote, setHistoryNote] = useState('');
+
+    const handleAddHistoryNote = () => {
+        if (!selectedProject || !historyNote.trim()) return;
+
+        const newEvent: AssistanceEvent = {
+            id: `evt-${Date.now()}`,
+            description: historyNote,
+            date: new Date().toISOString(),
+            authorName: currentUser?.name || 'Sistema',
+            type: 'NOTE'
+        };
+
+        const currentEvents = selectedProject.postAssemblyEvents || [];
+        updateProjectPostAssemblyItems(selectedProject.id, {
+            events: [...currentEvents, newEvent]
+        });
+
+        setHistoryNote('');
+    };
+
     const printServiceOrder = () => {
         if (!selectedProject) return;
 
@@ -264,11 +285,15 @@ const PostAssembly: React.FC = () => {
                 </style>
             </head>
             <body>
-                <div class="header">
-                    <div class="logo">${companySettings.name}</div>
-                    <div class="title">
-                        <h1>Ordem de Serviço - Pós-Montagem</h1>
-                        <p>#${selectedProject.id.slice(-6).toUpperCase()}</p>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+                    <div>
+                        <h1 style="margin: 0; color: #0f172a;">Ordem de Serviço: Pós-Montagem</h1>
+                        <p style="margin: 5px 0; color: #64748b;">${companySettings.name}</p>
+                        ${selectedProject.postAssemblyCode ? `<p style="margin: 5px 0; font-weight: bold; color: #059669;">CÓDIGO: ${selectedProject.postAssemblyCode}</p>` : ''}
+                    </div>
+                    <div style="text-align: right;">
+                        <p style="margin: 0; font-size: 18px; font-weight: bold; color: #333;">#${selectedProject.id.slice(-6).toUpperCase()}</p>
+                        <p style="margin: 5px 0; color: #64748b;">Data: ${new Date().toLocaleDateString()}</p>
                     </div>
                 </div>
 
@@ -405,9 +430,16 @@ const PostAssembly: React.FC = () => {
                                                 className="bg-white dark:bg-[#1e2936] p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 group hover:shadow-md transition-all cursor-pointer relative overflow-hidden"
                                             >
                                                 <div className="flex justify-between items-start mb-2">
-                                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${priority === 'Urgente' ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
-                                                        {priority}
-                                                    </span>
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className={`text-[10px] w-fit font-bold px-1.5 py-0.5 rounded border ${priority === 'Urgente' ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
+                                                            {priority}
+                                                        </span>
+                                                        {project.postAssemblyCode && (
+                                                            <span className="text-[10px] font-bold text-orange-600 dark:text-orange-400">
+                                                                {project.postAssemblyCode}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <span className="text-[10px] text-slate-400 font-medium">{new Date(batch?.lastUpdated || project.created_at).toLocaleDateString()}</span>
                                                 </div>
                                                 <h4 className="font-bold text-slate-800 dark:text-white mb-1 truncate">{project.client.name}</h4>
@@ -574,6 +606,11 @@ const PostAssembly: React.FC = () => {
                                         }
                                     </span>
                                     {selectedProject.postAssemblyPriority === 'Urgente' && <span className="px-2 py-0.5 bg-rose-100 text-rose-600 rounded text-[10px] font-bold uppercase">URGENTE</span>}
+                                    {selectedProject.postAssemblyCode && (
+                                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[10px] font-bold tracking-wider">
+                                            {selectedProject.postAssemblyCode}
+                                        </span>
+                                    )}
                                 </div>
                                 <h2 className="text-xl font-bold text-slate-900 dark:text-white">{selectedProject.client.name}</h2>
                             </div>
@@ -722,14 +759,38 @@ const PostAssembly: React.FC = () => {
 
                             {activeTab === 'HISTORY' && (
                                 <div className="space-y-6">
+                                    <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 mb-6">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Adicionar Nota ao Histórico</label>
+                                        <div className="flex gap-2">
+                                            <textarea
+                                                value={historyNote}
+                                                onChange={(e) => setHistoryNote(e.target.value)}
+                                                placeholder="Digite uma observação..."
+                                                className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm py-2 px-3 focus:ring-emerald-500 focus:border-emerald-500"
+                                                rows={2}
+                                            />
+                                            <button
+                                                onClick={handleAddHistoryNote}
+                                                disabled={!historyNote.trim()}
+                                                className="bg-emerald-600 text-white font-bold px-4 rounded-lg text-sm hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                                            >
+                                                Enviar
+                                            </button>
+                                        </div>
+                                    </div>
+
                                     <div className="relative pl-4 space-y-6">
                                         <div className="absolute left-[27px] top-4 bottom-4 w-0.5 bg-slate-200 dark:bg-slate-700"></div>
                                         {selectedProject.postAssemblyEvents && selectedProject.postAssemblyEvents.length > 0 ? (
                                             selectedProject.postAssemblyEvents.slice().reverse().map(event => (
                                                 <div key={event.id} className="relative flex gap-4 animate-fade-in">
-                                                    <div className={`size-10 rounded-full flex items-center justify-center shrink-0 z-10 border-4 border-slate-50 dark:border-[#101922] ${event.type === 'STATUS_CHANGE' ? 'bg-blue-500 text-white' : event.type === 'ITEM_ADD' ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                                                    <div className={`size-10 rounded-full flex items-center justify-center shrink-0 z-10 border-4 border-slate-50 dark:border-[#101922] ${event.type === 'STATUS_CHANGE' ? 'bg-blue-500 text-white' :
+                                                        event.type === 'ITEM_ADD' ? 'bg-emerald-500 text-white' :
+                                                            event.type === 'NOTE' ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-600'}`}>
                                                         <span className="material-symbols-outlined text-lg">
-                                                            {event.type === 'STATUS_CHANGE' ? 'sync_alt' : event.type === 'ITEM_ADD' ? 'add' : 'edit'}
+                                                            {event.type === 'STATUS_CHANGE' ? 'sync_alt' :
+                                                                event.type === 'ITEM_ADD' ? 'add' :
+                                                                    event.type === 'NOTE' ? 'description' : 'edit'}
                                                         </span>
                                                     </div>
                                                     <div className="flex-1 bg-white dark:bg-slate-900 p-3 rounded-lg border border-slate-100 dark:border-slate-800 shadow-sm">
@@ -737,7 +798,7 @@ const PostAssembly: React.FC = () => {
                                                             <span className="font-bold text-xs text-slate-700 dark:text-slate-300">{event.authorName}</span>
                                                             <span className="text-[10px] text-slate-400">{new Date(event.date).toLocaleString()}</span>
                                                         </div>
-                                                        <p className="text-sm text-slate-600 dark:text-slate-400">{event.description}</p>
+                                                        <p className="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap">{event.description}</p>
                                                     </div>
                                                 </div>
                                             ))

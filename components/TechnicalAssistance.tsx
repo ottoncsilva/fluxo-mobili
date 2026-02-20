@@ -17,6 +17,28 @@ const TechnicalAssistance: React.FC = () => {
     const [isInspectionOpen, setIsInspectionOpen] = useState(false);
     const [activeTicket, setActiveTicket] = useState<AssistanceTicket | null>(null);
     const [activeTab, setActiveTab] = useState<'DETAILS' | 'HISTORY'>('DETAILS');
+    const [historyNote, setHistoryNote] = useState('');
+
+    const handleAddHistoryNote = () => {
+        if (!activeTicket || !historyNote.trim()) return;
+
+        const newEvent: AssistanceEvent = {
+            id: `evt-${Date.now()}`,
+            description: historyNote,
+            date: new Date().toISOString(),
+            authorName: currentUser?.name || 'Sistema',
+            type: 'NOTE'
+        };
+
+        const updatedTicket = {
+            ...activeTicket,
+            events: [...(activeTicket.events || []), newEvent]
+        };
+
+        updateAssistanceTicket(updatedTicket);
+        setActiveTicket(updatedTicket);
+        setHistoryNote('');
+    };
 
     // New Ticket State
     const [selectedClient, setSelectedClient] = useState('');
@@ -232,13 +254,17 @@ const TechnicalAssistance: React.FC = () => {
                 </style>
             </head>
             <body>
-                <div class="header">
-                    <div class="logo">${companySettings.name}</div>
-                    <div class="title">
-                        <h1>Ordem de Serviço</h1>
-                        <p>#${activeTicket.id.slice(-6).toUpperCase()}</p>
-                    </div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+                <div style="flex: 1;">
+                    <h1 style="margin: 0; color: #0f172a; font-size: 24px;">Ordem de Serviço: Assistência Técnica</h1>
+                    <p style="margin: 5px 0; color: #64748b; font-size: 14px;">${companySettings.name}</p>
+                    ${activeTicket.code ? `<p style="margin: 5px 0; font-weight: bold; color: #ea580c; font-size: 16px;">CÓDIGO: ${activeTicket.code}</p>` : ''}
                 </div>
+                <div style="text-align: right; min-width: 150px;">
+                    <p style="margin: 0; font-size: 18px; font-weight: bold; color: #333;">#${activeTicket.id.slice(-6).toUpperCase()}</p>
+                    <p style="margin: 5px 0; color: #64748b;">Data: ${new Date().toLocaleDateString()}</p>
+                </div>
+            </div>
 
                 <div class="section">
                     <div class="section-title">Dados do Cliente</div>
@@ -389,8 +415,11 @@ const TechnicalAssistance: React.FC = () => {
                                 </div>
 
                                 <div className="flex-1 bg-slate-100/30 dark:bg-[#15202b]/50 rounded-xl p-2 border border-slate-200/50 dark:border-slate-800 overflow-y-auto custom-scrollbar flex flex-col gap-3">
-                                    {columnTickets.map(ticket => {
-                                        const slaDays = assistanceWorkflow.find((s: AssistanceWorkflowStep) => s.id === ticket.status)?.sla || 0;
+                                    {columnTickets.map((ticket: AssistanceTicket) => {
+                                        const createdDate = new Date(ticket.createdAt);
+                                        const now = new Date();
+                                        const slaDays = Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 3600 * 24));
+
                                         return (
                                             <div
                                                 key={ticket.id}
@@ -398,10 +427,17 @@ const TechnicalAssistance: React.FC = () => {
                                                 className="bg-white dark:bg-[#1e2936] p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 group hover:shadow-md transition-all cursor-pointer relative overflow-hidden"
                                             >
                                                 <div className="flex justify-between items-start mb-2">
-                                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${ticket.priority === 'Urgente' ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
-                                                        {ticket.priority}
-                                                    </span>
-                                                    <span className="text-[10px] text-slate-400 font-medium">SLA: {slaDays} dias</span>
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className={`text-[10px] w-fit font-bold px-1.5 py-0.5 rounded border ${ticket.priority === 'Urgente' ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
+                                                            {ticket.priority}
+                                                        </span>
+                                                        {ticket.code && (
+                                                            <span className="text-[10px] font-bold text-orange-600 dark:text-orange-400">
+                                                                {ticket.code}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <span className="text-[10px] text-slate-400 font-medium">Dias: {slaDays}</span>
                                                 </div>
                                                 <h4 className="font-bold text-slate-800 dark:text-white mb-1 truncate">{ticket.clientName}</h4>
                                                 <p className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-2 truncate">{ticket.title}</p>
@@ -560,6 +596,11 @@ const TechnicalAssistance: React.FC = () => {
                                         Etapa: {assistanceWorkflow.find((c: AssistanceWorkflowStep) => c.id === activeTicket.status)?.label}
                                     </span>
                                     {activeTicket.priority === 'Urgente' && <span className="px-2 py-0.5 bg-rose-100 text-rose-600 rounded text-[10px] font-bold uppercase">URGENTE</span>}
+                                    {activeTicket.code && (
+                                        <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-[10px] font-bold tracking-wider">
+                                            {activeTicket.code}
+                                        </span>
+                                    )}
                                 </div>
                                 <h2 className="text-xl font-bold text-slate-900 dark:text-white">{activeTicket.clientName} - {activeTicket.title}</h2>
                             </div>
@@ -709,14 +750,38 @@ const TechnicalAssistance: React.FC = () => {
 
                             {activeTab === 'HISTORY' && (
                                 <div className="space-y-6">
+                                    <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 mb-6">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Adicionar Nota ao Histórico</label>
+                                        <div className="flex gap-2">
+                                            <textarea
+                                                value={historyNote}
+                                                onChange={(e) => setHistoryNote(e.target.value)}
+                                                placeholder="Digite uma observação..."
+                                                className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm py-2 px-3 focus:ring-orange-500 focus:border-orange-500"
+                                                rows={2}
+                                            />
+                                            <button
+                                                onClick={handleAddHistoryNote}
+                                                disabled={!historyNote.trim()}
+                                                className="bg-orange-600 text-white font-bold px-4 rounded-lg text-sm hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                                            >
+                                                Enviar
+                                            </button>
+                                        </div>
+                                    </div>
+
                                     <div className="relative pl-4 space-y-6">
                                         <div className="absolute left-[27px] top-4 bottom-4 w-0.5 bg-slate-200 dark:bg-slate-700"></div>
                                         {activeTicket.events && activeTicket.events.length > 0 ? (
                                             activeTicket.events.slice().reverse().map(event => (
                                                 <div key={event.id} className="relative flex gap-4 animate-fade-in">
-                                                    <div className={`size-10 rounded-full flex items-center justify-center shrink-0 z-10 border-4 border-slate-50 dark:border-[#101922] ${event.type === 'STATUS_CHANGE' ? 'bg-blue-500 text-white' : event.type === 'ITEM_ADD' ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                                                    <div className={`size-10 rounded-full flex items-center justify-center shrink-0 z-10 border-4 border-slate-50 dark:border-[#101922] ${event.type === 'STATUS_CHANGE' ? 'bg-blue-500 text-white' :
+                                                        event.type === 'ITEM_ADD' ? 'bg-emerald-500 text-white' :
+                                                            event.type === 'NOTE' ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-600'}`}>
                                                         <span className="material-symbols-outlined text-lg">
-                                                            {event.type === 'STATUS_CHANGE' ? 'sync_alt' : event.type === 'ITEM_ADD' ? 'add' : 'edit'}
+                                                            {event.type === 'STATUS_CHANGE' ? 'sync_alt' :
+                                                                event.type === 'ITEM_ADD' ? 'add' :
+                                                                    event.type === 'NOTE' ? 'description' : 'edit'}
                                                         </span>
                                                     </div>
                                                     <div className="flex-1 bg-white dark:bg-slate-900 p-3 rounded-lg border border-slate-100 dark:border-slate-800 shadow-sm">
@@ -724,7 +789,7 @@ const TechnicalAssistance: React.FC = () => {
                                                             <span className="font-bold text-xs text-slate-700 dark:text-slate-300">{event.authorName}</span>
                                                             <span className="text-[10px] text-slate-400">{new Date(event.date).toLocaleString()}</span>
                                                         </div>
-                                                        <p className="text-sm text-slate-600 dark:text-slate-400">{event.description}</p>
+                                                        <p className="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap">{event.description}</p>
                                                     </div>
                                                 </div>
                                             ))
