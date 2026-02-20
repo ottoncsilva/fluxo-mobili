@@ -1338,7 +1338,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         };
 
         // Geração automática de código POS se ainda não existir
-        if (!project.postAssemblyCode && currentStore) {
+        if (!project.postAssemblyCode && currentStore && db) {
             const nextNum = lastPostAssemblyNumber + 1;
             const code = `POS-${String(nextNum).padStart(5, '0')}`;
             updates.postAssemblyCode = code;
@@ -1374,7 +1374,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             updatedAt: new Date().toISOString()
         };
 
-        if (useCloud) {
+        if (useCloud && db) {
             await setDoc(doc(db, "assistance_tickets", newTicket.id), newTicket);
             // Incrementa contador
             setLastAssistanceNumber(nextNum);
@@ -1387,7 +1387,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     const updateAssistanceTicket = async (ticket: AssistanceTicket) => {
         const updatedTicket = { ...ticket, updatedAt: new Date().toISOString() };
-        if (useCloud) {
+        if (useCloud && db) {
             await setDoc(doc(db, "assistance_tickets", ticket.id), updatedTicket);
         } else {
             setAssistanceTickets(prev => prev.map(t => t.id === ticket.id ? updatedTicket : t));
