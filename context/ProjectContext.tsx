@@ -745,9 +745,11 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
         const isHighLevelRole = currentUser && ['Admin', 'Proprietario', 'Gerente'].includes(currentUser.role);
 
-        // Permission check for the CURRENT step being finished
+        // Permission check: verifica se o usuário pode concluir o step ATUAL (origem).
+        // O destino não é verificado — actionableSteps define quem CONCLUI o step,
+        // não quem pode receber o lote nele.
         if (!isHighLevelRole && !canUserAdvanceStep(batch.phase)) {
-            alert("Você não tem permissão para esta ação nesta etapa.");
+            alert("Você não tem permissão para concluir esta etapa.");
             return;
         }
 
