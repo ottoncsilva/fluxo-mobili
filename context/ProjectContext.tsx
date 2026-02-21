@@ -26,21 +26,21 @@ const INITIAL_WORKFLOW_CONFIG: Record<string, WorkflowStep> = {
     '3.1': { id: '3.1', label: 'Avaliação para Medição', ownerRole: 'Medidor', sla: 1, stage: 3 },
     '3.2': { id: '3.2', label: 'Medição', ownerRole: 'Medidor', sla: 2, stage: 3 },
 
-    // 4 - Executivo
-    '4.1': { id: '4.1', label: 'Construção dos Ambientes', ownerRole: 'Liberador', sla: 1, stage: 4 },
-    '4.2': { id: '4.2', label: 'Construção do Mobiliário', ownerRole: 'Liberador', sla: 5, stage: 4 },
-    '4.3': { id: '4.3', label: 'Aprovação Financeira', ownerRole: 'Financeiro', sla: 2, stage: 4 },
-    '4.4': { id: '4.4', label: 'Detalhamento Executivo', ownerRole: 'Liberador', sla: 5, stage: 4 },
-    '4.5': { id: '4.5', label: 'Aprovação do Executivo', ownerRole: 'Vendedor', sla: 2, stage: 4 },
-    '4.6': { id: '4.6', label: 'Correção', ownerRole: 'Liberador', sla: 2, stage: 4 },
+    // 4 - Engenharia e Projetos
+    '4.1': { id: '4.1', label: 'Construção de Mobiliário', ownerRole: 'Liberador', sla: 3, stage: 4 },
+    '4.2': { id: '4.2', label: 'Conferência Técnica', ownerRole: 'Liberador', sla: 2, stage: 4 },
+    '4.3': { id: '4.3', label: 'Aprovação Financeira', ownerRole: 'Financeiro', sla: 1, stage: 4 },
+    '4.4': { id: '4.4', label: 'Detalhamento Executivo', ownerRole: 'Liberador', sla: 3, stage: 4 },
+    '4.5': { id: '4.5', label: 'Aprovação do Executivo', ownerRole: 'Vendedor', sla: 1, stage: 4 },
+    '4.6': { id: '4.6', label: 'Solicitação de Correção', ownerRole: 'Liberador', sla: 2, stage: 4 },
 
-    // 5 - Fabricação
-    '5.1': { id: '5.1', label: 'Implantação', ownerRole: 'Financeiro', sla: 2, stage: 5 },
-    '5.2': { id: '5.2', label: 'Fabricação', ownerRole: 'Industria', sla: 25, stage: 5 },
+    // 5 - Implantação
+    '5.1': { id: '5.1', label: 'Pedido à Fábrica', ownerRole: 'Logistica', sla: 1, stage: 5 },
+    '5.2': { id: '5.2', label: 'Pagamento à Fábrica', ownerRole: 'Financeiro', sla: 2, stage: 5 },
 
-    // 6 - Entrega
-    '6.1': { id: '6.1', label: 'Verificação Pré-Montagem', ownerRole: 'Coordenador de Montagem', sla: 2, stage: 6 },
-    '6.2': { id: '6.2', label: 'Transporte', ownerRole: 'Logistica', sla: 2, stage: 6 },
+    // 6 - Logística
+    '6.1': { id: '6.1', label: 'Conferir Pedido', ownerRole: 'Logistica', sla: 1, stage: 6 },
+    '6.2': { id: '6.2', label: 'Agendar Carreto', ownerRole: 'Logistica', sla: 1, stage: 6 },
     '6.3': { id: '6.3', label: 'Entrega', ownerRole: 'Logistica', sla: 1, stage: 6 },
 
     // 7 - Montagem
@@ -48,14 +48,14 @@ const INITIAL_WORKFLOW_CONFIG: Record<string, WorkflowStep> = {
     '7.2': { id: '7.2', label: 'Vistoria Montagem', ownerRole: 'Coordenador de Montagem', sla: 1, stage: 7 },
 
     // 8 - Pós Montagem
-    '8.1': { id: '8.1', label: 'Levantamento', ownerRole: 'Montador', sla: 2, stage: 8 },
-    '8.2': { id: '8.2', label: 'Solicitação de Pós Montagem', ownerRole: 'Liberador', sla: 2, stage: 8 },
-    '8.3': { id: '8.3', label: 'Aprovação Financeira e Implantação', ownerRole: 'Financeiro', sla: 2, stage: 8 },
-    '8.4': { id: '8.4', label: 'Fabricação Pós Montagem', ownerRole: 'Industria', sla: 10, stage: 8 },
-    '8.5': { id: '8.5', label: 'Transporte Pós Montagem', ownerRole: 'Logistica', sla: 5, stage: 8 },
-    '8.6': { id: '8.6', label: 'Pós Montagem', ownerRole: 'Montador', sla: 5, stage: 8 },
-    '8.7': { id: '8.7', label: 'Vistoria Pós Montagem', ownerRole: 'Coordenador de Montagem', sla: 1, stage: 8 },
-    '8.8': { id: '8.8', label: 'Concluído', ownerRole: 'Gerente', sla: 0, stage: 8 },
+    '8.1': { id: '8.1', label: 'Levantamento de Assistência', ownerRole: 'Montador', sla: 2, stage: 8 },
+    '8.2': { id: '8.2', label: 'Pedido de Assistência', ownerRole: 'Liberador', sla: 2, stage: 8 },
+    '8.3': { id: '8.3', label: 'Recebimento de Assistência', ownerRole: 'Logistica', sla: 5, stage: 8 },
+    '8.4': { id: '8.4', label: 'Montagem de Assistência', ownerRole: 'Montador', sla: 5, stage: 8 },
+    '8.5': { id: '8.5', label: 'Vistoria Assistência', ownerRole: 'Coordenador de Montagem', sla: 1, stage: 8 },
+    '8.6': { id: '8.6', label: 'Finalizar e Encerrar', ownerRole: 'Gerente', sla: 0, stage: 8 },
+    '8.7': { id: '8.7', label: 'Coleta de Feedback', ownerRole: 'Vendedor', sla: 1, stage: 8 },
+    '8.8': { id: '8.8', label: 'Pós-Venda 12 meses', ownerRole: 'Vendedor', sla: 365, stage: 8 },
 
     // 9 - Conclusão
     '9.0': { id: '9.0', label: 'Projeto Entregue', ownerRole: 'Gerente', sla: 0, stage: 9 },
@@ -210,15 +210,15 @@ const DEFAULT_PERMISSIONS: PermissionConfig[] = [
         role: 'Vendedor',
         canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: false, canEditProject: true,
         canChangeSeller: false,
-        viewableStages: [1, 2, 4],
-        actionableSteps: ['1.1', '1.2', '1.3', '2.5', '2.7', '2.8', '2.9', '2.10', '4.5']
+        viewableStages: [1, 2, 4, 8, 9],
+        actionableSteps: ['1.1', '1.2', '1.3', '2.5', '2.7', '2.8', '2.9', '2.10', '4.5', '8.7', '8.8']
     },
     {
         role: 'Projetista',
         canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: false, canEditProject: true,
         canChangeSeller: false,
         viewableStages: [1, 2, 3, 4],
-        actionableSteps: ['2.1', '2.2', '2.3', '2.4', '2.6']
+        actionableSteps: ['2.1', '2.2', '2.3', '2.4', '2.6', '4.1']
     },
     {
         role: 'Gerente',
@@ -232,21 +232,21 @@ const DEFAULT_PERMISSIONS: PermissionConfig[] = [
         canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: false, canEditProject: true,
         canChangeSeller: false,
         viewableStages: [6, 7, 8],
-        actionableSteps: ['6.1', '7.2', '8.5']
+        actionableSteps: ['7.2', '8.5']
     },
     {
         role: 'Montador',
         canViewDashboard: true, canViewKanban: false, canViewClients: false, canViewSettings: false, canEditProject: false,
         canChangeSeller: false,
         viewableStages: [7, 8],
-        actionableSteps: ['7.1', '8.4']
+        actionableSteps: ['7.1', '8.1', '8.4']
     },
     {
         role: 'Logistica',
         canViewDashboard: true, canViewKanban: true, canViewClients: false, canViewSettings: false, canEditProject: false,
         canChangeSeller: false,
-        viewableStages: [6, 8],
-        actionableSteps: ['6.2', '6.3', '8.3']
+        viewableStages: [5, 6, 8],
+        actionableSteps: ['5.1', '6.1', '6.2', '6.3', '8.3']
     },
     {
         role: 'Medidor',
@@ -267,21 +267,21 @@ const DEFAULT_PERMISSIONS: PermissionConfig[] = [
         canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: false, canEditProject: true,
         canChangeSeller: false,
         viewableStages: [4, 8, 9],
-        actionableSteps: ['4.1', '4.2', '4.4', '4.6', '8.1']
+        actionableSteps: ['4.2', '4.4', '4.6', '8.2']
     },
     {
         role: 'Financeiro',
         canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: false, canEditProject: false,
         canChangeSeller: false,
         viewableStages: [4, 5],
-        actionableSteps: ['4.3', '5.1']
+        actionableSteps: ['4.3', '5.2']
     },
     {
         role: 'Industria',
         canViewDashboard: true, canViewKanban: true, canViewClients: false, canViewSettings: false, canEditProject: false,
         canChangeSeller: false,
         viewableStages: [5, 8],
-        actionableSteps: ['5.2', '8.2']
+        actionableSteps: [] // Industria usually just views, or we can add steps if needed
     },
 ];
 
@@ -1456,6 +1456,12 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
                 { label: 'Projetar Ambientes', description: 'Avançar para projeto.', targetStepId: '2.1', color: 'emerald', icon: 'architecture' },
             ];
         }
+        if (stepId === '1.3') {
+            return [
+                { label: 'Qualificação / Visita', description: 'Retornar para qualificação ou agendar visita.', targetStepId: '1.2', color: 'emerald', icon: 'storefront' },
+                { label: 'Projetar Ambientes', description: 'Avançar para projeto.', targetStepId: '2.1', color: 'emerald', icon: 'architecture' },
+            ];
+        }
 
         if (stepId === '2.3') {
             return [
@@ -1466,42 +1472,60 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         }
         if (stepId === '2.5') {
             return [
-                { label: 'Aprovado', description: 'Prosseguir para Detalhamento de Contrato.', targetStepId: '2.9', color: 'emerald', icon: 'verified' },
-                { label: 'Ajuste Solicitado', description: 'Retornar para ajustes de proposta.', targetStepId: '2.6', color: 'orange', icon: 'edit' },
-                { label: 'Follow Up', description: 'Manter em acompanhamento de vendas.', targetStepId: '2.7', color: 'primary', icon: 'running_with_errors' },
+                { label: 'Aprovar e Avançar p/ Contrato', description: 'Prosseguir para Contrato e Detalhamento.', targetStepId: '2.9', color: 'emerald', icon: 'verified' },
+                { label: 'Solicitar Ajustes', description: 'Retornar para ajustes de proposta.', targetStepId: '2.6', color: 'orange', icon: 'edit' },
+                { label: 'Follow Up / Próxima Reunião', description: 'Manter contato ativo.', targetStepId: '2.7', color: 'primary', icon: 'running_with_errors' },
             ];
         }
         if (stepId === '2.6') {
             return [
+                { label: 'Ajuste Concluído', description: 'Apresentar novamente.', targetStepId: '2.5', color: 'emerald', icon: 'check_circle' },
                 { label: 'Follow Up', description: 'Manter em acompanhamento de vendas.', targetStepId: '2.7', color: 'primary', icon: 'phone_in_talk' },
+            ];
+        }
+        if (stepId === '2.7') {
+            return [
                 { label: 'Reunião de Fechamento', description: 'Agendar fechamento.', targetStepId: '2.8', color: 'emerald', icon: 'handshake' },
+                { label: 'Novo Ajuste', description: 'Voltar para ajustes se necessário.', targetStepId: '2.6', color: 'orange', icon: 'edit' },
+                { label: 'Venda Perdida', description: 'Marcar como perdido.', targetStepId: '9.1', color: 'rose', icon: 'cancel' },
             ];
         }
         if (stepId === '2.8') {
             return [
                 { label: 'Venda Fechada', description: 'Avançar para Contrato e Detalhamento.', targetStepId: '2.9', color: 'emerald', icon: 'verified' },
                 { label: 'Ajuste Solicitado', description: 'Retornar para ajustes na proposta.', targetStepId: '2.6', color: 'orange', icon: 'edit_square' },
-                { label: 'Ir para Follow-up', description: 'Manter contato para fechamento futuro.', targetStepId: '2.7', color: 'primary', icon: 'event_repeat' },
+                { label: 'Manter Follow-up', description: 'Voltar para acompanhamento.', targetStepId: '2.7', color: 'primary', icon: 'event_repeat' },
             ];
         }
 
         if (stepId === '4.3') {
             return [
-                { label: 'Aprovado Financeiro', description: 'Pagamento liberado. Avançar para detalhamento.', targetStepId: '4.4', color: 'emerald', icon: 'verified' },
-                { label: 'Pendência Financeira', description: 'Retornar para Construção de Mobiliário.', targetStepId: '4.2', color: 'rose', icon: 'payments' },
+                { label: 'Liberar Carregamento', description: 'Pagamento OK. Liberar para engenharia.', targetStepId: '4.4', color: 'emerald', icon: 'fact_check' },
+                { label: 'Pendência Financeira', description: 'Aguardar regularização.', targetStepId: '4.3', color: 'rose', icon: 'block' },
             ];
         }
-
         if (stepId === '4.5') {
             return [
                 { label: 'Tudo Certo (Implantação)', description: 'Projeto aprovado, ir para implantação.', targetStepId: '5.1', color: 'emerald', icon: 'check_circle' },
                 { label: 'Solicitar Correção', description: 'Devolver para o liberador corrigir.', targetStepId: '4.6', color: 'rose', icon: 'build' },
             ];
         }
-
         if (stepId === '4.6') {
             return [
                 { label: 'Revisão Concluída', description: 'Retornar projeto revisado para o Vendedor.', targetStepId: '4.5', color: 'emerald', icon: 'check_circle' },
+            ];
+        }
+
+        if (stepId === '7.2') {
+            return [
+                { label: 'Tudo Certo', description: 'Montagem aprovada sem assistência.', targetStepId: '8.6', color: 'emerald', icon: 'verified' },
+                { label: 'Com Assistência', description: 'Iniciar levantamento de itens pendentes.', targetStepId: '8.1', color: 'orange', icon: 'handyman' },
+            ];
+        }
+        if (stepId === '8.5') {
+            return [
+                { label: 'Aprovado', description: 'Assistência concluída com sucesso.', targetStepId: '8.6', color: 'emerald', icon: 'check_circle' },
+                { label: 'Reprovar / Nova Assistência', description: 'Retornar para levantamento.', targetStepId: '8.1', color: 'rose', icon: 'replay' },
             ];
         }
 

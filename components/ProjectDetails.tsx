@@ -34,7 +34,8 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
         allUsers,
         permissions,
         updateProjectSeller,
-        deleteProject
+        deleteProject,
+        getBranchingOptions
     } = useProjects();
     const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'ENVIRONMENTS' | 'BRIEFING' | 'TIMELINE'>('OVERVIEW'); // Changed 'ITPP' to 'BRIEFING'
     const [noteContent, setNoteContent] = useState('');
@@ -178,8 +179,9 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
     const handleAdvance = (batch: Batch) => {
         const step = workflowConfig[batch.phase];
 
-        // CHECK FOR BRANCHING
-        if (['2.3', '2.5', '2.8', '4.3', '4.6'].includes(batch.phase)) {
+        // CHECK FOR BRANCHING using context logic
+        const options = getBranchingOptions(batch.phase);
+        if (options.length > 0) {
             setDecisionModalData({ batch, step });
             return;
         }
@@ -197,71 +199,6 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
         setDecisionModalData(null);
     };
 
-    const getBranchingOptions = (stepId: string) => {
-        if (stepId === '1.1') {
-            return [
-                { label: 'Visita Showroom', description: 'Cliente fará visita presencial.', targetStepId: '1.2', color: 'emerald', icon: 'storefront' } as const,
-                { label: 'Follow Up', description: 'Manter contato ativo.', targetStepId: '1.3', color: 'primary', icon: 'phone_in_talk' } as const,
-                { label: 'Projetar Ambientes', description: 'Pular visita e ir direto para projeto.', targetStepId: '2.1', color: 'emerald', icon: 'architecture' } as const,
-            ];
-        }
-        if (stepId === '1.2') {
-            return [
-                { label: 'Follow Up', description: 'Manter contato ativo.', targetStepId: '1.3', color: 'primary', icon: 'phone_in_talk' } as const,
-                { label: 'Projetar Ambientes', description: 'Avançar para projeto.', targetStepId: '2.1', color: 'emerald', icon: 'architecture' } as const,
-            ];
-        }
-
-        if (stepId === '2.3') {
-            return [
-                { label: 'Aprovar Orçamento', description: 'Avançar para montagem da apresentação.', targetStepId: '2.4', color: 'emerald', icon: 'check_circle' } as const,
-                { label: 'Revisar / Ajustar', description: 'Retornar para rascunho (Projetar Mobiliário).', targetStepId: '2.2', color: 'orange', icon: 'edit' } as const,
-                { label: 'Cancelar / Perdido', description: 'Cliente não aceitou. Marcar como perdido.', targetStepId: '9.1', color: 'rose', icon: 'cancel' } as const
-            ];
-        }
-        if (stepId === '2.5') {
-            return [
-                { label: 'Aprovado', description: 'Prosseguir para Detalhamento de Contrato.', targetStepId: '2.9', color: 'emerald', icon: 'verified' } as const,
-                { label: 'Ajuste Solicitado', description: 'Retornar para ajustes de proposta.', targetStepId: '2.6', color: 'orange', icon: 'edit' } as const,
-                { label: 'Follow Up', description: 'Manter em acompanhamento de vendas.', targetStepId: '2.7', color: 'primary', icon: 'running_with_errors' } as const,
-            ];
-        }
-        if (stepId === '2.6') {
-            return [
-                { label: 'Follow Up', description: 'Manter em acompanhamento de vendas.', targetStepId: '2.7', color: 'primary', icon: 'phone_in_talk' } as const,
-                { label: 'Reunião de Fechamento', description: 'Agendar fechamento.', targetStepId: '2.8', color: 'emerald', icon: 'handshake' } as const,
-            ];
-        }
-        if (stepId === '2.8') {
-            return [
-                { label: 'Venda Fechada', description: 'Avançar para Contrato e Detalhamento.', targetStepId: '2.9', color: 'emerald', icon: 'verified' } as const,
-                { label: 'Ajuste Solicitado', description: 'Retornar para ajustes na proposta.', targetStepId: '2.6', color: 'orange', icon: 'edit_square' } as const,
-                { label: 'Ir para Follow-up', description: 'Manter contato para fechamento futuro.', targetStepId: '2.7', color: 'primary', icon: 'event_repeat' } as const,
-            ];
-        }
-
-        if (stepId === '4.3') {
-            return [
-                { label: 'Aprovado Financeiro', description: 'Pagamento liberado. Avançar para detalhamento.', targetStepId: '4.4', color: 'emerald', icon: 'verified' } as const,
-                { label: 'Pendência Financeira', description: 'Retornar para Construção de Mobiliário.', targetStepId: '4.2', color: 'rose', icon: 'payments' } as const,
-            ];
-        }
-
-        if (stepId === '4.5') {
-            return [
-                { label: 'Tudo Certo (Implantação)', description: 'Projeto aprovado, ir para implantação.', targetStepId: '5.1', color: 'emerald', icon: 'check_circle' } as const,
-                { label: 'Solicitar Correção', description: 'Devolver para o liberador corrigir.', targetStepId: '4.6', color: 'rose', icon: 'build' } as const,
-            ];
-        }
-
-        if (stepId === '4.6') {
-            return [
-                { label: 'Revisão Concluída', description: 'Retornar projeto revisado para o Vendedor.', targetStepId: '4.5', color: 'emerald', icon: 'check_circle' } as const,
-            ];
-        }
-
-        return [];
-    };
 
     const handleSplitClick = (batch: Batch) => {
         setSelectedBatchIdForSplit(batch.id);
