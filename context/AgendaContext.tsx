@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useProjects } from './ProjectContext';
 import { db } from '../firebase';
-import { collection, onSnapshot, addDoc, setDoc, deleteDoc, updateDoc, doc, Firestore } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, setDoc, deleteDoc, updateDoc, doc, Firestore, query, where, QuerySnapshot, DocumentData } from "firebase/firestore";
 
 export interface AppointmentType {
     id: string;
@@ -69,10 +69,10 @@ export const AgendaProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
             // Appointments - Filtered by storeId 
             const qApts = query(collection(db, "appointments"), where("storeId", "==", currentUser.storeId));
-            const unsubAppointments = onSnapshot(qApts, (snapshot) => {
-                const loadedApts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Appointment[];
+            const unsubAppointments = onSnapshot(qApts, (snapshot: QuerySnapshot<DocumentData>) => {
+                const loadedApts = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() })) as Appointment[];
                 setAppointments(loadedApts);
-            }, (error) => {
+            }, (error: any) => {
                 console.error("AgendaContext: Error in appointments snapshot", error);
             });
 
