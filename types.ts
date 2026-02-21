@@ -286,7 +286,7 @@ export interface KanbanCard {
   stepLabel: string;
   owner: string;
   sellerName?: string;
-  slaStatus: 'No Prazo' | 'Atenção' | 'Atrasado';
+  slaStatus: 'No Prazo' | 'Atenção' | 'Atrasado' | 'Perdido' | 'Concluido';
   slaColor: 'emerald' | 'orange' | 'rose';
   daysDiff: number;
   date: string;

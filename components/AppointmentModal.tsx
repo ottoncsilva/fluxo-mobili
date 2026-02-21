@@ -116,11 +116,11 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 end: endDateTime.toISOString(),
                 durationMinutes: duration,
                 typeId,
-                clientId: client?.id || null,
-                clientName: client?.name || null,
+                clientId: client?.id,
+                clientName: client?.name,
                 userId: currentUser.id,
                 notes: notes || '',
-                linkedTaskId: initialTask?.id || editingAppointment?.linkedTaskId || null
+                linkedTaskId: initialTask?.id ?? editingAppointment?.linkedTaskId
             };
 
             console.log("AppointmentModal: Sending data", appointmentData);
@@ -128,7 +128,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
             if (editingAppointment) {
                 await updateAppointment(editingAppointment.id, appointmentData);
             } else {
-                await addAppointment(appointmentData);
+                await addAppointment(appointmentData as Omit<Appointment, 'id' | 'storeId'>);
             }
             onClose();
         } catch (error: unknown) {

@@ -6,7 +6,8 @@ import { getAuth, Auth } from "firebase/auth";
 // from the Firebase Console -> Project Settings -> General -> Your Apps
 
 // Acessa as variáveis de ambiente do Vite via import.meta.env
-const env: Record<string, string> = import.meta.env ?? {};
+// Cast necessário pois o tsconfig não inclui lib "vite/client" explicitamente
+const env = (import.meta as unknown as { env: Record<string, string> }).env ?? {};
 
 const firebaseConfig = {
   apiKey: env.VITE_FIREBASE_API_KEY,

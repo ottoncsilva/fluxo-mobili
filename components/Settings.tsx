@@ -223,7 +223,7 @@ const Settings: React.FC = () => {
     }
 
     // Generic Permission Handler
-    const handlePermissionChange = (role: Role, field: keyof PermissionConfig, value: boolean | string | number) => {
+    const handlePermissionChange = (role: Role, field: keyof PermissionConfig, value: boolean | string | number | number[] | string[]) => {
         const updated = permissions.map(p => {
             if (p.role === role) {
                 return { ...p, [field]: value };
