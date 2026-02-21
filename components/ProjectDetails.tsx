@@ -74,8 +74,6 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
     const [decisionModalData, setDecisionModalData] = useState<{ batch: Batch, step: WorkflowStep } | null>(null);
     const [selectedBatchIdForSplit, setSelectedBatchIdForSplit] = useState<string | null>(null);
     const [isLotModalOpen, setIsLotModalOpen] = useState(false);
-    const [splitModalBatch, setSplitModalBatch] = useState<Batch | null>(null);
-    const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
 
     // Contract Modal
     const [isContractOpen, setIsContractOpen] = useState(false);
@@ -267,28 +265,8 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
     };
 
     const handleSplitClick = (batch: Batch) => {
-        setSplitModalBatch(batch);
-        setIsSplitModalOpen(true);
-    };
-
-    const handleSplitConfirmed = async (selectedIds: string[]) => {
-        if (!splitModalBatch) return;
-
-        if (!project) return;
-        if (selectedIds.length === project.environments.length) {
-            setIsUpdatingStep(splitModalBatch.id);
-            await advanceBatch(splitModalBatch.id);
-            setIsUpdatingStep(null);
-        } else {
-            const newBatchId = splitBatch(splitModalBatch.id, selectedIds);
-            if (newBatchId) {
-                setIsUpdatingStep(newBatchId);
-                await advanceBatch(newBatchId);
-                setIsUpdatingStep(null);
-            }
-        }
-        setIsSplitModalOpen(false);
-        setSplitModalBatch(null);
+        setSelectedBatchIdForSplit(batch.id);
+        setIsLotModalOpen(true);
     };
 
     const handleSaveClientData = () => {
@@ -1324,12 +1302,6 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                 />
             )}
 
-            <SplitBatchModal
-                isOpen={isSplitModalOpen}
-                onClose={() => setIsSplitModalOpen(false)}
-                batch={splitModalBatch}
-                onSplitConfirmed={handleSplitConfirmed}
-            />
 
             {selectedBatchIdForSplit && (
                 <LotModal

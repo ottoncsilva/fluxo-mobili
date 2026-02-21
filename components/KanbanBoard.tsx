@@ -3,7 +3,6 @@ import { KanbanColumn, Batch, KanbanCard } from '../types';
 import { useProjects } from '../context/ProjectContext';
 import AuditDrawer from './AuditDrawer';
 import LotModal from './LotModal';
-import SplitBatchModal from './SplitBatchModal';
 import StepDecisionModal from './StepDecisionModal';
 import { addBusinessDays, getBusinessDaysDifference } from '../utils/dateUtils';
 
@@ -41,8 +40,7 @@ const KanbanBoard: React.FC = () => {
 
     const handleCardClick = (batchId: string, phase: string, projectId: string) => {
         setCurrentProjectId(projectId);
-        setSelectedBatchId(batchId);
-        setIsLotModalOpen(true);
+        // setSelectedBatchId(batchId); // We might keep this if other things use it, but for card click, ProjectDetails handles it.
     };
 
     const getBranchingOptions = (currentPhase: string) => {
@@ -421,8 +419,8 @@ const KanbanBoard: React.FC = () => {
                                                                     e.stopPropagation();
                                                                     const batch = batches.find((b: Batch) => b.id === card.id);
                                                                     if (batch) {
-                                                                        setSplitModalBatch(batch);
-                                                                        setIsSplitModalOpen(true);
+                                                                        setSelectedBatchId(batch.id);
+                                                                        setIsLotModalOpen(true);
                                                                     }
                                                                 }}
                                                                 className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 border border-blue-100 dark:border-blue-800 rounded transition-colors"

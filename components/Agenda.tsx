@@ -79,40 +79,83 @@ const Agenda: React.FC = () => {
 
                     <div className="flex items-center gap-3">
                         {canViewOthers && (
-                            <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-x-auto max-w-[400px] no-scrollbar">
-                                <label className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-transparent cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors whitespace-nowrap">
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedUserIds.length === users.length}
-                                        onChange={(e) => {
-                                            if (e.target.checked) setSelectedUserIds(users.map(u => u.id));
-                                            else setSelectedUserIds([currentUser?.id || '']);
-                                        }}
-                                        className="rounded border-slate-300 dark:border-slate-600 text-primary focus:ring-primary"
-                                    />
-                                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Todos</span>
-                                </label>
-                                <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1"></div>
-                                {users.map(u => (
-                                    <label
-                                        key={u.id}
-                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all cursor-pointer whitespace-nowrap
-                                            ${selectedUserIds.includes(u.id)
-                                                ? 'bg-primary/10 border-primary text-primary'
-                                                : 'bg-transparent border-transparent text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedUserIds.includes(u.id)}
-                                            onChange={(e) => {
-                                                if (e.target.checked) setSelectedUserIds(prev => [...prev, u.id]);
-                                                else setSelectedUserIds(prev => prev.filter(id => id !== u.id));
-                                            }}
-                                            className="rounded border-slate-300 dark:border-slate-600 text-primary focus:ring-primary"
-                                        />
-                                        <span className="text-xs font-bold">{u.id === currentUser?.id ? 'Minha Agenda' : u.name}</span>
-                                    </label>
-                                ))}
+                            <div className="relative group/dropdown">
+                                <button
+                                    onClick={() => {
+                                        const dropdown = document.getElementById('agenda-user-dropdown');
+                                        if (dropdown) dropdown.classList.toggle('hidden');
+                                    }}
+                                    className="flex items-center gap-2 bg-white dark:bg-slate-800 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all"
+                                >
+                                    <span className="material-symbols-outlined text-primary text-xl">group</span>
+                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                                        {selectedUserIds.length === users.length
+                                            ? 'Todas Agendas'
+                                            : selectedUserIds.length === 1
+                                                ? (users.find(u => u.id === selectedUserIds[0])?.name || 'Uma Agenda')
+                                                : `${selectedUserIds.length} Agendas`}
+                                    </span>
+                                    <span className="material-symbols-outlined text-slate-400 group-hover/dropdown:text-primary transition-colors">keyboard_arrow_down</span>
+                                </button>
+
+                                {/* Dropdown Menu */}
+                                <div
+                                    id="agenda-user-dropdown"
+                                    className="hidden absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden z-50 animate-fade-in origin-top-right backdrop-blur-md bg-white/90 dark:bg-slate-800/90"
+                                >
+                                    <div className="p-2 max-h-[300px] overflow-y-auto custom-scrollbar">
+                                        <label className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors group/item">
+                                            <div className="relative flex items-center justify-center">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedUserIds.length === users.length}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) setSelectedUserIds(users.map(u => u.id));
+                                                        else setSelectedUserIds([currentUser?.id || '']);
+                                                    }}
+                                                    className="w-5 h-5 rounded border-slate-300 dark:border-slate-600 text-primary focus:ring-primary transition-all cursor-pointer"
+                                                />
+                                            </div>
+                                            <span className="text-sm font-bold text-slate-700 dark:text-slate-200 group-hover/item:text-primary transition-colors">Ver Todas</span>
+                                        </label>
+
+                                        <div className="h-px bg-slate-100 dark:bg-slate-700 my-1 mx-2"></div>
+
+                                        {users.map(u => (
+                                            <label
+                                                key={u.id}
+                                                className={`flex items-center gap-3 p-3 rounded-xl transition-all cursor-pointer group/item
+                                                    ${selectedUserIds.includes(u.id) ? 'bg-primary/5' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
+                                            >
+                                                <div className="relative flex items-center justify-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedUserIds.includes(u.id)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) setSelectedUserIds(prev => [...prev, u.id]);
+                                                            else setSelectedUserIds(prev => prev.filter(id => id !== u.id));
+                                                        }}
+                                                        className="w-5 h-5 rounded border-slate-300 dark:border-slate-600 text-primary focus:ring-primary transition-all cursor-pointer"
+                                                    />
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <span className={`text-sm font-bold transition-colors ${selectedUserIds.includes(u.id) ? 'text-primary' : 'text-slate-700 dark:text-slate-200 group-hover/item:text-primary'}`}>
+                                                        {u.id === currentUser?.id ? 'Minha Agenda' : u.name}
+                                                    </span>
+                                                    <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">{u.role}</span>
+                                                </div>
+                                            </label>
+                                        ))}
+                                    </div>
+                                    <div className="p-2 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-700">
+                                        <button
+                                            onClick={() => document.getElementById('agenda-user-dropdown')?.classList.add('hidden')}
+                                            className="w-full py-2 text-xs font-bold text-slate-500 hover:text-primary transition-colors uppercase tracking-widest"
+                                        >
+                                            Fechar
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         )}
 

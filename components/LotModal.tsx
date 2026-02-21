@@ -8,7 +8,7 @@ interface LotModalProps {
 }
 
 const LotModal: React.FC<LotModalProps> = ({ isOpen, onClose, batchId }) => {
-  const { batches, getProjectById, splitBatch } = useProjects();
+  const { batches, getProjectById, splitBatch, workflowConfig, workflowOrder, advanceBatch } = useProjects();
   const [selectedEnvIds, setSelectedEnvIds] = useState<string[]>([]);
 
   const batch = useMemo(() => batches.find(b => b.id === batchId), [batches, batchId]);
@@ -20,16 +20,33 @@ const LotModal: React.FC<LotModalProps> = ({ isOpen, onClose, batchId }) => {
     return project.environments.filter(e => (batch.environmentIds || []).includes(e.id));
   }, [project, batch]);
 
+  const currentStep = useMemo(() => batch ? workflowConfig[batch.phase] : null, [batch, workflowConfig]);
+  const nextStep = useMemo(() => {
+    if (!batch) return null;
+    const currentIndex = workflowOrder.indexOf(batch.phase);
+    const nextId = workflowOrder[currentIndex + 1];
+    return workflowConfig[nextId] || null;
+  }, [batch, workflowOrder, workflowConfig]);
+
   const handleToggle = (envId: string) => {
     setSelectedEnvIds(prev =>
       prev.includes(envId) ? prev.filter(id => id !== envId) : [...prev, envId]
     );
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (selectedEnvIds.length === 0) return;
-    splitBatch(batchId, selectedEnvIds);
+
+    if (selectedEnvIds.length === environments.length) {
+      await advanceBatch(batchId);
+    } else {
+      const newBatchId = splitBatch(batchId, selectedEnvIds);
+      if (newBatchId) {
+        await advanceBatch(newBatchId);
+      }
+    }
     onClose();
+    setSelectedEnvIds([]);
   };
 
   if (!isOpen || !batch || !project) return null;
@@ -49,12 +66,12 @@ const LotModal: React.FC<LotModalProps> = ({ isOpen, onClose, batchId }) => {
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2">
               <span className="px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-primary dark:text-blue-400 text-xs font-bold uppercase tracking-wide">
-                Etapa 3 → 4
+                Etapa {currentStep?.id} → {nextStep?.id || '?'}
               </span>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white">Criar Lote de Produção (Executivo)</h2>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white">Criar Lote de Produção ({nextStep?.label || 'Avançar'})</h2>
             </div>
             <p className="text-slate-500 dark:text-slate-400 text-sm">
-              Cliente: <span className="font-semibold text-slate-700 dark:text-slate-300">{project.client.name}</span> • Selecione os ambientes medidos para avançar.
+              Cliente: <span className="font-semibold text-slate-700 dark:text-slate-300">{project.client.name}</span> • Selecione os ambientes para avançar para a próxima etapa.
             </p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-2 rounded-full hover:bg-slate-50 dark:hover:bg-slate-800">
@@ -70,7 +87,7 @@ const LotModal: React.FC<LotModalProps> = ({ isOpen, onClose, batchId }) => {
             <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex justify-between items-center">
               <h3 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
                 <span className="material-symbols-outlined text-slate-400 text-sm">inventory_2</span>
-                Ambientes na Etapa 3 (Medição)
+                Ambientes na Etapa {currentStep?.label}
               </h3>
               <span className="bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold px-2 py-0.5 rounded-full">{environments.length}</span>
             </div>
@@ -108,7 +125,7 @@ const LotModal: React.FC<LotModalProps> = ({ isOpen, onClose, batchId }) => {
             <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex justify-between items-center">
               <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-sm">check_circle</span>
-                Novo Lote (Vai para Etapa 4)
+                Novo Lote (Vai p/ {nextStep?.label || '...'})
               </h3>
               <span className="bg-primary/10 text-primary text-xs font-bold px-2 py-0.5 rounded-full">{selectedEnvIds.length} Selecionados</span>
             </div>
@@ -140,7 +157,7 @@ const LotModal: React.FC<LotModalProps> = ({ isOpen, onClose, batchId }) => {
         <div className="bg-white dark:bg-slate-900 p-6 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center shrink-0">
           <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
             <span className="material-symbols-outlined text-lg text-slate-400">info</span>
-            <p>Ambientes não selecionados permanecerão na fase de <span className="font-semibold text-slate-700 dark:text-slate-300">Medição</span>.</p>
+            <p>Ambientes não selecionados permanecerão na fase de <span className="font-semibold text-slate-700 dark:text-slate-300">{currentStep?.label}</span>.</p>
           </div>
           <div className="flex gap-4">
             <button onClick={onClose} className="px-6 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold text-sm hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-800 transition-colors">
