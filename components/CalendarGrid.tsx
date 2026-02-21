@@ -348,8 +348,8 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                                 )}
                                             </button>
                                         );
-                                    })
-                                }
+                                    });
+                                })()}
                             </div>
                         </div>
                     </div>
