@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, Firestore } from "firebase/firestore";
+import { initializeFirestore, Firestore } from "firebase/firestore";
 import { getAuth, Auth } from "firebase/auth";
 
 // Replace these values with your actual Firebase project configuration
@@ -25,7 +25,8 @@ let auth: Auth | null = null;
 if (firebaseConfig.apiKey && firebaseConfig.projectId) {
     try {
         const app = initializeApp(firebaseConfig);
-        db = getFirestore(app);
+        // ignoreUndefinedProperties: evita erro do Firestore quando campos opcionais são undefined
+        db = initializeFirestore(app, { ignoreUndefinedProperties: true });
         auth = getAuth(app);
         console.log("Firebase initialized successfully");
     } catch (error) {
