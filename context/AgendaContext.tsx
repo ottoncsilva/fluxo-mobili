@@ -28,12 +28,12 @@ export interface Appointment {
 interface AgendaContextType {
     appointments: Appointment[];
     appointmentTypes: AppointmentType[];
-    addAppointment: (apt: Omit<Appointment, 'id'>) => void;
-    updateAppointment: (id: string, updates: Partial<Appointment>) => void;
-    deleteAppointment: (id: string) => void;
-    addAppointmentType: (type: Omit<AppointmentType, 'id'>) => void;
-    updateAppointmentType: (id: string, updates: Partial<AppointmentType>) => void;
-    deleteAppointmentType: (id: string) => void;
+    addAppointment: (apt: Omit<Appointment, 'id' | 'storeId'>) => Promise<void>;
+    updateAppointment: (id: string, updates: Partial<Appointment>) => Promise<void>;
+    deleteAppointment: (id: string) => Promise<void>;
+    addAppointmentType: (type: Omit<AppointmentType, 'id'>) => Promise<void>;
+    updateAppointmentType: (id: string, updates: Partial<AppointmentType>) => Promise<void>;
+    deleteAppointmentType: (id: string) => Promise<void>;
     agendaUsers: string[]; // List of user IDs who have agenda enabled
     toggleAgendaUser: (userId: string) => void;
 }
