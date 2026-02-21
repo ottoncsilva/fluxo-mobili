@@ -32,7 +32,7 @@ interface CalendarGridProps {
     onSelectAppointment: (apt: Appointment) => void;
 }
 
-const HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 07:00 to 20:00
+const HOURS = Array.from({ length: 17 }, (_, i) => i + 6); // 06:00 to 22:00
 
 const CalendarGrid: React.FC<CalendarGridProps> = ({
     date,
@@ -251,7 +251,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                                 const startTime = new Date(apt.start);
                                                 const hourProp = startTime.getHours() + startTime.getMinutes() / 60;
                                                 const top = (hourProp - HOURS[0]) * 64;
-                                                const height = (apt.durationMinutes / 60) * 64;
+                                                const height = (Math.max(15, apt.durationMinutes || 60) / 60) * 64;
 
                                                 return (
                                                     <button
@@ -312,34 +312,44 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                     <div key={hour} className="absolute left-0 right-0 h-24 border-b border-slate-100 dark:border-slate-800 pointer-events-none" style={{ top: (hour - HOURS[0]) * 96 }} />
                                 ))}
 
-                                {getDayAppointments(date).map(apt => {
-                                    const startTime = new Date(apt.start);
-                                    const hourProp = startTime.getHours() + startTime.getMinutes() / 60;
-                                    const top = (hourProp - HOURS[0]) * 96;
-                                    const height = (apt.durationMinutes / 60) * 96;
-
-                                    return (
-                                        <button
-                                            key={apt.id}
-                                            onClick={(e) => { e.stopPropagation(); onSelectAppointment(apt); }}
-                                            className="absolute left-2 right-2 z-10 p-3 rounded-xl text-xs font-bold text-white shadow-lg hover:brightness-110 active:scale-[0.99] transition-all overflow-hidden border border-white/20 flex flex-col items-start gap-1"
-                                            style={{
-                                                top: Math.max(0, top),
-                                                height,
-                                                backgroundColor: getTypeColor(apt.typeId),
-                                            }}
-                                        >
-                                            <div className="flex items-center gap-1.5 opacity-90 px-1.5 py-0.5 bg-black/10 rounded-full text-[10px]">
-                                                <span className="material-symbols-outlined text-sm">schedule</span>
-                                                {format(startTime, 'HH:mm')} — {apt.durationMinutes}min
+                                {(() => {
+                                    const dayApts = getDayAppointments(date);
+                                    if (dayApts.length === 0) {
+                                        return (
+                                            <div className="flex flex-col items-center justify-center h-full text-slate-300 dark:text-slate-700 opacity-50 bg-slate-50/20 dark:bg-slate-900/10">
+                                                <span className="material-symbols-outlined text-4xl mb-2">event_available</span>
+                                                <p className="text-sm font-medium">Nenhum compromisso para hoje</p>
                                             </div>
-                                            <div className="text-sm font-black leading-tight break-words text-left">{apt.title}</div>
-                                            {height > 60 && apt.notes && (
-                                                <p className="text-[10px] opacity-80 mt-1 line-clamp-2 text-left font-normal">{apt.notes}</p>
-                                            )}
-                                        </button>
-                                    );
-                                })}
+                                        );
+                                    }
+                                    return dayApts.map(apt => {
+                                        const startTime = new Date(apt.start);
+                                        const hourProp = startTime.getHours() + startTime.getMinutes() / 60;
+                                        const top = (hourProp - HOURS[0]) * 96;
+                                        const height = (Math.max(15, apt.durationMinutes || 60) / 60) * 96;
+                                        return (
+                                            <button
+                                                key={apt.id}
+                                                onClick={(e) => { e.stopPropagation(); onSelectAppointment(apt); }}
+                                                className="absolute left-2 right-2 z-10 p-3 rounded-xl text-xs font-bold text-white shadow-lg hover:brightness-110 active:scale-[0.99] transition-all overflow-hidden border border-white/20 flex flex-col items-start gap-1"
+                                                style={{
+                                                    top: Math.max(0, top),
+                                                    height,
+                                                    backgroundColor: getTypeColor(apt.typeId),
+                                                }}
+                                            >
+                                                <div className="flex items-center gap-1.5 opacity-90 px-1.5 py-0.5 bg-black/10 rounded-full text-[10px]">
+                                                    <span className="material-symbols-outlined text-sm">schedule</span>
+                                                    {format(startTime, 'HH:mm')} — {apt.durationMinutes}min
+                                                </div>
+                                                <div className="text-sm font-black leading-tight break-words text-left">{apt.title}</div>
+                                                {height > 60 && apt.notes && (
+                                                    <p className="text-[10px] opacity-80 mt-1 line-clamp-2 text-left font-normal">{apt.notes}</p>
+                                                )}
+                                            </button>
+                                        );
+                                    })
+                                }
                             </div>
                         </div>
                     </div>

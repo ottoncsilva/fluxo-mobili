@@ -560,7 +560,19 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
                 // Only update if data exists, otherwise keep defaults (or initial load)
                 if (data.workflowConfig) setWorkflowConfig(data.workflowConfig);
                 if (data.workflowOrder) setWorkflowOrder(data.workflowOrder);
-                if (data.assistanceWorkflow) setAssistanceWorkflow(data.assistanceWorkflow);
+                if (data.assistanceWorkflow) {
+                    // Merge with INITIAL_ASSISTANCE_WORKFLOW to ensure new fields like ownerRole are present
+                    const mergedAssistance = data.assistanceWorkflow.map(remoteStep => {
+                        const initialStep = INITIAL_ASSISTANCE_WORKFLOW.find(s => s.id === remoteStep.id);
+                        return {
+                            ...initialStep,
+                            ...remoteStep,
+                            // Ensure ownerRole is kept if not present in remote
+                            ownerRole: remoteStep.ownerRole || initialStep?.ownerRole
+                        };
+                    });
+                    setAssistanceWorkflow(mergedAssistance);
+                }
                 if (data.origins) setOrigins(data.origins);
                 if (data.permissions) {
                     setPermissions(data.permissions);
@@ -855,7 +867,15 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
 
     const updateAssistanceStep = (id: string, updates: Partial<AssistanceWorkflowStep>) => {
-        setAssistanceWorkflow(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+        setAssistanceWorkflow(prev => {
+            const next = prev.map(s => s.id === id ? { ...s, ...updates } : s);
+            // Auto-persist if in cloud mode
+            if (useCloud && db && currentStore) {
+                const configRef = doc(db, 'store_configs', currentStore.id);
+                setDoc(configRef, { assistanceWorkflow: next, updatedAt: new Date().toISOString() }, { merge: true });
+            }
+            return next;
+        });
     };
 
     const deleteAssistanceStep = (id: string) => {

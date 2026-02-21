@@ -123,6 +123,8 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 linkedTaskId: initialTask?.id || editingAppointment?.linkedTaskId || null
             };
 
+            console.log("AppointmentModal: Sending data", appointmentData);
+
             if (editingAppointment) {
                 await updateAppointment(editingAppointment.id, appointmentData);
             } else {

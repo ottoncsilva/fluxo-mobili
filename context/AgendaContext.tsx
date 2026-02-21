@@ -12,6 +12,7 @@ export interface AppointmentType {
 
 export interface Appointment {
     id: string;
+    storeId: string;
     title: string;
     start: string; // ISO
     end: string; // ISO
@@ -66,10 +67,13 @@ export const AgendaProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         if (useCloud && db) {
             // Firestore Subscriptions
 
-            // Appointments
-            const unsubAppointments = onSnapshot(collection(db, "appointments"), (snapshot) => {
+            // Appointments - Filtered by storeId 
+            const qApts = query(collection(db, "appointments"), where("storeId", "==", currentUser.storeId));
+            const unsubAppointments = onSnapshot(qApts, (snapshot) => {
                 const loadedApts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Appointment[];
                 setAppointments(loadedApts);
+            }, (error) => {
+                console.error("AgendaContext: Error in appointments snapshot", error);
             });
 
             // Apppointment Types are now hardcoded, no need to subscribe to DB for them
@@ -119,11 +123,20 @@ export const AgendaProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         return Date.now().toString(36) + Math.random().toString(36).substring(2);
     };
 
-    const addAppointment = async (apt: Omit<Appointment, 'id'>) => {
+    const addAppointment = async (apt: Omit<Appointment, 'id' | 'storeId'>) => {
+        if (!currentUser) return;
         try {
-            const newApt = { ...apt, id: generateId() };
+            const newApt: Appointment = {
+                ...apt,
+                id: generateId(),
+                storeId: currentUser.storeId
+            };
+
+            console.log("AgendaContext: Adding appointment", newApt);
+
             if (useCloud && db) {
                 await setDoc(doc(db, "appointments", newApt.id), newApt);
+                console.log("AgendaContext: Appointment added to Firestore");
             } else {
                 const updated = [...appointments, newApt];
                 setAppointments(updated);

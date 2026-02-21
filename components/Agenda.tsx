@@ -18,32 +18,22 @@ const Agenda: React.FC = () => {
     const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
     const [initialTask, setInitialTask] = useState<{ id: string; title: string; clientName: string; projectId: string } | null>(null);
 
-    // User Filtering State
-    // Default to current user's ID
-    const [selectedUserId, setSelectedUserId] = useState<string>(currentUser?.id || '');
+    // User Filtering State - Now an array of IDs
+    const [selectedUserIds, setSelectedUserIds] = useState<string[]>(currentUser?.id ? [currentUser.id] : []);
 
     // Permission Check
     const canViewOthers = ['Admin', 'Proprietario', 'Gerente', 'SuperAdmin'].includes(currentUser?.role || '');
 
     // Filter appointments
     const filteredAppointments = useMemo(() => {
-        let filtered = appointments;
-
-        // If selecting a specific user (and has permission or it's themselves)
-        if (selectedUserId && selectedUserId !== 'ALL') {
-            filtered = filtered.filter(a => a.userId === selectedUserId);
-        } else if (selectedUserId === 'ALL' && canViewOthers) {
-            // Show all (maybe filter by storeId if needed, but AgendaContext usually loads store-specific data?) 
-            // Currently AgendaContext loads from LocalStorage which is shared. 
-            // In a real app, backend would filter by store.
-            // For now, assume 'appointments' contains all visible appointments.
-        } else {
-            // Fallback: only show own
-            filtered = filtered.filter(a => a.userId === currentUser?.id);
+        if (!canViewOthers) {
+            return appointments.filter(a => a.userId === currentUser?.id);
         }
 
-        return filtered;
-    }, [appointments, selectedUserId, canViewOthers, currentUser]);
+        if (selectedUserIds.length === 0) return [];
+
+        return appointments.filter(a => selectedUserIds.includes(a.userId));
+    }, [appointments, selectedUserIds, canViewOthers, currentUser]);
 
     // Initial check for functionality
     // If user doesn't have agenda enabled, maybe show a warning?
@@ -87,21 +77,43 @@ const Agenda: React.FC = () => {
                         <p className="text-sm text-slate-500">Gerencie seus compromissos e tarefas.</p>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                         {canViewOthers && (
-                            <select
-                                value={selectedUserId}
-                                onChange={e => setSelectedUserId(e.target.value)}
-                                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/50"
-                            >
-                                <option value={currentUser?.id}>Minha Agenda</option>
-                                <option value="ALL">Ver Todos</option>
-                                <optgroup label="Outros Usuários">
-                                    {users.filter(u => u.id !== currentUser?.id).map(u => (
-                                        <option key={u.id} value={u.id}>{u.name}</option>
-                                    ))}
-                                </optgroup>
-                            </select>
+                            <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-x-auto max-w-[400px] no-scrollbar">
+                                <label className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-transparent cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors whitespace-nowrap">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedUserIds.length === users.length}
+                                        onChange={(e) => {
+                                            if (e.target.checked) setSelectedUserIds(users.map(u => u.id));
+                                            else setSelectedUserIds([currentUser?.id || '']);
+                                        }}
+                                        className="rounded border-slate-300 dark:border-slate-600 text-primary focus:ring-primary"
+                                    />
+                                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Todos</span>
+                                </label>
+                                <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1"></div>
+                                {users.map(u => (
+                                    <label
+                                        key={u.id}
+                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all cursor-pointer whitespace-nowrap
+                                            ${selectedUserIds.includes(u.id)
+                                                ? 'bg-primary/10 border-primary text-primary'
+                                                : 'bg-transparent border-transparent text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedUserIds.includes(u.id)}
+                                            onChange={(e) => {
+                                                if (e.target.checked) setSelectedUserIds(prev => [...prev, u.id]);
+                                                else setSelectedUserIds(prev => prev.filter(id => id !== u.id));
+                                            }}
+                                            className="rounded border-slate-300 dark:border-slate-600 text-primary focus:ring-primary"
+                                        />
+                                        <span className="text-xs font-bold">{u.id === currentUser?.id ? 'Minha Agenda' : u.name}</span>
+                                    </label>
+                                ))}
+                            </div>
                         )}
 
                         <button
