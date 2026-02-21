@@ -34,18 +34,13 @@ const KanbanBoard: React.FC = () => {
     const [showCompleted, setShowCompleted] = useState(false);
     const [showLost, setShowLost] = useState(false);
 
-    const { batches, projects, workflowConfig, workflowOrder, setCurrentProjectId, canUserViewStage, splitBatch, advanceBatch, moveBatchToStep, canUserAdvanceStep } = useProjects();
+    const { batches, projects, workflowConfig, workflowOrder, setCurrentProjectId, canUserViewStage, splitBatch, advanceBatch, moveBatchToStep, canUserAdvanceStep, getBranchingOptions } = useProjects();
 
     const handleCardClick = (batchId: string, phase: string, projectId: string) => {
         setCurrentProjectId(projectId);
         // setSelectedBatchId(batchId); // We might keep this if other things use it, but for card click, ProjectDetails handles it.
     };
 
-    const getBranchingOptions = (currentPhase: string) => {
-        // Simplified branching logic: returns an empty array for now since complex branching
-        // usually needs custom config or is handled centrally in ProjectContext.
-        return [];
-    };
 
     const handleDecisionSelect = async (nextStepId: string) => {
         if (!decisionModalData) return;

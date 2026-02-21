@@ -6,7 +6,7 @@ import { collection, onSnapshot, addDoc, setDoc, doc, updateDoc, deleteDoc, quer
 // Updated Workflow Config
 const INITIAL_WORKFLOW_CONFIG: Record<string, WorkflowStep> = {
     // 1 - Pré-Venda
-    '1.1': { id: '1.1', label: 'Briefing e Qualificação', ownerRole: 'Vendedor', sla: 1, stage: 1 },
+    '1.1': { id: '1.1', label: 'Briefing', ownerRole: 'Vendedor', sla: 1, stage: 1 },
     '1.2': { id: '1.2', label: 'Visita Showroom', ownerRole: 'Vendedor', sla: 1, stage: 1 },
     '1.3': { id: '1.3', label: 'Follow Up (Pré-Venda)', ownerRole: 'Vendedor', sla: 3, stage: 1 },
 
@@ -48,14 +48,14 @@ const INITIAL_WORKFLOW_CONFIG: Record<string, WorkflowStep> = {
     '7.2': { id: '7.2', label: 'Vistoria Montagem', ownerRole: 'Coordenador de Montagem', sla: 1, stage: 7 },
 
     // 8 - Pós Montagem
-    '8.1': { id: '8.1', label: 'Levantamento de Assistência', ownerRole: 'Montador', sla: 2, stage: 8 },
-    '8.2': { id: '8.2', label: 'Pedido de Assistência', ownerRole: 'Liberador', sla: 2, stage: 8 },
-    '8.3': { id: '8.3', label: 'Recebimento de Assistência', ownerRole: 'Logistica', sla: 5, stage: 8 },
-    '8.4': { id: '8.4', label: 'Montagem de Assistência', ownerRole: 'Montador', sla: 5, stage: 8 },
-    '8.5': { id: '8.5', label: 'Vistoria Assistência', ownerRole: 'Coordenador de Montagem', sla: 1, stage: 8 },
-    '8.6': { id: '8.6', label: 'Finalizar e Encerrar', ownerRole: 'Gerente', sla: 0, stage: 8 },
-    '8.7': { id: '8.7', label: 'Coleta de Feedback', ownerRole: 'Vendedor', sla: 1, stage: 8 },
-    '8.8': { id: '8.8', label: 'Pós-Venda 12 meses', ownerRole: 'Vendedor', sla: 365, stage: 8 },
+    '8.1': { id: '8.1', label: 'Levantamento', ownerRole: 'Montador', sla: 2, stage: 8 },
+    '8.2': { id: '8.2', label: 'Solicitação de Pós Montagem', ownerRole: 'Liberador', sla: 2, stage: 8 },
+    '8.3': { id: '8.3', label: 'Aprovação Financeira e Implantação', ownerRole: 'Financeiro', sla: 2, stage: 8 },
+    '8.4': { id: '8.4', label: 'Fabricação Pós Montagem', ownerRole: 'Industria', sla: 15, stage: 8 },
+    '8.5': { id: '8.5', label: 'Transporte Pós Montagem', ownerRole: 'Logistica', sla: 5, stage: 8 },
+    '8.6': { id: '8.6', label: 'Pós Montagem', ownerRole: 'Montador', sla: 4, stage: 8 },
+    '8.7': { id: '8.7', label: 'Vistoria Pós Montagem', ownerRole: 'Coordenador de Montagem', sla: 1, stage: 8 },
+    '8.8': { id: '8.8', label: 'Concluído', ownerRole: 'Gerente', sla: 0, stage: 8 },
 
     // 9 - Conclusão
     '9.0': { id: '9.0', label: 'Projeto Entregue', ownerRole: 'Gerente', sla: 0, stage: 9 },
@@ -1446,19 +1446,18 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         if (stepId === '1.1') {
             return [
                 { label: 'Visita Showroom', description: 'Cliente fará visita presencial.', targetStepId: '1.2', color: 'emerald', icon: 'storefront' },
-                { label: 'Follow Up', description: 'Manter contato ativo.', targetStepId: '1.3', color: 'primary', icon: 'phone_in_talk' },
-                { label: 'Projetar Ambientes', description: 'Pular visita e ir direto para projeto.', targetStepId: '2.1', color: 'emerald', icon: 'architecture' },
+                { label: 'Follow Up Pré-Venda', description: 'Manter contato ativo.', targetStepId: '1.3', color: 'primary', icon: 'phone_in_talk' },
+                { label: 'Projetar Ambientes', description: 'Avançar para projeto.', targetStepId: '2.1', color: 'emerald', icon: 'architecture' },
             ];
         }
         if (stepId === '1.2') {
             return [
-                { label: 'Follow Up', description: 'Manter contato ativo.', targetStepId: '1.3', color: 'primary', icon: 'phone_in_talk' },
+                { label: 'Follow Up Pré-Venda', description: 'Manter contato ativo.', targetStepId: '1.3', color: 'primary', icon: 'phone_in_talk' },
                 { label: 'Projetar Ambientes', description: 'Avançar para projeto.', targetStepId: '2.1', color: 'emerald', icon: 'architecture' },
             ];
         }
         if (stepId === '1.3') {
             return [
-                { label: 'Qualificação / Visita', description: 'Retornar para qualificação ou agendar visita.', targetStepId: '1.2', color: 'emerald', icon: 'storefront' },
                 { label: 'Projetar Ambientes', description: 'Avançar para projeto.', targetStepId: '2.1', color: 'emerald', icon: 'architecture' },
             ];
         }
@@ -1467,14 +1466,13 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             return [
                 { label: 'Aprovar Orçamento', description: 'Avançar para montagem da apresentação.', targetStepId: '2.4', color: 'emerald', icon: 'check_circle' },
                 { label: 'Revisar / Ajustar', description: 'Retornar para rascunho (Projetar Mobiliário).', targetStepId: '2.2', color: 'orange', icon: 'edit' },
-                { label: 'Cancelar / Perdido', description: 'Cliente não aceitou. Marcar como perdido.', targetStepId: '9.1', color: 'rose', icon: 'cancel' }
             ];
         }
         if (stepId === '2.5') {
             return [
-                { label: 'Aprovar e Avançar p/ Contrato', description: 'Prosseguir para Contrato e Detalhamento.', targetStepId: '2.9', color: 'emerald', icon: 'verified' },
-                { label: 'Solicitar Ajustes', description: 'Retornar para ajustes de proposta.', targetStepId: '2.6', color: 'orange', icon: 'edit' },
-                { label: 'Follow Up / Próxima Reunião', description: 'Manter contato ativo.', targetStepId: '2.7', color: 'primary', icon: 'running_with_errors' },
+                { label: 'Aprovado', description: 'Prosseguir para Contrato e Detalhamento.', targetStepId: '2.9', color: 'emerald', icon: 'verified' },
+                { label: 'Ajuste Solicitado', description: 'Retornar para ajustes de proposta.', targetStepId: '2.6', color: 'orange', icon: 'edit' },
+                { label: 'Follow Up', description: 'Manter contato ativo.', targetStepId: '2.7', color: 'primary', icon: 'running_with_errors' },
             ];
         }
         if (stepId === '2.6') {
@@ -1494,20 +1492,20 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             return [
                 { label: 'Venda Fechada', description: 'Avançar para Contrato e Detalhamento.', targetStepId: '2.9', color: 'emerald', icon: 'verified' },
                 { label: 'Ajuste Solicitado', description: 'Retornar para ajustes na proposta.', targetStepId: '2.6', color: 'orange', icon: 'edit_square' },
-                { label: 'Manter Follow-up', description: 'Voltar para acompanhamento.', targetStepId: '2.7', color: 'primary', icon: 'event_repeat' },
+                { label: 'Ir para Follow-up', description: 'Voltar para acompanhamento.', targetStepId: '2.7', color: 'primary', icon: 'event_repeat' },
             ];
         }
 
         if (stepId === '4.3') {
             return [
-                { label: 'Liberar Carregamento', description: 'Pagamento OK. Liberar para engenharia.', targetStepId: '4.4', color: 'emerald', icon: 'fact_check' },
-                { label: 'Pendência Financeira', description: 'Aguardar regularização.', targetStepId: '4.3', color: 'rose', icon: 'block' },
+                { label: 'Aprovado Financeiro', description: 'Pagamento OK. Liberar para engenharia.', targetStepId: '4.4', color: 'emerald', icon: 'fact_check' },
+                { label: 'Pendência Financeira', description: 'Aguardar regularização.', targetStepId: '4.2', color: 'rose', icon: 'block' },
             ];
         }
         if (stepId === '4.5') {
             return [
-                { label: 'Tudo Certo (Implantação)', description: 'Projeto aprovado, ir para implantação.', targetStepId: '5.1', color: 'emerald', icon: 'check_circle' },
-                { label: 'Solicitar Correção', description: 'Devolver para o liberador corrigir.', targetStepId: '4.6', color: 'rose', icon: 'build' },
+                { label: 'Avançar para Implantação', description: 'Projeto aprovado, ir para implantação.', targetStepId: '5.1', color: 'emerald', icon: 'check_circle' },
+                { label: 'Correção', description: 'Devolver para o liberador corrigir.', targetStepId: '4.6', color: 'rose', icon: 'build' },
             ];
         }
         if (stepId === '4.6') {
@@ -1518,10 +1516,30 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
         if (stepId === '7.2') {
             return [
-                { label: 'Tudo Certo', description: 'Montagem aprovada sem assistência.', targetStepId: '9.0', color: 'emerald', icon: 'verified' },
-                { label: 'Com Assistência', description: 'Iniciar levantamento de itens pendentes.', targetStepId: '8.1', color: 'orange', icon: 'handyman' },
+                { label: 'Avançar para Assistência', description: 'Iniciar levantamento de itens pendentes.', targetStepId: '8.1', color: 'orange', icon: 'handyman' },
+                { label: 'Concluído', description: 'Montagem aprovada sem assistência.', targetStepId: '9.0', color: 'emerald', icon: 'verified' },
             ];
         }
+
+        // Stage 8 Linear Transitions
+        if (stepId === '8.1') return [{ label: 'Concluir Levantamento', description: 'Avançar para Solicitação.', targetStepId: '8.2', color: 'primary', icon: 'arrow_forward' }];
+        if (stepId === '8.2') return [{ label: 'Solicitação Enviada', description: 'Avançar para Aprovação e Implantação.', targetStepId: '8.3', color: 'primary', icon: 'arrow_forward' }];
+        if (stepId === '8.3') return [{ label: 'Aprovado e Implantado', description: 'Avançar para Fabricação.', targetStepId: '8.4', color: 'primary', icon: 'arrow_forward' }];
+        if (stepId === '8.4') return [{ label: 'Fabricação Concluída', description: 'Avançar para Transporte.', targetStepId: '8.5', color: 'primary', icon: 'arrow_forward' }];
+        if (stepId === '8.5') return [{ label: 'Transporte Concluído', description: 'Avançar para Pós Montagem.', targetStepId: '8.6', color: 'primary', icon: 'arrow_forward' }];
+        if (stepId === '8.6') return [{ label: 'Pós Montagem Concluída', description: 'Avançar para Vistoria.', targetStepId: '8.7', color: 'primary', icon: 'arrow_forward' }];
+        if (stepId === '8.7') return [{ label: 'Vistoria Concluída', description: 'Avançar para Concluído.', targetStepId: '8.8', color: 'primary', icon: 'arrow_forward' }];
+        if (stepId === '8.8') return [{ label: 'Encerrar Processo', description: 'Avançar para Projeto Entregue.', targetStepId: '9.0', color: 'emerald', icon: 'check_circle' }];
+
+
+        // Stage 10 Linear Transitions (Assistência Técnica)
+        if (stepId === '10.1') return [{ label: 'Concluir Levantamento', description: 'Avançar para Solicitação.', targetStepId: '10.2', color: 'primary', icon: 'arrow_forward' }];
+        if (stepId === '10.2') return [{ label: 'Solicitação Enviada', description: 'Avançar para Aprovação e Implantação.', targetStepId: '10.3', color: 'primary', icon: 'arrow_forward' }];
+        if (stepId === '10.3') return [{ label: 'Aprovado e Implantado', description: 'Avançar para Fabricação.', targetStepId: '10.4', color: 'primary', icon: 'arrow_forward' }];
+        if (stepId === '10.4') return [{ label: 'Fabricação Concluída', description: 'Avançar para Transporte.', targetStepId: '10.5', color: 'primary', icon: 'arrow_forward' }];
+        if (stepId === '10.5') return [{ label: 'Transporte Concluído', description: 'Avançar para Assistência.', targetStepId: '10.6', color: 'primary', icon: 'arrow_forward' }];
+        if (stepId === '10.6') return [{ label: 'Assistência Concluída', description: 'Avançar para Vistoria.', targetStepId: '10.7', color: 'primary', icon: 'arrow_forward' }];
+        if (stepId === '10.7') return [{ label: 'Vistoria Concluída', description: 'Processo Concluído.', targetStepId: '10.8', color: 'emerald', icon: 'check_circle' }];
 
         return [];
     };
