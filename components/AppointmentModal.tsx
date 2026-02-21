@@ -110,7 +110,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
             const client = clients.find((c: Client) => c.id === clientId);
 
-            const appointmentData: any = {
+            const appointmentData: Partial<Appointment> = {
                 title,
                 start: startDateTime.toISOString(),
                 end: endDateTime.toISOString(),
@@ -131,9 +131,10 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 await addAppointment(appointmentData);
             }
             onClose();
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Erro ao agendar:", error);
-            alert(`Falha ao agendar: ${error.message || "Erro desconhecido"}`);
+            const message = error instanceof Error ? error.message : "Erro desconhecido";
+            alert(`Falha ao agendar: ${message}`);
         }
     };
 
@@ -191,7 +192,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                                         backgroundColor: typeId === type.id ? type.color : undefined,
                                         borderColor: typeId === type.id ? type.color : undefined,
                                         '--tw-ring-color': type.color
-                                    } as any}
+                                    } as React.CSSProperties}
                                 >
                                     {type.name}
                                 </button>

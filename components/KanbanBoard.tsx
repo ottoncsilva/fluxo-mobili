@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { KanbanColumn, Batch, KanbanCard } from '../types';
+import { KanbanColumn, Batch, KanbanCard, WorkflowStep, Project } from '../types';
 import { useProjects } from '../context/ProjectContext';
 import AuditDrawer from './AuditDrawer';
 import LotModal from './LotModal';
@@ -28,7 +28,7 @@ const KanbanBoard: React.FC = () => {
     const [selectedColumnId, setSelectedColumnId] = useState<number | null>(4);
     const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
     const [subStepFilter, setSubStepFilter] = useState<string | null>(null);
-    const [decisionModalData, setDecisionModalData] = useState<{ batch: Batch, step: any } | null>(null);
+    const [decisionModalData, setDecisionModalData] = useState<{ batch: Batch, step: WorkflowStep } | null>(null);
 
     // Visibility Toggles
     const [showCompleted, setShowCompleted] = useState(false);
@@ -77,7 +77,7 @@ const KanbanBoard: React.FC = () => {
     // Adjust default selected column if current selection becomes hidden
     useEffect(() => {
         if (visibleUiColumns.length > 0 && selectedColumnId) {
-            const isVisible = visibleUiColumns.some((c: any) => c.id === selectedColumnId);
+            const isVisible = visibleUiColumns.some(c => c.id === selectedColumnId);
             if (!isVisible) {
                 setSelectedColumnId(visibleUiColumns[0].id);
             }
@@ -86,7 +86,7 @@ const KanbanBoard: React.FC = () => {
 
     // Process Batches into UI Cards
     const columns = useMemo(() => {
-        return visibleUiColumns.map((col: any) => {
+        return visibleUiColumns.map(col => {
             let colBatches: Batch[] = [];
 
             // Special Logic for Split Columns
@@ -112,7 +112,7 @@ const KanbanBoard: React.FC = () => {
             return {
                 ...col,
                 cards: filteredBatches.map((b: Batch) => {
-                    const project = projects.find((p: any) => p.id === b.projectId);
+                    const project = projects.find((p: Project) => p.id === b.projectId);
                     const step = workflowConfig[b.phase];
 
                     // Calculate SLA (Business Days)
@@ -122,26 +122,8 @@ const KanbanBoard: React.FC = () => {
                     // Deadline is N business days after last update
                     const deadline = addBusinessDays(lastUpdate, step.sla);
 
-                    // Diff is business days remaining from now to deadline
-                    // If deadline is past, this should be negative
-                    const diffDays = getBusinessDaysDifference(now, deadline);
-
-                    // Fix: getBusinessDaysDifference returns absolute difference or 0 if start > end in my implementation?
-                    // Let's check dateUtils implementation. 
-                    // My implementation: if (start > end) return 0; 
-                    // This is bad for "late" calculation. I need it to return negative if late.
-                    // I will verify dateUtils first or just fix it here.
-                    // Actually, let's just use raw date comparison for "is late" check if getBusinessDaysDifference doesn't handle negative.
-
-                    // Let's trust I will fix dateUtils or use a workaround.
-                    // Workaround: 
-                    let remainingDays = 0;
-                    if (now > deadline) {
-                        // Late
-                        remainingDays = -getBusinessDaysDifference(deadline, now);
-                    } else {
-                        remainingDays = getBusinessDaysDifference(now, deadline);
-                    }
+                    // Dias úteis restantes: positivo = no prazo, negativo = atrasado
+                    const remainingDays = getBusinessDaysDifference(now, deadline);
                     let slaStatus: 'No Prazo' | 'Atenção' | 'Atrasado' = 'No Prazo';
                     let slaColor: 'emerald' | 'orange' | 'rose' = 'emerald';
 
@@ -190,7 +172,7 @@ const KanbanBoard: React.FC = () => {
         // Use workflowOrder to ensure correct sequence (e.g. 2.9 before 2.10)
         return workflowOrder
             .map((stepId: string) => workflowConfig[stepId])
-            .filter((step: any) => step && step.stage === selectedColumnId);
+            .filter((step): step is WorkflowStep => !!step && step.stage === selectedColumnId);
     }, [selectedColumnId, workflowConfig, workflowOrder]);
 
     // State for mobile sidebar drawer
@@ -232,7 +214,7 @@ const KanbanBoard: React.FC = () => {
                         >
                             Todos os Itens
                         </button>
-                        {activeSubSteps.sort((a: any, b: any) => a.id.localeCompare(b.id)).map((step: any) => (
+                        {activeSubSteps.sort((a: WorkflowStep, b: WorkflowStep) => a.id.localeCompare(b.id)).map((step: WorkflowStep) => (
                             <button
                                 key={step.id}
                                 onClick={() => { setSubStepFilter(step.id); setIsMobileSidebarOpen(false); }}
@@ -305,7 +287,7 @@ const KanbanBoard: React.FC = () => {
                     {/* Columns */}
                     <div className="flex-1 overflow-x-auto overflow-y-hidden p-3 md:p-6 custom-scrollbar">
                         <div className="flex h-full gap-3 md:gap-4 w-max">
-                            {columns.map((column: any) => (
+                            {columns.map((column: KanbanColumn) => (
                                 <div
                                     key={column.id}
                                     onClick={() => { setSelectedColumnId(column.id); setSubStepFilter(null); }}
@@ -338,7 +320,7 @@ const KanbanBoard: React.FC = () => {
                                             : 'bg-slate-100/50 dark:bg-[#15202b] border-slate-200/60 dark:border-slate-800'
                                         }
                 `}>
-                                        {column.cards.map((card: any) => (
+                                        {column.cards.map((card: KanbanCard) => (
                                             <div
                                                 key={card.id}
                                                 onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleCardClick(card.id, card.phase, card.projectId); }}

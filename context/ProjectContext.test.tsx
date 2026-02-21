@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { ProjectProvider, useProjects } from './ProjectContext';
+import { AuthProvider } from './AuthContext';
 import React from 'react';
 
 // Mock Firebase
@@ -32,7 +33,9 @@ beforeEach(() => {
 describe('ProjectContext - Split Batch', () => {
     it('should split a batch and return the new batch ID', async () => {
         const wrapper = ({ children }: { children: React.ReactNode }) => (
-            <ProjectProvider>{children}</ProjectProvider>
+            <AuthProvider>
+                <ProjectProvider>{children}</ProjectProvider>
+            </AuthProvider>
         );
 
         const { result } = renderHook(() => useProjects(), { wrapper });
@@ -77,7 +80,9 @@ describe('ProjectContext - Split Batch', () => {
 
     it('should allow advancing the new batch independently', () => {
         const wrapper = ({ children }: { children: React.ReactNode }) => (
-            <ProjectProvider>{children}</ProjectProvider>
+            <AuthProvider>
+                <ProjectProvider>{children}</ProjectProvider>
+            </AuthProvider>
         );
 
         const { result } = renderHook(() => useProjects(), { wrapper });

@@ -223,7 +223,7 @@ const Settings: React.FC = () => {
     }
 
     // Generic Permission Handler
-    const handlePermissionChange = (role: Role, field: keyof PermissionConfig, value: any) => {
+    const handlePermissionChange = (role: Role, field: keyof PermissionConfig, value: boolean | string | number) => {
         const updated = permissions.map(p => {
             if (p.role === role) {
                 return { ...p, [field]: value };
@@ -1147,7 +1147,7 @@ const Settings: React.FC = () => {
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Tipo de Contrato</label>
-                                        <select value={uContract} onChange={e => setUContract(e.target.value as any)} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm">
+                                        <select value={uContract} onChange={e => setUContract(e.target.value as 'CLT' | 'PJ')} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm">
                                             <option>CLT</option>
                                             <option>PJ</option>
                                         </select>

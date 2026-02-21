@@ -496,7 +496,7 @@ const PostAssembly: React.FC = () => {
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Prioridade</label>
-                                    <select value={initialPriority} onChange={e => setInitialPriority(e.target.value as any)} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm">
+                                    <select value={initialPriority} onChange={e => setInitialPriority(e.target.value as 'Normal' | 'Urgente')} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm">
                                         <option>Normal</option>
                                         <option>Urgente</option>
                                     </select>
@@ -519,7 +519,7 @@ const PostAssembly: React.FC = () => {
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tipo de Custo</label>
-                                        <select value={tempCostType} onChange={e => setTempCostType(e.target.value as any)} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm">
+                                        <select value={tempCostType} onChange={e => setTempCostType(e.target.value as 'Custo Loja' | 'Custo Fábrica')} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm">
                                             <option>Custo Loja</option>
                                             <option>Custo Fábrica</option>
                                         </select>
@@ -732,7 +732,7 @@ const PostAssembly: React.FC = () => {
 
                                             <div>
                                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo de Custo</label>
-                                                <select value={inspectCostType} onChange={e => setInspectCostType(e.target.value as any)} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm">
+                                                <select value={inspectCostType} onChange={e => setInspectCostType(e.target.value as 'Custo Loja' | 'Custo Fábrica')} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm">
                                                     <option>Custo Loja</option>
                                                     <option>Custo Fábrica</option>
                                                 </select>

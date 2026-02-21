@@ -2,288 +2,21 @@ import React, { createContext, useContext, useState, ReactNode, useEffect, useMe
 import { Project, Batch, WorkflowStep, Environment, Client, User, Role, Note, FactoryOrder, PermissionConfig, AssistanceTicket, CompanySettings, AssistanceWorkflowStep, Store, StoreConfig, PostAssemblyEvaluation, AssistanceItem, AssistanceEvent } from '../types';
 import { db } from '../firebase'; // Import Firebase DB
 import { collection, onSnapshot, addDoc, setDoc, doc, updateDoc, deleteDoc, query, where, getDoc, Firestore } from "firebase/firestore";
+import { useAuth } from './AuthContext';
+import {
+    INITIAL_WORKFLOW_CONFIG,
+    INITIAL_WORKFLOW_ORDER,
+    INITIAL_ASSISTANCE_WORKFLOW,
+    MASTER_STORE_ID,
+    DEFAULT_COMPANY_SETTINGS,
+    DEFAULT_ORIGINS,
+    DEFAULT_PERMISSIONS,
+    SEED_STORES,
+    SEED_USERS,
+    SEED_PROJECTS,
+    SEED_BATCHES,
+} from './defaults';
 
-// Updated Workflow Config
-const INITIAL_WORKFLOW_CONFIG: Record<string, WorkflowStep> = {
-    // 1 - Pré-Venda
-    '1.1': { id: '1.1', label: 'Briefing', ownerRole: 'Vendedor', sla: 1, stage: 1 },
-    '1.2': { id: '1.2', label: 'Visita Showroom', ownerRole: 'Vendedor', sla: 1, stage: 1 },
-    '1.3': { id: '1.3', label: 'Follow Up (Pré-Venda)', ownerRole: 'Vendedor', sla: 3, stage: 1 },
-
-    // 2 - Venda
-    '2.1': { id: '2.1', label: 'Projetar Ambientes', ownerRole: 'Projetista', sla: 2, stage: 2 },
-    '2.2': { id: '2.2', label: 'Projetar Mobiliário', ownerRole: 'Projetista', sla: 5, stage: 2 },
-    '2.3': { id: '2.3', label: 'Orçamento', ownerRole: 'Projetista', sla: 1, stage: 2 },
-    '2.4': { id: '2.4', label: 'Montagem da Apresentação', ownerRole: 'Projetista', sla: 1, stage: 2 },
-    '2.5': { id: '2.5', label: 'Reunião Primeira Apresentação', ownerRole: 'Vendedor', sla: 0, stage: 2 },
-    '2.6': { id: '2.6', label: 'Ajuste de Proposta', ownerRole: 'Projetista', sla: 2, stage: 2 },
-    '2.7': { id: '2.7', label: 'Follow Up (Venda)', ownerRole: 'Vendedor', sla: 3, stage: 2 },
-    '2.8': { id: '2.8', label: 'Reunião de Fechamento', ownerRole: 'Vendedor', sla: 0, stage: 2 },
-    '2.9': { id: '2.9', label: 'Contrato e Detalhamento', ownerRole: 'Vendedor', sla: 1, stage: 2 },
-    '2.10': { id: '2.10', label: 'Aprovação Detalhamento Contrato', ownerRole: 'Vendedor', sla: 1, stage: 2 },
-
-    // 3 - Medição
-    '3.1': { id: '3.1', label: 'Avaliação para Medição', ownerRole: 'Medidor', sla: 1, stage: 3 },
-    '3.2': { id: '3.2', label: 'Medição', ownerRole: 'Medidor', sla: 2, stage: 3 },
-
-    // 4 - Engenharia e Projetos
-    '4.1': { id: '4.1', label: 'Construção de Mobiliário', ownerRole: 'Liberador', sla: 3, stage: 4 },
-    '4.2': { id: '4.2', label: 'Conferência Técnica', ownerRole: 'Liberador', sla: 2, stage: 4 },
-    '4.3': { id: '4.3', label: 'Aprovação Financeira', ownerRole: 'Financeiro', sla: 1, stage: 4 },
-    '4.4': { id: '4.4', label: 'Detalhamento Executivo', ownerRole: 'Liberador', sla: 3, stage: 4 },
-    '4.5': { id: '4.5', label: 'Aprovação do Executivo', ownerRole: 'Vendedor', sla: 1, stage: 4 },
-    '4.6': { id: '4.6', label: 'Solicitação de Correção', ownerRole: 'Liberador', sla: 2, stage: 4 },
-
-    // 5 - Implantação
-    '5.1': { id: '5.1', label: 'Pedido à Fábrica', ownerRole: 'Logistica', sla: 1, stage: 5 },
-    '5.2': { id: '5.2', label: 'Pagamento à Fábrica', ownerRole: 'Financeiro', sla: 2, stage: 5 },
-
-    // 6 - Logística
-    '6.1': { id: '6.1', label: 'Conferir Pedido', ownerRole: 'Logistica', sla: 1, stage: 6 },
-    '6.2': { id: '6.2', label: 'Agendar Carreto', ownerRole: 'Logistica', sla: 1, stage: 6 },
-    '6.3': { id: '6.3', label: 'Entrega', ownerRole: 'Logistica', sla: 1, stage: 6 },
-
-    // 7 - Montagem
-    '7.1': { id: '7.1', label: 'Montagem', ownerRole: 'Montador', sla: 5, stage: 7 },
-    '7.2': { id: '7.2', label: 'Vistoria Montagem', ownerRole: 'Coordenador de Montagem', sla: 1, stage: 7 },
-
-    // 8 - Pós Montagem
-    '8.1': { id: '8.1', label: 'Levantamento', ownerRole: 'Montador', sla: 2, stage: 8 },
-    '8.2': { id: '8.2', label: 'Solicitação de Pós Montagem', ownerRole: 'Liberador', sla: 2, stage: 8 },
-    '8.3': { id: '8.3', label: 'Aprovação Financeira e Implantação', ownerRole: 'Financeiro', sla: 2, stage: 8 },
-    '8.4': { id: '8.4', label: 'Fabricação Pós Montagem', ownerRole: 'Industria', sla: 15, stage: 8 },
-    '8.5': { id: '8.5', label: 'Transporte Pós Montagem', ownerRole: 'Logistica', sla: 5, stage: 8 },
-    '8.6': { id: '8.6', label: 'Pós Montagem', ownerRole: 'Montador', sla: 4, stage: 8 },
-    '8.7': { id: '8.7', label: 'Vistoria Pós Montagem', ownerRole: 'Coordenador de Montagem', sla: 1, stage: 8 },
-    '8.8': { id: '8.8', label: 'Concluído', ownerRole: 'Gerente', sla: 0, stage: 8 },
-
-    // 9 - Conclusão
-    '9.0': { id: '9.0', label: 'Projeto Entregue', ownerRole: 'Gerente', sla: 0, stage: 9 },
-    '9.1': { id: '9.1', label: 'Projeto Perdido', ownerRole: 'Vendedor', sla: 0, stage: 9 },
-};
-
-const INITIAL_WORKFLOW_ORDER = [
-    '1.1', '1.2', '1.3',
-    '2.1', '2.2', '2.3', '2.4', '2.5', '2.6', '2.7', '2.8', '2.9', '2.10',
-    '3.1', '3.2',
-    '4.1', '4.2', '4.3', '4.4', '4.5', '4.6',
-    '5.1', '5.2',
-    '6.1', '6.2', '6.3',
-    '7.1', '7.2',
-    '8.1', '8.2', '8.3', '8.4', '8.5', '8.6', '8.7', '8.8',
-    '9.0', '9.1'
-];
-
-const INITIAL_ASSISTANCE_WORKFLOW: AssistanceWorkflowStep[] = [
-    { id: '10.1', label: 'Levantamento', sla: 3, ownerRole: 'Montador' },
-    { id: '10.2', label: 'Solicitação de Assistência Técnica', sla: 2, ownerRole: 'Liberador' },
-    { id: '10.3', label: 'Aprovação Financeira e Implantação', sla: 2, ownerRole: 'Financeiro' },
-    { id: '10.4', label: 'Fabricação Assistência Técnica', sla: 15, ownerRole: 'Industria' },
-    { id: '10.5', label: 'Transporte Assistência Técnica', sla: 5, ownerRole: 'Logistica' },
-    { id: '10.6', label: 'Assistência Técnica', sla: 4, ownerRole: 'Montador' },
-    { id: '10.7', label: 'Vistoria Assistência Técnica', sla: 1, ownerRole: 'Coordenador de Montagem' },
-    { id: '10.8', label: 'Concluído', sla: 0, ownerRole: 'Gerente' },
-];
-
-const MASTER_STORE_ID = 'store-modelo';
-
-const DEFAULT_COMPANY_SETTINGS: CompanySettings = {
-    name: 'FluxoPlanejados Modelo',
-    cnpj: '00.000.000/0001-00',
-    corporateName: 'Fluxo Modelo Ltda',
-    address: 'Av. Moveleira, 1000',
-    phone: '(11) 99999-9999',
-    socialMedia: '@fluxomodelo'
-};
-
-const DEFAULT_ORIGINS = [
-    'Captação (Vendedor)',
-    'Porta de Loja',
-    'Indicação Cliente',
-    'Recompra',
-    'Google Ads',
-    'Arquiteto',
-    'Engenheiro',
-    'Instagram',
-    'Facebook',
-    'Captação (Gerente)',
-    'Captação (Proprietario)',
-    'Construtora',
-    'Corretor'
-];
-const ALL_STEPS = Object.keys(INITIAL_WORKFLOW_CONFIG);
-const ALL_STAGES = [1, 2, 3, 4, 5, 6, 7, 8, 9];
-
-const SEED_STORES: Store[] = [
-    {
-        id: MASTER_STORE_ID,
-        name: 'FluxoPlanejados Modelo',
-        slug: 'modelo',
-        createdAt: '2024-01-01T00:00:00',
-        settings: DEFAULT_COMPANY_SETTINGS,
-        status: 'active'
-    }
-];
-
-const SEED_USERS: User[] = [
-    {
-        id: 'u1',
-        storeId: MASTER_STORE_ID,
-        name: 'Otton Silva',
-        username: 'ottonsilva',
-        password: '123456',
-        role: 'Admin',
-        isSystemUser: true,
-        contractType: 'PJ'
-    },
-    {
-        id: 'u2',
-        storeId: MASTER_STORE_ID,
-        name: 'Carlos Vendedor',
-        username: 'carlos',
-        password: '123',
-        role: 'Vendedor',
-        isSystemUser: true,
-        contractType: 'CLT'
-    },
-];
-
-// Add Store ID to Seed Data
-const SEED_CLIENTS: Client[] = [
-    {
-        id: 'c1',
-        storeId: MASTER_STORE_ID,
-        name: 'Ana Silva',
-        phone: '11999999999',
-        email: 'ana@email.com',
-        address: 'Rua A, 123',
-        status: 'Ativo',
-        origin: 'Instagram',
-        budget_expectation: 150000,
-        time_move_in: '2024-12-20',
-        profile_pains: 'Precisa de muito espaço de armazenamento.',
-        property_type: 'Reforma'
-    },
-    {
-        id: 'c2',
-        storeId: MASTER_STORE_ID,
-        name: 'João Souza',
-        phone: '11988888888',
-        email: 'joao@email.com',
-        address: 'Av Paulista, 100',
-        status: 'Ativo',
-        origin: 'Indicação Arquiteto',
-        budget_expectation: 300000,
-        property_type: 'Construção Nova'
-    },
-];
-
-const SEED_PROJECTS: Project[] = [
-    {
-        id: 'p1', storeId: MASTER_STORE_ID, client: SEED_CLIENTS[0], sellerName: 'Otton Silva', created_at: '2024-10-10',
-        environments: [{ id: 'e1', name: 'Sala de Estar', area_sqm: 25, urgency_level: 'Média', estimated_value: 45000, observations: '', status: 'InBatch', version: 1 }, { id: 'e2', name: 'Cozinha', area_sqm: 12, urgency_level: 'Alta', estimated_value: 32000, observations: '', status: 'InBatch', version: 1 }],
-        notes: [{ id: 'n1', storeId: MASTER_STORE_ID, content: 'Projeto criado no sistema.', authorId: 'sys', authorName: 'Sistema', createdAt: '2024-10-10T10:00:00', type: 'SYSTEM' }],
-        factoryOrders: []
-    },
-    {
-        id: 'p2', storeId: MASTER_STORE_ID, client: SEED_CLIENTS[1], sellerName: 'Carlos Vendedor', created_at: '2024-09-15',
-        environments: [{ id: 'e3', name: 'Suíte Master', area_sqm: 30, urgency_level: 'Alta', estimated_value: 55000, observations: '', status: 'InBatch', version: 1 }],
-        notes: [{ id: 'n2', storeId: MASTER_STORE_ID, content: 'Cliente solicitou mudança no acabamento da suíte.', authorId: 't1', authorName: 'Carlos Silva', createdAt: '2024-10-15T14:30:00', type: 'MANUAL' }],
-        factoryOrders: []
-    }
-];
-
-const SEED_BATCHES: Batch[] = [
-    { id: 'b1', storeId: MASTER_STORE_ID, projectId: 'p1', name: 'Projeto Completo', phase: '1.2', environmentIds: ['e1', 'e2'], createdAt: '2024-10-10', lastUpdated: '2024-10-12', status: 'Active' },
-    { id: 'b2', storeId: MASTER_STORE_ID, projectId: 'p2', name: 'Lote 1', phase: '4.5', environmentIds: ['e3'], createdAt: '2024-09-15', lastUpdated: '2024-10-18', status: 'Active' },
-];
-
-const DEFAULT_PERMISSIONS: PermissionConfig[] = [
-    {
-        role: 'Admin',
-        canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: true, canEditProject: true,
-        canChangeSeller: true,
-        viewableStages: ALL_STAGES,
-        actionableSteps: ALL_STEPS
-    },
-    {
-        role: 'Vendedor',
-        canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: false, canEditProject: true,
-        canChangeSeller: false,
-        viewableStages: [1, 2, 4, 8, 9],
-        actionableSteps: ['1.1', '1.2', '1.3', '2.5', '2.7', '2.8', '2.9', '2.10', '4.5', '8.7', '8.8']
-    },
-    {
-        role: 'Projetista',
-        canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: false, canEditProject: true,
-        canChangeSeller: false,
-        viewableStages: [1, 2, 3, 4],
-        actionableSteps: ['2.1', '2.2', '2.3', '2.4', '2.6', '4.1']
-    },
-    {
-        role: 'Gerente',
-        canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: true, canEditProject: true,
-        canChangeSeller: true,
-        viewableStages: ALL_STAGES,
-        actionableSteps: ALL_STEPS
-    },
-    {
-        role: 'Coordenador de Montagem',
-        canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: false, canEditProject: true,
-        canChangeSeller: false,
-        viewableStages: [6, 7, 8],
-        actionableSteps: ['7.2', '8.5']
-    },
-    {
-        role: 'Montador',
-        canViewDashboard: true, canViewKanban: false, canViewClients: false, canViewSettings: false, canEditProject: false,
-        canChangeSeller: false,
-        viewableStages: [7, 8],
-        actionableSteps: ['7.1', '8.1', '8.4']
-    },
-    {
-        role: 'Logistica',
-        canViewDashboard: true, canViewKanban: true, canViewClients: false, canViewSettings: false, canEditProject: false,
-        canChangeSeller: false,
-        viewableStages: [5, 6, 8],
-        actionableSteps: ['5.1', '6.1', '6.2', '6.3', '8.3']
-    },
-    {
-        role: 'Medidor',
-        canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: false, canEditProject: false,
-        canChangeSeller: false,
-        viewableStages: [3],
-        actionableSteps: ['3.1', '3.2']
-    },
-    {
-        role: 'Proprietario',
-        canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: true, canEditProject: true,
-        canChangeSeller: true,
-        viewableStages: ALL_STAGES,
-        actionableSteps: ALL_STEPS
-    },
-    {
-        role: 'Liberador',
-        canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: false, canEditProject: true,
-        canChangeSeller: false,
-        viewableStages: [4, 8, 9],
-        actionableSteps: ['4.2', '4.4', '4.6', '8.2']
-    },
-    {
-        role: 'Financeiro',
-        canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: false, canEditProject: false,
-        canChangeSeller: false,
-        viewableStages: [4, 5],
-        actionableSteps: ['4.3', '5.2']
-    },
-    {
-        role: 'Industria',
-        canViewDashboard: true, canViewKanban: true, canViewClients: false, canViewSettings: false, canEditProject: false,
-        canChangeSeller: false,
-        viewableStages: [5, 8],
-        actionableSteps: [] // Industria usually just views, or we can add steps if needed
-    },
-];
 
 interface ProjectContextType {
     currentUser: User | null;
@@ -363,23 +96,15 @@ interface ProjectContextType {
 export const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
 // Storage Keys
-const STORAGE_KEY_USER = 'fluxo_erp_user';
+// STORAGE_KEY_USER movida para AuthContext — persistência do usuário é gerenciada lá.
 const STORAGE_KEY_STORES = 'fluxo_erp_stores_data';
 const STORAGE_KEY_USERS_LIST = 'fluxo_erp_users_list';
 const STORAGE_KEY_PROJECTS = 'fluxo_erp_projects';
 const STORAGE_KEY_BATCHES = 'fluxo_erp_batches';
 
 export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    // Use Firebase if DB is initialized, otherwise LocalStorage
-    const useCloud = !!db;
-
-    // Active Session State
-    const [currentUser, setCurrentUser] = useState<User | null>(() => {
-        try {
-            const savedUser = localStorage.getItem(STORAGE_KEY_USER);
-            return savedUser ? JSON.parse(savedUser) : null;
-        } catch (e) { return null; }
-    });
+    // Estado de autenticação vem do AuthContext (currentUser, setCurrentUser, useCloud)
+    const { currentUser, setCurrentUser, useCloud } = useAuth();
 
     // Load All Stores (Only if SuperAdmin or Initial Load for login check - In real app, only check via cloud function)
     const [stores, setStores] = useState<Store[]>(() => {
@@ -638,7 +363,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     useEffect(() => { if (!useCloud) localStorage.setItem(STORAGE_KEY_BATCHES, JSON.stringify(allBatches)); }, [allBatches, useCloud]);
 
     // Helper to persist to DB
-    const persist = (collectionName: string, docId: string, data: any) => {
+    const persist = <T extends object>(collectionName: string, docId: string, data: T) => {
         if (useCloud && db) {
             setDoc(doc(db, collectionName, docId), data, { merge: true });
         }
@@ -656,8 +381,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
                 role: 'SuperAdmin',
                 isSystemUser: true
             };
-            setCurrentUser(superAdminUser);
-            localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(superAdminUser));
+            setCurrentUser(superAdminUser); // AuthContext persiste no localStorage
             return true;
         }
 
@@ -706,16 +430,14 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         }
 
         if (user) {
-            setCurrentUser(user);
-            localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
+            setCurrentUser(user); // AuthContext persiste no localStorage
             return true;
         }
         return false;
     };
 
     const logout = () => {
-        setCurrentUser(null);
-        localStorage.removeItem(STORAGE_KEY_USER);
+        setCurrentUser(null); // AuthContext remove do localStorage automaticamente
     };
 
     const createStore = (storeName: string, storeSlug: string, adminName: string, adminUsername: string, adminPass: string) => {
@@ -805,8 +527,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         }
 
         if (currentUser?.id === updatedUser.id) {
-            setCurrentUser(updatedUser);
-            localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updatedUser));
+            setCurrentUser(updatedUser); // AuthContext persiste no localStorage
         }
     };
 
@@ -1351,7 +1072,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         const project = allProjects.find(p => p.id === projectId);
         if (!project) return;
 
-        const updates: any = {
+        const updates: Partial<Project> = {
             postAssemblyItems: data.items !== undefined ? data.items : project.postAssemblyItems,
             postAssemblyEvents: data.events !== undefined ? data.events : project.postAssemblyEvents,
             postAssemblyPriority: data.priority !== undefined ? data.priority : project.postAssemblyPriority
@@ -1417,7 +1138,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     const resetStoreDefaults = async (type: 'origins' | 'assistance' | 'all') => {
         if (!currentStore) return false;
 
-        let updates: any = {};
+        let updates: Partial<Pick<StoreConfig, 'origins' | 'assistanceWorkflow'>> = {};
 
         if (type === 'origins' || type === 'all') {
             setOrigins(DEFAULT_ORIGINS);

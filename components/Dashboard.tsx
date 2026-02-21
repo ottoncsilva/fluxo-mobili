@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { useProjects } from '../context/ProjectContext';
 import { DashboardKPIs, DashboardGraphs } from './DashboardCharts';
 import { Batch, Project, AssistanceTicket, AssistanceWorkflowStep } from '../types';
+import { addBusinessDays, getBusinessDaysDifference } from '../utils/dateUtils';
 
 interface DashboardTask {
     id: string;
@@ -70,12 +71,12 @@ const Dashboard: React.FC = () => {
 
         const allTasks = [...projectTasks, ...assistanceTasks];
 
-        // Sort by Deadline (SLA): Most delayed first (oldest deadline) to future deadlines
+        // Sort by Deadline (SLA em dias úteis): Mais atrasado primeiro
         return allTasks.sort((a, b) => {
-            const deadlineA = a.lastUpdated.getTime() + (a.sla * 24 * 60 * 60 * 1000);
-            const deadlineB = b.lastUpdated.getTime() + (b.sla * 24 * 60 * 60 * 1000);
+            const deadlineA = addBusinessDays(a.lastUpdated, a.sla).getTime();
+            const deadlineB = addBusinessDays(b.lastUpdated, b.sla).getTime();
 
-            return deadlineA - deadlineB; // Ascending: Smaller (older) date first
+            return deadlineA - deadlineB; // Ascending: prazo mais próximo/vencido primeiro
         });
 
     }, [batches, workflowConfig, currentUser, assistanceTickets, assistanceWorkflow, projects]);
@@ -104,10 +105,9 @@ const Dashboard: React.FC = () => {
                             <div className="p-8 text-center text-slate-400">Tudo em dia!</div>
                         ) : (
                             myTasks.map(task => {
-                                const deadline = new Date(task.lastUpdated.getTime() + (task.sla * 24 * 60 * 60 * 1000));
+                                const deadline = addBusinessDays(task.lastUpdated, task.sla);
                                 const now = new Date();
-                                const diffTime = deadline.getTime() - now.getTime();
-                                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                const diffDays = getBusinessDaysDifference(now, deadline);
 
                                 return (
                                     <div key={task.id} className="p-3 bg-white dark:bg-[#1e293b] border border-slate-100 dark:border-slate-700/50 rounded-xl hover:shadow-md transition-all group cursor-pointer" onClick={() => task.projectId && setCurrentProjectId(task.projectId)}>

@@ -71,6 +71,8 @@ export const addBusinessDays = (startDate: Date | string, daysToAdd: number): Da
 
 /**
  * Calcula a diferença em dias úteis entre duas datas.
+ * Retorna valor positivo se endDate > startDate (prazo no futuro),
+ * negativo se startDate > endDate (prazo já vencido), e 0 se iguais.
  */
 export const getBusinessDaysDifference = (startDate: Date | string, endDate: Date | string): number => {
     const start = new Date(startDate);
@@ -80,17 +82,22 @@ export const getBusinessDaysDifference = (startDate: Date | string, endDate: Dat
     start.setHours(0, 0, 0, 0);
     end.setHours(0, 0, 0, 0);
 
-    if (start > end) return 0;
+    if (start.getTime() === end.getTime()) return 0;
+
+    const isNegative = start > end;
+    const from = isNegative ? end : start;
+    const to = isNegative ? start : end;
 
     let count = 0;
-    let current = new Date(start);
+    let current = new Date(from);
     current.setDate(current.getDate() + 1); // Começa a contar do dia seguinte
 
-    while (current <= end) {
+    while (current <= to) {
         if (isBusinessDay(current)) {
             count++;
         }
         current.setDate(current.getDate() + 1);
     }
-    return count;
+
+    return isNegative ? -count : count;
 };

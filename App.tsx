@@ -12,6 +12,7 @@ import Dashboard from './components/Dashboard';
 import Agenda from './components/Agenda';
 import SuperAdminDashboard from './components/SuperAdminDashboard';
 import { ProjectProvider, useProjects } from './context/ProjectContext';
+import { AuthProvider } from './context/AuthContext';
 import { NotificationProvider, useNotifications } from './context/NotificationContext';
 import { AgendaProvider } from './context/AgendaContext';
 
@@ -294,13 +295,15 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <ProjectProvider>
-      <NotificationProvider>
-        <AgendaProvider>
-          <AppContent />
-        </AgendaProvider>
-      </NotificationProvider>
-    </ProjectProvider>
+    <AuthProvider>
+      <ProjectProvider>
+        <NotificationProvider>
+          <AgendaProvider>
+            <AppContent />
+          </AgendaProvider>
+        </NotificationProvider>
+      </ProjectProvider>
+    </AuthProvider>
   );
 };
 

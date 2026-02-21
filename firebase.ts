@@ -5,9 +5,8 @@ import { getAuth, Auth } from "firebase/auth";
 // Replace these values with your actual Firebase project configuration
 // from the Firebase Console -> Project Settings -> General -> Your Apps
 
-// Safely access import.meta.env to avoid errors if it's undefined
-// We cast to any to avoid TypeScript errors, and default to empty object if undefined
-const env = (import.meta as any).env || {};
+// Acessa as variáveis de ambiente do Vite via import.meta.env
+const env: Record<string, string> = import.meta.env ?? {};
 
 const firebaseConfig = {
   apiKey: env.VITE_FIREBASE_API_KEY,
