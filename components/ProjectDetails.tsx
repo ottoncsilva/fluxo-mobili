@@ -4,7 +4,6 @@ import { Batch, Client, Project, Note, WorkflowStep, Environment, Role } from '.
 import { maskPhone, maskCPF, maskCEP } from '../utils/masks';
 import StepDecisionModal from './StepDecisionModal';
 import LotModal from './LotModal';
-import SplitBatchModal from './SplitBatchModal';
 import ContractModal from './ContractModal';
 import EditableField from './EditableField'; // Assuming this component is available
 

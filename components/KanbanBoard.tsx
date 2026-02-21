@@ -25,8 +25,6 @@ const UI_COLUMNS = [
 const KanbanBoard: React.FC = () => {
     const [isAuditOpen, setIsAuditOpen] = useState(false);
     const [isLotModalOpen, setIsLotModalOpen] = useState(false);
-    const [splitModalBatch, setSplitModalBatch] = useState<Batch | null>(null);
-    const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
     const [selectedColumnId, setSelectedColumnId] = useState<number | null>(4);
     const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
     const [subStepFilter, setSubStepFilter] = useState<string | null>(null);
@@ -181,19 +179,6 @@ const KanbanBoard: React.FC = () => {
         });
     }, [visibleUiColumns, batches, projects, workflowConfig, subStepFilter, selectedColumnId]);
 
-    const handleSplitConfirmed = async (selectedIds: string[]) => {
-        if (!splitModalBatch || selectedIds.length === 0) return;
-
-        // Move Partial
-        // Logic: splitBatch creates a new batch with selectedIds at CURRENT step.
-        // We then verify the new ID and advance it.
-        const newBatchId = splitBatch(splitModalBatch.id, selectedIds);
-        if (newBatchId) {
-            await advanceBatch(newBatchId);
-        }
-        setIsSplitModalOpen(false);
-        setSplitModalBatch(null);
-    };
 
     // Get Substeps for the Sidebar
     const activeSubSteps = useMemo(() => {
@@ -224,12 +209,6 @@ const KanbanBoard: React.FC = () => {
                     <div className="md:hidden fixed inset-0 z-30 bg-black/40" onClick={() => setIsMobileSidebarOpen(false)} />
                 )}
 
-                <SplitBatchModal
-                    isOpen={isSplitModalOpen}
-                    onClose={() => setIsSplitModalOpen(false)}
-                    batch={splitModalBatch}
-                    onSplitConfirmed={handleSplitConfirmed}
-                />
 
                 {/* Contextual Sidebar (Left of Board) - hidden on mobile by default, drawer on mobile */}
                 <div className={`
