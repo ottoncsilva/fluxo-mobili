@@ -1479,7 +1479,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         }
         if (stepId === '2.6') {
             return [
-                { label: 'Ajuste Concluído', description: 'Apresentar novamente.', targetStepId: '2.5', color: 'emerald', icon: 'check_circle' },
+                { label: 'Ajuste Concluído', description: 'Proceder para Reunião de Fechamento.', targetStepId: '2.8', color: 'emerald', icon: 'check_circle' },
                 { label: 'Follow Up', description: 'Manter em acompanhamento de vendas.', targetStepId: '2.7', color: 'primary', icon: 'phone_in_talk' },
             ];
         }
@@ -1518,14 +1518,8 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
         if (stepId === '7.2') {
             return [
-                { label: 'Tudo Certo', description: 'Montagem aprovada sem assistência.', targetStepId: '8.6', color: 'emerald', icon: 'verified' },
+                { label: 'Tudo Certo', description: 'Montagem aprovada sem assistência.', targetStepId: '9.0', color: 'emerald', icon: 'verified' },
                 { label: 'Com Assistência', description: 'Iniciar levantamento de itens pendentes.', targetStepId: '8.1', color: 'orange', icon: 'handyman' },
-            ];
-        }
-        if (stepId === '8.5') {
-            return [
-                { label: 'Aprovado', description: 'Assistência concluída com sucesso.', targetStepId: '8.6', color: 'emerald', icon: 'check_circle' },
-                { label: 'Reprovar / Nova Assistência', description: 'Retornar para levantamento.', targetStepId: '8.1', color: 'rose', icon: 'replay' },
             ];
         }
 
