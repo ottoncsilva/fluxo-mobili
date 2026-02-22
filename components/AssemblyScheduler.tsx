@@ -256,7 +256,6 @@ const AssemblyScheduler: React.FC = () => {
 
     const relevantAssistances = useMemo(() =>
         assistanceTickets.filter(t =>
-            t.status !== '10.0' && // Excluir não iniciadas
             t.status !== '10.8'    // Excluir concluídas
         ),
         [assistanceTickets]
@@ -1279,9 +1278,10 @@ const AssemblyScheduler: React.FC = () => {
                                                 onChange={e => {
                                                     setTeamForm(prev => ({
                                                         ...prev,
-                                                        serviceTypes: e.target.checked
+                                                        serviceTypes: (e.target.checked
                                                             ? [...prev.serviceTypes, 'assembly'].filter((v, i, a) => a.indexOf(v) === i)
                                                             : prev.serviceTypes.filter(t => t !== 'assembly')
+                                                        ) as ('assembly' | 'assistance')[]
                                                     }));
                                                 }}
                                                 className="w-4 h-4 rounded cursor-pointer accent-primary"
@@ -1298,9 +1298,10 @@ const AssemblyScheduler: React.FC = () => {
                                                 onChange={e => {
                                                     setTeamForm(prev => ({
                                                         ...prev,
-                                                        serviceTypes: e.target.checked
+                                                        serviceTypes: (e.target.checked
                                                             ? [...prev.serviceTypes, 'assistance'].filter((v, i, a) => a.indexOf(v) === i)
                                                             : prev.serviceTypes.filter(t => t !== 'assistance')
+                                                        ) as ('assembly' | 'assistance')[]
                                                     }));
                                                 }}
                                                 className="w-4 h-4 rounded cursor-pointer accent-primary"
@@ -1343,7 +1344,7 @@ const AssemblyScheduler: React.FC = () => {
                                 <div className="flex gap-2 pt-2">
                                     {editingTeam && (
                                         <button
-                                            onClick={() => { setEditingTeam(null); setTeamForm({ name: '', color: 'blue', memberInput: '', members: [] }); }}
+                                            onClick={() => { setEditingTeam(null); setTeamForm({ name: '', color: 'blue', memberInput: '', members: [], serviceTypes: ['assembly'] }); }}
                                             className="px-4 py-2 rounded-lg text-sm font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                                         >
                                             Cancelar
