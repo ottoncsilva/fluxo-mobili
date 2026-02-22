@@ -9,7 +9,7 @@ import {
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useProjects } from '../context/ProjectContext';
-import { AssemblyTeam, AssemblySchedule, AssemblyStatus, Batch } from '../types';
+import { AssemblyTeam, AssemblySchedule, AssemblyStatus, AssistanceStatus, Batch } from '../types';
 import { getBusinessDaysDifference, isHoliday, addBusinessDays } from '../utils/dateUtils';
 
 // ─── Color map (static for Tailwind purge safety) ────────────────────────────
@@ -62,7 +62,7 @@ const AssemblyScheduler: React.FC = () => {
     const {
         batches, projects, workflowConfig,
         assemblyTeams, updateBatchAssemblySchedule, saveAssemblyTeams,
-        canUserEditAssembly, companySettings
+        canUserEditAssembly, companySettings, assistanceTickets
     } = useProjects();
 
     const canEdit = canUserEditAssembly();
@@ -111,7 +111,13 @@ const AssemblyScheduler: React.FC = () => {
     const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
     const [localTeams, setLocalTeams] = useState<AssemblyTeam[]>([]);
     const [editingTeam, setEditingTeam] = useState<AssemblyTeam | null>(null);
-    const [teamForm, setTeamForm] = useState({ name: '', color: 'blue', memberInput: '', members: [] as string[] });
+    const [teamForm, setTeamForm] = useState({
+        name: '',
+        color: 'blue',
+        memberInput: '',
+        members: [] as string[],
+        serviceTypes: ['assembly'] as ('assembly' | 'assistance')[]
+    });
     const [isSavingTeams, setIsSavingTeams] = useState(false);
 
     // ── Mobile tab ─────────────────────────────────────────────────────────────
@@ -244,6 +250,66 @@ const AssemblyScheduler: React.FC = () => {
         return rows;
     }, [assemblyTeams, ganttEvents]);
 
+    // ── Technical Assistance Scheduling ───────────────────────────────────────
+    // SLA acumulado de assistência: 10.1 até 10.6 = 31 dias úteis
+    const ASSISTANCE_SLA_DAYS = 31;
+
+    const relevantAssistances = useMemo(() =>
+        assistanceTickets.filter(t =>
+            t.status !== '10.0' && // Excluir não iniciadas
+            t.status !== '10.8'    // Excluir concluídas
+        ),
+        [assistanceTickets]
+    );
+
+    const enrichedAssistances = useMemo(() =>
+        relevantAssistances.map(t => ({
+            ticket: t,
+            project: projects.find(p => p.client.id === t.clientId)
+        })),
+        [relevantAssistances, projects]
+    );
+
+    const assistanceEvents = useMemo(() =>
+        enrichedAssistances
+            .filter((x): x is { ticket: typeof x.ticket; project: NonNullable<typeof x.project> } => !!x.project)
+            .map(({ ticket, project }) => {
+                const createdDate = new Date(ticket.createdAt);
+                const deadline = addBusinessDays(createdDate, ASSISTANCE_SLA_DAYS, companySettings?.holidays);
+                const team = assemblyTeams.find(t => t.id === ticket.teamId);
+                const bizDays = ticket.estimatedDays || ASSISTANCE_SLA_DAYS;
+                const calendarDays = Math.max(1, differenceInDays(deadline, createdDate));
+                return {
+                    ticketId: ticket.id,
+                    code: ticket.code || `ASS-${ticket.id.substring(0, 5)}`,
+                    date: ticket.createdAt,
+                    clientName: project.client.name,
+                    teamId: ticket.teamId || null,
+                    teamColor: team?.color || 'slate',
+                    status: ticket.status,
+                    priority: ticket.priority,
+                    estimatedDays: bizDays,
+                    calendarDays,
+                    deadline: deadline.toISOString(),
+                };
+            }),
+        [enrichedAssistances, assemblyTeams, companySettings?.holidays]
+    );
+
+    const assistanceRows = useMemo(() => {
+        const rows: Array<{ team: AssemblyTeam | null; events: typeof assistanceEvents; isAssistance: boolean }> = [
+            ...assemblyTeams
+                .filter(team => team.serviceTypes?.includes('assistance') !== false) // Teams that do assistance
+                .map(team => ({
+                    team,
+                    events: assistanceEvents.filter(e => e.teamId === team.id),
+                    isAssistance: true
+                })),
+            { team: null, events: assistanceEvents.filter(e => !e.teamId), isAssistance: true }
+        ];
+        return rows.filter(row => row.events.length > 0); // Only show teams with active assistances
+    }, [assemblyTeams, assistanceEvents]);
+
     // ── Deadline urgency ───────────────────────────────────────────────────────
     const getDeadlineChip = (assemblyDeadline?: string) => {
         if (!assemblyDeadline) return null;
@@ -313,13 +379,19 @@ const AssemblyScheduler: React.FC = () => {
     const handleOpenTeamModal = () => {
         setLocalTeams([...assemblyTeams]);
         setEditingTeam(null);
-        setTeamForm({ name: '', color: 'blue', memberInput: '', members: [] });
+        setTeamForm({ name: '', color: 'blue', memberInput: '', members: [], serviceTypes: ['assembly'] });
         setIsTeamModalOpen(true);
     };
 
     const handleEditTeam = (team: AssemblyTeam) => {
         setEditingTeam(team);
-        setTeamForm({ name: team.name, color: team.color, memberInput: '', members: [...team.members] });
+        setTeamForm({
+            name: team.name,
+            color: team.color,
+            memberInput: '',
+            members: [...team.members],
+            serviceTypes: team.serviceTypes || ['assembly']
+        });
     };
 
     const handleDeleteTeam = (teamId: string) => {
@@ -330,7 +402,7 @@ const AssemblyScheduler: React.FC = () => {
         setLocalTeams(prev => prev.filter(t => t.id !== teamId));
         if (editingTeam?.id === teamId) {
             setEditingTeam(null);
-            setTeamForm({ name: '', color: 'blue', memberInput: '', members: [] });
+            setTeamForm({ name: '', color: 'blue', memberInput: '', members: [], serviceTypes: ['assembly'] });
         }
     };
 
@@ -346,9 +418,13 @@ const AssemblyScheduler: React.FC = () => {
 
     const handleSaveTeamForm = () => {
         if (!teamForm.name.trim()) return;
+        if (teamForm.serviceTypes.length === 0) {
+            alert('Selecione pelo menos um tipo de serviço (Montagem ou Assistência)');
+            return;
+        }
         if (editingTeam) {
             setLocalTeams(prev => prev.map(t => t.id === editingTeam.id
-                ? { ...t, name: teamForm.name, color: teamForm.color, members: teamForm.members }
+                ? { ...t, name: teamForm.name, color: teamForm.color, members: teamForm.members, serviceTypes: teamForm.serviceTypes }
                 : t
             ));
         } else {
@@ -356,12 +432,13 @@ const AssemblyScheduler: React.FC = () => {
                 id: `team-${Date.now()}`,
                 name: teamForm.name,
                 color: teamForm.color,
-                members: teamForm.members
+                members: teamForm.members,
+                serviceTypes: teamForm.serviceTypes
             };
             setLocalTeams(prev => [...prev, newTeam]);
         }
         setEditingTeam(null);
-        setTeamForm({ name: '', color: 'blue', memberInput: '', members: [] });
+        setTeamForm({ name: '', color: 'blue', memberInput: '', members: [], serviceTypes: ['assembly'] });
     };
 
     const handleSaveTeams = async () => {
@@ -592,10 +669,95 @@ const AssemblyScheduler: React.FC = () => {
                         </React.Fragment>
                         ))}
 
-                        {ganttRows.every(r => r.events.length === 0) && (
+                        {/* Separator between Assembly and Assistance sections */}
+                        {assistanceRows.length > 0 && ganttRows.some(r => r.events.length > 0) && (
+                            <div className="w-full h-1.5 bg-slate-300 dark:bg-slate-700 my-2" />
+                        )}
+
+                        {/* Assistance rows */}
+                        {assistanceRows.map(({ team, events }, idx) => (
+                            <React.Fragment key={`assistance-${team?.id || 'no-team'}`}>
+                                <div className="flex border-b border-slate-100 dark:border-slate-800 last:border-b-0">
+                                    {/* Row label with Assistance marker */}
+                                    <div className="w-32 shrink-0 px-3 py-2 border-r border-slate-200 dark:border-slate-700 flex items-start gap-2 bg-green-50/50 dark:bg-green-900/20">
+                                        {team ? (
+                                            <>
+                                                <div className={`w-2.5 h-2.5 rounded-full shrink-0 mt-0.5 ${TEAM_COLOR_MAP[team.color]?.bg || 'bg-slate-400'}`} />
+                                                <div className="flex-1">
+                                                    <div className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{team.name}</div>
+                                                    <div className="text-[7px] font-bold text-green-600 dark:text-green-400 uppercase tracking-tight">Assistência</div>
+                                                    {team.members.length > 0 && (
+                                                        <div className="text-[10px] text-slate-400 truncate">{team.members.slice(0, 2).join(', ')}{team.members.length > 2 ? '...' : ''}</div>
+                                                    )}
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <span className="text-[10px] text-slate-400 italic">Sem equipe (Assistência)</span>
+                                        )}
+                                    </div>
+
+                                    {/* Gantt bar area */}
+                                    <div className="flex-1 relative" style={{ minHeight: 68 }}>
+                                        {/* Background grid */}
+                                        {ganttDays.map((day, i) => {
+                                            const nonWorking = isNonWorkingDay(day);
+                                            return (
+                                                <div
+                                                    key={`asst-grid-${i}`}
+                                                    className={`absolute top-0 bottom-0 border-r border-slate-400 dark:border-slate-600 ${nonWorking ? 'bg-slate-50/90 dark:bg-slate-800/50' : ''}`}
+                                                    style={{
+                                                        left: `${(i / totalDays) * 100}%`,
+                                                        width: `${(1 / totalDays) * 100}%`,
+                                                        ...(nonWorking ? NON_WORKING_GRID_STYLE : {})
+                                                    }}
+                                                />
+                                            );
+                                        })}
+
+                                        {/* Today column */}
+                                        {isInGanttRange(new Date().toISOString()) && (
+                                            <div
+                                                className="absolute top-0 bottom-0 bg-orange-200/50 dark:bg-orange-900/30 z-10 pointer-events-none"
+                                                style={{
+                                                    left: `${dateToPercent(new Date())}%`,
+                                                    width: `${(1 / totalDays) * 100}%`
+                                                }}
+                                            />
+                                        )}
+
+                                        {/* Assistance bars (green-based colors) */}
+                                        {events.map(evt => {
+                                            const left = dateToPercent(evt.date);
+                                            const width = durationToPercent(evt.date, evt.calendarDays);
+                                            const baseColor = TEAM_COLOR_MAP[evt.teamColor] || TEAM_COLOR_MAP.slate;
+                                            // Use a green-based color for assistance to distinguish from assembly
+                                            const isUrgent = evt.priority === 'Urgente';
+
+                                            return (
+                                                <div
+                                                    key={evt.ticketId}
+                                                    className={`absolute top-2 bottom-2 rounded-md px-2 flex items-center z-10 overflow-hidden transition-transform hover:scale-y-105 ${isUrgent ? 'bg-rose-500 shadow-md' : 'bg-emerald-500 shadow-md'} ${canEdit ? 'cursor-pointer' : 'cursor-default'}`}
+                                                    style={{ left: `${left}%`, width: `${Math.max(width, 1.5)}%` }}
+                                                    title={`${evt.clientName} — ${evt.code} (${evt.status}) - ${evt.estimatedDays} d.ú.`}
+                                                >
+                                                    <span className="text-white text-[10px] font-bold truncate select-none">{evt.clientName}</span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+                            {/* Team separator */}
+                            {idx < assistanceRows.length - 1 && (
+                                <div className="w-full h-1 bg-slate-400 dark:bg-slate-600" />
+                            )}
+                        </React.Fragment>
+                        ))}
+
+                        {ganttRows.every(r => r.events.length === 0) && assistanceRows.every(r => r.events.length === 0) && (
                             <div className="flex flex-col items-center justify-center py-16 text-center">
                                 <span className="material-symbols-outlined text-slate-300 dark:text-slate-600 text-5xl mb-2">bar_chart</span>
-                                <p className="text-sm text-slate-400">Nenhuma montagem agendada neste período</p>
+                                <p className="text-sm text-slate-400">Nenhuma montagem ou assistência agendada neste período</p>
                                 <p className="text-xs text-slate-300 dark:text-slate-600 mt-1">Adicione agendamentos na fila ao lado</p>
                             </div>
                         )}
@@ -726,6 +888,120 @@ const AssemblyScheduler: React.FC = () => {
                                     </div>
                                 );
                             })
+                        )}
+
+                        {/* Separator between Assembly and Assistance queues */}
+                        {relevantAssistances.length > 0 && queueBatches.length > 0 && (
+                            <div className="my-2 h-px bg-slate-300 dark:bg-slate-700 mx-1" />
+                        )}
+
+                        {/* Assistance queue header */}
+                        {relevantAssistances.length > 0 && (
+                            <div className="sticky top-0 px-3 py-2 bg-slate-50 dark:bg-[#0f1419] border-t border-slate-200 dark:border-slate-800">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-green-600 text-sm">support_agent</span>
+                                        <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200">Fila de Assistências</h4>
+                                    </div>
+                                    <span className="text-xs text-slate-400 font-medium">{relevantAssistances.length} chamados</span>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Assistance cards */}
+                        {relevantAssistances.map(ticket => {
+                            const project = projects.find(p => p.client.id === ticket.clientId);
+                            const team = assemblyTeams.find(t => t.id === ticket.teamId);
+                            const createdDate = new Date(ticket.createdAt);
+                            const deadline = addBusinessDays(createdDate, ASSISTANCE_SLA_DAYS, companySettings?.holidays);
+                            const daysRemaining = getBusinessDaysDifference(new Date(), deadline, companySettings?.holidays);
+                            const statusLabel = {
+                                '10.1': 'Aberto',
+                                '10.2': 'Diagnóstico',
+                                '10.3': 'Orçamento',
+                                '10.4': 'Aprovado',
+                                '10.5': 'Produção',
+                                '10.6': 'Instalação',
+                                '10.7': 'Finalizado',
+                                '10.8': 'Fechado'
+                            }[ticket.status] || ticket.status;
+
+                            const statusColor = {
+                                '10.1': 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300',
+                                '10.2': 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300',
+                                '10.3': 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300',
+                                '10.4': 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300',
+                                '10.5': 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300',
+                                '10.6': 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300',
+                                '10.7': 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300',
+                                '10.8': 'bg-slate-50 dark:bg-slate-900/20 text-slate-700 dark:text-slate-300'
+                            }[ticket.status] || 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400';
+
+                            const urgencyColor = ticket.priority === 'Urgente'
+                                ? 'text-rose-600 dark:text-rose-400 font-bold'
+                                : 'text-slate-500 dark:text-slate-400';
+
+                            if (!project) return null;
+
+                            return (
+                                <div key={ticket.id} className="bg-white dark:bg-[#1e2936] rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                                    {/* Status bar */}
+                                    <div className={`px-3 py-1.5 flex items-center justify-between ${statusColor} border-b border-slate-200/50 dark:border-slate-700/50`}>
+                                        <span className="text-[10px] font-bold uppercase tracking-wide">{statusLabel}</span>
+                                        {team && (
+                                            <div className="flex items-center gap-1">
+                                                <div className={`w-2 h-2 rounded-full ${TEAM_COLOR_MAP[team.color]?.bg || 'bg-slate-400'}`} />
+                                                <span className="text-[10px] font-bold">{team.name}</span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="p-3">
+                                        {/* Ticket code and client */}
+                                        <div className="flex items-start justify-between gap-2 mb-1">
+                                            <div className="flex-1">
+                                                <div className="font-bold text-slate-800 dark:text-white text-sm truncate">{project.client.name}</div>
+                                                <div className="text-[10px] text-slate-400">{ticket.code || `ASS-${ticket.id.substring(0, 5)}`}</div>
+                                            </div>
+                                            {ticket.priority === 'Urgente' && (
+                                                <span className="material-symbols-outlined text-rose-500 text-sm animate-pulse">priority_high</span>
+                                            )}
+                                        </div>
+
+                                        {/* Priority and SLA */}
+                                        <div className={`text-[10px] mb-2 ${urgencyColor}`}>
+                                            {ticket.priority === 'Urgente' ? '⚠️ Urgente' : 'Normal'}
+                                        </div>
+
+                                        {/* SLA countdown */}
+                                        <div className={`text-[10px] mb-2 flex items-center gap-1 ${daysRemaining < 7 ? 'text-rose-600 dark:text-rose-400 font-bold' : daysRemaining < 15 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                            <span className="material-symbols-outlined text-[12px]">schedule</span>
+                                            SLA: {daysRemaining} dias úteis restantes
+                                        </div>
+
+                                        {/* Created date */}
+                                        <div className="text-[10px] text-slate-400 mb-2 flex items-center gap-1">
+                                            <span className="material-symbols-outlined text-[12px]">calendar_month</span>
+                                            Aberto em {format(createdDate, 'dd/MM/yyyy', { locale: ptBR })}
+                                        </div>
+
+                                        {/* Item count if available */}
+                                        {ticket.items?.length > 0 && (
+                                            <div className="text-[10px] text-slate-500 mb-2 flex items-center gap-1">
+                                                <span className="material-symbols-outlined text-[12px]">list_alt</span>
+                                                {ticket.items.length} item{ticket.items.length !== 1 ? 'ns' : ''}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+
+                        {relevantAssistances.length === 0 && queueBatches.length > 0 && (
+                            <div className="flex flex-col items-center justify-center py-8 text-center text-xs text-slate-400">
+                                <span className="material-symbols-outlined text-slate-300 dark:text-slate-600 text-3xl mb-1">support_agent</span>
+                                <p>Nenhuma assistência técnica em progresso</p>
+                            </div>
                         )}
                     </div>
                 </div>
@@ -934,6 +1210,16 @@ const AssemblyScheduler: React.FC = () => {
                                             {team.members.length > 0 && (
                                                 <p className="text-[10px] text-slate-400 truncate pl-5">{team.members.join(', ')}</p>
                                             )}
+                                            {team.serviceTypes && team.serviceTypes.length > 0 && (
+                                                <div className="flex gap-1 mt-1 pl-5 flex-wrap">
+                                                    {team.serviceTypes.includes('assembly') && (
+                                                        <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-bold">Montagem</span>
+                                                    )}
+                                                    {team.serviceTypes.includes('assistance') && (
+                                                        <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-bold">Assistência</span>
+                                                    )}
+                                                </div>
+                                            )}
                                             <div className="flex gap-1 mt-1.5">
                                                 <button onClick={() => handleEditTeam(team)} className="flex-1 py-0.5 text-[10px] rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-primary/10 hover:text-primary transition-colors font-bold">
                                                     Editar
@@ -981,6 +1267,50 @@ const AssemblyScheduler: React.FC = () => {
                                                 </button>
                                             );
                                         })}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-2">Tipos de Serviço</label>
+                                    <div className="space-y-2">
+                                        <label className="flex items-center gap-3 p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
+                                            <input
+                                                type="checkbox"
+                                                checked={teamForm.serviceTypes.includes('assembly')}
+                                                onChange={e => {
+                                                    setTeamForm(prev => ({
+                                                        ...prev,
+                                                        serviceTypes: e.target.checked
+                                                            ? [...prev.serviceTypes, 'assembly'].filter((v, i, a) => a.indexOf(v) === i)
+                                                            : prev.serviceTypes.filter(t => t !== 'assembly')
+                                                    }));
+                                                }}
+                                                className="w-4 h-4 rounded cursor-pointer accent-primary"
+                                            />
+                                            <div className="flex-1">
+                                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Montagem</span>
+                                                <p className="text-[10px] text-slate-400">Agendamentos de montagem de móveis</p>
+                                            </div>
+                                        </label>
+                                        <label className="flex items-center gap-3 p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
+                                            <input
+                                                type="checkbox"
+                                                checked={teamForm.serviceTypes.includes('assistance')}
+                                                onChange={e => {
+                                                    setTeamForm(prev => ({
+                                                        ...prev,
+                                                        serviceTypes: e.target.checked
+                                                            ? [...prev.serviceTypes, 'assistance'].filter((v, i, a) => a.indexOf(v) === i)
+                                                            : prev.serviceTypes.filter(t => t !== 'assistance')
+                                                    }));
+                                                }}
+                                                className="w-4 h-4 rounded cursor-pointer accent-primary"
+                                            />
+                                            <div className="flex-1">
+                                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Assistência Técnica</span>
+                                                <p className="text-[10px] text-slate-400">Chamados e visitas técnicas de assistência</p>
+                                            </div>
+                                        </label>
                                     </div>
                                 </div>
 

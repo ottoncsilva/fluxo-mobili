@@ -295,6 +295,8 @@ export interface AssistanceTicket {
   notes?: string;
   assemblerName?: string;
   events: AssistanceEvent[]; // History
+  teamId?: string; // Link to AssemblyTeam for scheduling
+  estimatedDays?: number; // dias úteis até conclusão (SLA acumulado até 10.6)
 }
 
 export interface AssistanceWorkflowStep {
@@ -310,6 +312,7 @@ export interface AssemblyTeam {
   name: string;
   members: string[]; // free-text names (not user IDs)
   color: string;     // 'blue' | 'emerald' | 'violet' | 'orange' | 'rose' | 'amber' | 'cyan' | 'indigo' | 'teal' | 'pink'
+  serviceTypes?: ('assembly' | 'assistance')[]; // Tipos de serviço que a equipe realiza: montagem e/ou assistência
 }
 
 export type AssemblyStatus = 'Sem Previsão' | 'Previsto' | 'Agendado' | 'Concluído';
@@ -321,6 +324,15 @@ export interface AssemblySchedule {
   scheduledDate?: string; // ISO date — status "Agendado" (confirmed)
   estimatedDays?: number; // duration in calendar days (for Gantt bar width)
   status: AssemblyStatus;
+  notes?: string;
+}
+
+export interface TechnicalAssistanceSchedule {
+  teamId?: string;
+  teamName?: string;      // denormalised for display even if team is later deleted
+  status: AssistanceStatus; // etapa de assistência (10.1-10.8)
+  estimatedDays?: number; // dias úteis até conclusão (SLA acumulado até 10.6)
+  createdAt: string;      // ISO date: quando foi criada
   notes?: string;
 }
 
