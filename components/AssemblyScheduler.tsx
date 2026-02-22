@@ -44,11 +44,11 @@ const GANTT_WEEKS = 6; // visible window width
 const isNonWorkingDay = (day: Date): boolean => isWeekend(day) || isHoliday(day);
 
 const NON_WORKING_HEADER_STYLE: React.CSSProperties = {
-    backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(148,163,184,0.15) 4px, rgba(148,163,184,0.15) 5px)'
+    backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(100,116,139,0.35) 4px, rgba(100,116,139,0.35) 5px)'
 };
 
 const NON_WORKING_GRID_STYLE: React.CSSProperties = {
-    backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(148,163,184,0.10) 4px, rgba(148,163,184,0.10) 5px)'
+    backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(100,116,139,0.32) 4px, rgba(100,116,139,0.32) 5px)'
 };
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
@@ -416,7 +416,7 @@ const AssemblyScheduler: React.FC = () => {
                                     <div
                                         key={i}
                                         style={{ flex: mg.count }}
-                                        className="px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide border-r last:border-r-0 border-slate-100 dark:border-slate-800 truncate"
+                                        className="px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide border-r last:border-r-0 border-slate-400 dark:border-slate-600 truncate"
                                     >
                                         {mg.label}
                                     </div>
@@ -437,7 +437,7 @@ const AssemblyScheduler: React.FC = () => {
                                         return (
                                             <div
                                                 key={i}
-                                                className={`flex-1 py-1.5 text-center border-r border-slate-100 dark:border-slate-800 last:border-r-0 ${nonWorking ? 'bg-slate-50 dark:bg-slate-800/60' : ''}`}
+                                                className={`flex-1 py-1.5 text-center border-r border-slate-400 dark:border-slate-600 last:border-r-0 ${nonWorking ? 'bg-slate-50 dark:bg-slate-800/60' : ''}`}
                                                 style={nonWorking ? NON_WORKING_HEADER_STYLE : {}}
                                             >
                                                 <div className={nonWorking
@@ -502,7 +502,7 @@ const AssemblyScheduler: React.FC = () => {
                                         return (
                                             <div
                                                 key={i}
-                                                className={`absolute top-0 bottom-0 border-r border-slate-100 dark:border-slate-800 ${nonWorking ? 'bg-slate-50/90 dark:bg-slate-800/50' : ''}`}
+                                                className={`absolute top-0 bottom-0 border-r border-slate-400 dark:border-slate-600 ${nonWorking ? 'bg-slate-50/90 dark:bg-slate-800/50' : ''}`}
                                                 style={{
                                                     left: `${(i / totalDays) * 100}%`,
                                                     width: `${(1 / totalDays) * 100}%`,

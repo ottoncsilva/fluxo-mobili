@@ -158,13 +158,13 @@ const AppContent: React.FC = () => {
     // Grupo 1 — Operacional
     if (canAccess(ViewState.DASHBOARD)) navItems.push({ icon: 'home', view: ViewState.DASHBOARD, label: 'Início', group: 1 });
     if (canAccess(ViewState.KANBAN)) navItems.push({ icon: 'view_kanban', view: ViewState.KANBAN, label: 'Kanban', group: 1 });
+    navItems.push({ icon: 'calendar_month', view: ViewState.AGENDA, label: 'Agenda', group: 1 });
     if (canAccess(ViewState.CLIENT_LIST)) navItems.push({ icon: 'contacts', view: ViewState.CLIENT_LIST, label: 'Clientes', group: 1 });
     // Grupo 2 — Pós-produção
     if (canAccess(ViewState.ASSEMBLY_SCHEDULER)) navItems.push({ icon: 'carpenter', view: ViewState.ASSEMBLY_SCHEDULER, label: 'Montagens', group: 2 });
     if (canAccess(ViewState.POST_ASSEMBLY)) navItems.push({ icon: 'fact_check', view: ViewState.POST_ASSEMBLY, label: 'Pós-Mont.', group: 2 });
     if (canAccess(ViewState.ASSISTANCE)) navItems.push({ icon: 'support_agent', view: ViewState.ASSISTANCE, label: 'Assistência', group: 2 });
-    // Grupo 3 — Pessoal/Admin
-    navItems.push({ icon: 'calendar_month', view: ViewState.AGENDA, label: 'Agenda', group: 3 });
+    // Grupo 3 — Admin
     if (canAccess(ViewState.SETTINGS)) navItems.push({ icon: 'settings', view: ViewState.SETTINGS, label: 'Config', group: 3 });
   }
 
