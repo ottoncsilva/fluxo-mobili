@@ -2,7 +2,7 @@
 // Módulo de Agendamento de Montagens
 // Gantt visual (uma linha por equipe) + Fila lateral (etapas 5/6/7)
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
     startOfWeek, addDays, eachDayOfInterval, differenceInDays,
     isWeekend, format
@@ -10,7 +10,7 @@ import {
 import { ptBR } from 'date-fns/locale';
 import { useProjects } from '../context/ProjectContext';
 import { AssemblyTeam, AssemblySchedule, AssemblyStatus, Batch } from '../types';
-import { getBusinessDaysDifference } from '../utils/dateUtils';
+import { getBusinessDaysDifference, isHoliday, addBusinessDays } from '../utils/dateUtils';
 
 // ─── Color map (static for Tailwind purge safety) ────────────────────────────
 const TEAM_COLOR_MAP: Record<string, { bg: string; border: string; text: string; light: string }> = {
@@ -40,6 +40,17 @@ const STATUS_STYLES: Record<AssemblyStatus, string> = {
 // ─── Gantt config ─────────────────────────────────────────────────────────────
 const GANTT_WEEKS = 6; // visible window width
 
+// ─── Non-working day helpers ──────────────────────────────────────────────────
+const isNonWorkingDay = (day: Date): boolean => isWeekend(day) || isHoliday(day);
+
+const NON_WORKING_HEADER_STYLE: React.CSSProperties = {
+    backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(148,163,184,0.15) 4px, rgba(148,163,184,0.15) 5px)'
+};
+
+const NON_WORKING_GRID_STYLE: React.CSSProperties = {
+    backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(148,163,184,0.10) 4px, rgba(148,163,184,0.10) 5px)'
+};
+
 // ─── Helper ───────────────────────────────────────────────────────────────────
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
@@ -47,8 +58,11 @@ const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(ma
 const AssemblyScheduler: React.FC = () => {
     const {
         batches, projects, workflowConfig,
-        assemblyTeams, updateBatchAssemblySchedule, saveAssemblyTeams
+        assemblyTeams, updateBatchAssemblySchedule, saveAssemblyTeams,
+        canUserEditAssembly
     } = useProjects();
+
+    const canEdit = canUserEditAssembly();
 
     // ── Gantt state ────────────────────────────────────────────────────────────
     const [ganttAnchor, setGanttAnchor] = useState(new Date()); // start of visible range
@@ -56,6 +70,25 @@ const AssemblyScheduler: React.FC = () => {
     const totalDays = GANTT_WEEKS * 7;
     const ganttEndDate = addDays(ganttStartDate, totalDays - 1);
     const ganttDays = eachDayOfInterval({ start: ganttStartDate, end: ganttEndDate });
+
+    // ── Drag panning refs ──────────────────────────────────────────────────────
+    const ganttBodyRef = useRef<HTMLDivElement>(null);
+    const dragRef = useRef<{ startX: number; startAnchor: Date } | null>(null);
+    const hasDraggedRef = useRef(false);
+    const [isDragging, setIsDragging] = useState(false);
+
+    // ── Month groups for header ────────────────────────────────────────────────
+    const monthGroups = useMemo(() => {
+        const groups: { label: string; count: number }[] = [];
+        ganttDays.forEach(day => {
+            const key = format(day, 'MMMM yyyy', { locale: ptBR });
+            if (!groups.length || groups[groups.length - 1].label !== key)
+                groups.push({ label: key, count: 1 });
+            else
+                groups[groups.length - 1].count++;
+        });
+        return groups;
+    }, [ganttDays]);
 
     // ── Queue state ────────────────────────────────────────────────────────────
     const [queueFilter, setQueueFilter] = useState<AssemblyStatus | 'Todos'>('Todos');
@@ -94,6 +127,46 @@ const AssemblyScheduler: React.FC = () => {
         return d >= ganttStartDate && d <= ganttEndDate;
     };
 
+    // ── Drag pan handlers ──────────────────────────────────────────────────────
+    const handleGanttMouseDown = (e: React.MouseEvent) => {
+        e.preventDefault();
+        hasDraggedRef.current = false;
+        dragRef.current = { startX: e.clientX, startAnchor: ganttAnchor };
+        setIsDragging(true);
+    };
+
+    const handleGanttMouseMove = (e: React.MouseEvent) => {
+        if (!dragRef.current || !ganttBodyRef.current) return;
+        const deltaX = e.clientX - dragRef.current.startX;
+        if (Math.abs(deltaX) > 5) hasDraggedRef.current = true;
+        const colWidth = ganttBodyRef.current.clientWidth / totalDays;
+        const daysDelta = Math.round(-deltaX / colWidth);
+        setGanttAnchor(addDays(dragRef.current.startAnchor, daysDelta));
+    };
+
+    const handleGanttMouseUp = () => {
+        dragRef.current = null;
+        setIsDragging(false);
+    };
+
+    const handleGanttTouchStart = (e: React.TouchEvent) => {
+        hasDraggedRef.current = false;
+        dragRef.current = { startX: e.touches[0].clientX, startAnchor: ganttAnchor };
+    };
+
+    const handleGanttTouchMove = (e: React.TouchEvent) => {
+        if (!dragRef.current || !ganttBodyRef.current) return;
+        const deltaX = e.touches[0].clientX - dragRef.current.startX;
+        if (Math.abs(deltaX) > 5) hasDraggedRef.current = true;
+        const colWidth = ganttBodyRef.current.clientWidth / totalDays;
+        const daysDelta = Math.round(-deltaX / colWidth);
+        setGanttAnchor(addDays(dragRef.current.startAnchor, daysDelta));
+    };
+
+    const handleGanttTouchEnd = () => {
+        dragRef.current = null;
+    };
+
     // ── Derived data ───────────────────────────────────────────────────────────
     const relevantBatches = useMemo(() =>
         batches.filter(b =>
@@ -125,6 +198,10 @@ const AssemblyScheduler: React.FC = () => {
             const date = s?.scheduledDate || s?.forecastDate;
             if (!date) return [];
             const team = assemblyTeams.find(t => t.id === s?.teamId);
+            const bizDays = s?.estimatedDays || 1;
+            const startDateObj = new Date(date);
+            const endDateObj = addBusinessDays(startDateObj, bizDays);
+            const calendarDays = Math.max(1, differenceInDays(endDateObj, startDateObj));
             return [{
                 batchId: batch.id,
                 date,
@@ -133,7 +210,8 @@ const AssemblyScheduler: React.FC = () => {
                 teamId: s?.teamId || null,
                 teamColor: team?.color || 'slate',
                 status: (s?.status || 'Sem Previsão') as AssemblyStatus,
-                estimatedDays: s?.estimatedDays || 1,
+                estimatedDays: bizDays,
+                calendarDays,
                 assemblyDeadline: batch.assemblyDeadline,
             }];
         }),
@@ -155,14 +233,15 @@ const AssemblyScheduler: React.FC = () => {
     const getDeadlineChip = (assemblyDeadline?: string) => {
         if (!assemblyDeadline) return null;
         const days = getBusinessDaysDifference(new Date(), new Date(assemblyDeadline));
+        const dateStr = format(new Date(assemblyDeadline), 'dd/MM');
         if (days > 15) {
-            return { cls: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400', icon: 'event', label: `Prazo: ${format(new Date(assemblyDeadline), 'dd/MM')} (+${days}d)`, pulse: false };
+            return { cls: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400', icon: 'event', label: `Início até: ${dateStr} (+${days} d.ú.)`, pulse: false };
         }
         if (days >= 0 && days <= 15) {
-            return { cls: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 font-bold', icon: 'warning', label: `⚠ Prazo: ${format(new Date(assemblyDeadline), 'dd/MM')} (+${days}d úteis)`, pulse: false };
+            return { cls: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 font-bold', icon: 'warning', label: `⚠ Início até: ${dateStr} (+${days} d.ú.)`, pulse: false };
         }
         // overdue
-        return { cls: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 font-bold animate-pulse', icon: 'alarm', label: `🚨 URGENTE — Prazo vencido há ${Math.abs(days)}d úteis`, pulse: true };
+        return { cls: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 font-bold animate-pulse', icon: 'alarm', label: `🚨 URGENTE — Prazo vencido há ${Math.abs(days)} d.ú.`, pulse: true };
     };
 
     // ── Stage badge ────────────────────────────────────────────────────────────
@@ -179,7 +258,7 @@ const AssemblyScheduler: React.FC = () => {
     // ── Open schedule modal ────────────────────────────────────────────────────
     const handleOpenScheduleModal = (batch: Batch) => {
         const project = projects.find(p => p.id === batch.projectId);
-        const defaultDays = (project?.environments?.length || 1) * 4;
+        const defaultDays = (project?.environments?.length || 1) * 3;
         setScheduleForm({
             ...(batch.assemblySchedule || { status: 'Sem Previsão' }),
             estimatedDays: batch.assemblySchedule?.estimatedDays ?? defaultDays
@@ -311,13 +390,15 @@ const AssemblyScheduler: React.FC = () => {
                     <button onClick={() => setMobileTab('GANTT')} className={`px-3 py-1 text-xs rounded-md font-bold transition-colors ${mobileTab === 'GANTT' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-500'}`}>Gantt</button>
                 </div>
 
-                <button
-                    onClick={handleOpenTeamModal}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                >
-                    <span className="material-symbols-outlined text-sm">groups</span>
-                    Equipes
-                </button>
+                {canEdit && (
+                    <button
+                        onClick={handleOpenTeamModal}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    >
+                        <span className="material-symbols-outlined text-sm">groups</span>
+                        Equipes
+                    </button>
+                )}
             </div>
 
             {/* ── Main content: Gantt + Queue ───────────────────────────────── */}
@@ -325,38 +406,75 @@ const AssemblyScheduler: React.FC = () => {
 
                 {/* ── Gantt (hidden on mobile when queue tab selected) ─────────── */}
                 <div className={`flex-1 flex flex-col overflow-hidden ${mobileTab === 'QUEUE' ? 'hidden md:flex' : 'flex'}`}>
-                    {/* Gantt date header */}
-                    <div className="flex shrink-0 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1a2632]">
-                        {/* Row label column */}
-                        <div className="w-32 shrink-0 px-3 py-2 border-r border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                            Equipe
-                        </div>
-                        {/* Date columns */}
-                        <div className="flex-1 relative overflow-hidden">
-                            <div className="flex">
-                                {ganttDays.map((day, i) => (
+                    {/* Gantt header: month row + day row */}
+                    <div className="flex flex-col shrink-0 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1a2632]">
+                        {/* Month/year header row */}
+                        <div className="flex border-b border-slate-100 dark:border-slate-800">
+                            <div className="w-32 shrink-0 border-r border-slate-200 dark:border-slate-700" />
+                            <div className="flex-1 flex overflow-hidden">
+                                {monthGroups.map((mg, i) => (
                                     <div
                                         key={i}
-                                        className={`flex-1 py-1.5 text-center border-r border-slate-100 dark:border-slate-800 last:border-r-0 ${isWeekend(day) ? 'bg-slate-50 dark:bg-slate-800/40' : ''}`}
+                                        style={{ flex: mg.count }}
+                                        className="px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide border-r last:border-r-0 border-slate-100 dark:border-slate-800 truncate"
                                     >
-                                        <div className={`text-[9px] font-bold uppercase ${isWeekend(day) ? 'text-slate-400 dark:text-slate-600' : 'text-slate-400 dark:text-slate-500'}`}>
-                                            {format(day, 'EEE', { locale: ptBR })}
-                                        </div>
-                                        <div className={`text-[11px] font-bold ${
-                                            format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
-                                                ? 'text-rose-600 dark:text-rose-400'
-                                                : isWeekend(day) ? 'text-slate-400 dark:text-slate-600' : 'text-slate-600 dark:text-slate-400'
-                                        }`}>
-                                            {format(day, 'd')}
-                                        </div>
+                                        {mg.label}
                                     </div>
                                 ))}
                             </div>
                         </div>
+                        {/* Day header row */}
+                        <div className="flex">
+                            {/* Row label column */}
+                            <div className="w-32 shrink-0 px-3 py-2 border-r border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                Equipe
+                            </div>
+                            {/* Date columns */}
+                            <div className="flex-1 relative overflow-hidden">
+                                <div className="flex">
+                                    {ganttDays.map((day, i) => {
+                                        const nonWorking = isNonWorkingDay(day);
+                                        return (
+                                            <div
+                                                key={i}
+                                                className={`flex-1 py-1.5 text-center border-r border-slate-100 dark:border-slate-800 last:border-r-0 ${nonWorking ? 'bg-slate-50 dark:bg-slate-800/60' : ''}`}
+                                                style={nonWorking ? NON_WORKING_HEADER_STYLE : {}}
+                                            >
+                                                <div className={nonWorking
+                                                    ? 'text-[8px] font-bold uppercase text-slate-300 dark:text-slate-600'
+                                                    : 'text-[9px] font-bold uppercase text-slate-400 dark:text-slate-500'
+                                                }>
+                                                    {format(day, 'EEE', { locale: ptBR })}
+                                                </div>
+                                                <div className={`font-bold ${
+                                                    format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
+                                                        ? 'text-[11px] text-rose-600 dark:text-rose-400'
+                                                        : nonWorking
+                                                            ? 'text-[9px] text-slate-300 dark:text-slate-600'
+                                                            : 'text-[11px] text-slate-600 dark:text-slate-400'
+                                                }`}>
+                                                    {format(day, 'd')}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
-                    {/* Gantt rows scroll area */}
-                    <div className="flex-1 overflow-y-auto custom-scrollbar">
+                    {/* Gantt rows scroll area — draggable */}
+                    <div
+                        ref={ganttBodyRef}
+                        className={`flex-1 overflow-y-auto custom-scrollbar select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                        onMouseDown={handleGanttMouseDown}
+                        onMouseMove={handleGanttMouseMove}
+                        onMouseUp={handleGanttMouseUp}
+                        onMouseLeave={handleGanttMouseUp}
+                        onTouchStart={handleGanttTouchStart}
+                        onTouchMove={handleGanttTouchMove}
+                        onTouchEnd={handleGanttTouchEnd}
+                    >
                         {ganttRows.map(({ team, events }) => (
                             <div key={team?.id || 'no-team'} className="flex border-b border-slate-100 dark:border-slate-800 last:border-b-0">
                                 {/* Row label */}
@@ -379,13 +497,20 @@ const AssemblyScheduler: React.FC = () => {
                                 {/* Gantt bar area */}
                                 <div className="flex-1 relative" style={{ minHeight: 68 }}>
                                     {/* Background grid */}
-                                    {ganttDays.map((day, i) => (
-                                        <div
-                                            key={i}
-                                            className={`absolute top-0 bottom-0 border-r border-slate-100 dark:border-slate-800 ${isWeekend(day) ? 'bg-slate-50/60 dark:bg-slate-800/30' : ''}`}
-                                            style={{ left: `${(i / totalDays) * 100}%`, width: `${(1 / totalDays) * 100}%` }}
-                                        />
-                                    ))}
+                                    {ganttDays.map((day, i) => {
+                                        const nonWorking = isNonWorkingDay(day);
+                                        return (
+                                            <div
+                                                key={i}
+                                                className={`absolute top-0 bottom-0 border-r border-slate-100 dark:border-slate-800 ${nonWorking ? 'bg-slate-50/90 dark:bg-slate-800/50' : ''}`}
+                                                style={{
+                                                    left: `${(i / totalDays) * 100}%`,
+                                                    width: `${(1 / totalDays) * 100}%`,
+                                                    ...(nonWorking ? NON_WORKING_GRID_STYLE : {})
+                                                }}
+                                            />
+                                        );
+                                    })}
 
                                     {/* Today line */}
                                     {isInGanttRange(new Date().toISOString()) && (
@@ -398,20 +523,22 @@ const AssemblyScheduler: React.FC = () => {
                                     {/* Assembly bars */}
                                     {events.map(evt => {
                                         const left = dateToPercent(evt.date);
-                                        const width = durationToPercent(evt.date, evt.estimatedDays);
+                                        const width = durationToPercent(evt.date, evt.calendarDays);
                                         const colorMap = TEAM_COLOR_MAP[evt.teamColor] || TEAM_COLOR_MAP.slate;
                                         const isDashed = evt.status === 'Previsto';
 
                                         return (
                                             <div
                                                 key={evt.batchId}
-                                                className={`absolute top-2 bottom-2 rounded-md px-2 flex items-center cursor-pointer z-10 overflow-hidden transition-transform hover:scale-y-105 ${colorMap.bg} ${isDashed ? 'border-2 border-dashed border-white/60 opacity-80' : 'shadow-md'}`}
+                                                className={`absolute top-2 bottom-2 rounded-md px-2 flex items-center z-10 overflow-hidden transition-transform hover:scale-y-105 ${colorMap.bg} ${isDashed ? 'border-2 border-dashed border-white/60 opacity-80' : 'shadow-md'} ${canEdit ? 'cursor-pointer' : 'cursor-default'}`}
                                                 style={{ left: `${left}%`, width: `${Math.max(width, 1.5)}%` }}
                                                 onClick={() => {
+                                                    if (hasDraggedRef.current) return;
+                                                    if (!canEdit) return;
                                                     const b = batches.find(x => x.id === evt.batchId);
                                                     if (b) handleOpenScheduleModal(b);
                                                 }}
-                                                title={`${evt.clientName} — ${evt.batchName} (${evt.estimatedDays}d)`}
+                                                title={`${evt.clientName} — ${evt.batchName} (${evt.estimatedDays} d.ú.)`}
                                             >
                                                 <span className="text-white text-[10px] font-bold truncate select-none">{evt.clientName}</span>
                                                 {/* Assembly deadline marker */}
@@ -483,7 +610,7 @@ const AssemblyScheduler: React.FC = () => {
                                 const stageBadge = getStageBadge(batch.phase);
                                 const step = workflowConfig[batch.phase];
                                 const envCount = batch.environmentIds?.length || project.environments.length;
-                                const defaultDays = envCount * 4;
+                                const defaultDays = envCount * 3;
                                 const estimatedDays = batch.assemblySchedule?.estimatedDays ?? defaultDays;
                                 const isCustomEstimate = batch.assemblySchedule?.estimatedDays !== undefined && batch.assemblySchedule.estimatedDays !== defaultDays;
 
@@ -515,11 +642,17 @@ const AssemblyScheduler: React.FC = () => {
                                                 </div>
                                             )}
 
-                                            {/* Deadline chip */}
+                                            {/* Deadline section */}
                                             {deadlineChip && (
-                                                <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] mb-2 ${deadlineChip.cls}`}>
-                                                    <span className="material-symbols-outlined text-[13px]">{deadlineChip.icon}</span>
-                                                    {deadlineChip.label}
+                                                <div className="mb-2">
+                                                    <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-[11px]">calendar_month</span>
+                                                        Limite para início da montagem
+                                                    </div>
+                                                    <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] ${deadlineChip.cls}`}>
+                                                        <span className="material-symbols-outlined text-[13px]">{deadlineChip.icon}</span>
+                                                        {deadlineChip.label}
+                                                    </div>
                                                 </div>
                                             )}
 
@@ -527,8 +660,8 @@ const AssemblyScheduler: React.FC = () => {
                                             <div className={`text-[11px] mb-2 flex items-center gap-1 ${isCustomEstimate ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}>
                                                 <span className="material-symbols-outlined text-[13px]">timer</span>
                                                 {isCustomEstimate
-                                                    ? `Estimativa: ${estimatedDays} dias (ajustado)`
-                                                    : `Estimativa: ${envCount} amb × 4d = ${defaultDays} dias`
+                                                    ? `Estimativa: ${estimatedDays} d.ú. (ajustado)`
+                                                    : `Estimativa: ${envCount} amb × 3d = ${defaultDays} d.ú.`
                                                 }
                                             </div>
 
@@ -546,16 +679,18 @@ const AssemblyScheduler: React.FC = () => {
                                                 </div>
                                             )}
 
-                                            {/* CTA */}
-                                            <button
-                                                onClick={() => handleOpenScheduleModal(batch)}
-                                                className="w-full mt-1 py-1.5 rounded-lg text-xs font-bold bg-primary text-white hover:bg-primary/90 transition-colors flex items-center justify-center gap-1.5"
-                                            >
-                                                <span className="material-symbols-outlined text-sm">
-                                                    {scheduleStatus === 'Sem Previsão' ? 'calendar_add_on' : 'edit_calendar'}
-                                                </span>
-                                                {scheduleStatus === 'Sem Previsão' ? 'Agendar' : 'Editar Agendamento'}
-                                            </button>
+                                            {/* CTA — only if canEdit */}
+                                            {canEdit && (
+                                                <button
+                                                    onClick={() => handleOpenScheduleModal(batch)}
+                                                    className="w-full mt-1 py-1.5 rounded-lg text-xs font-bold bg-primary text-white hover:bg-primary/90 transition-colors flex items-center justify-center gap-1.5"
+                                                >
+                                                    <span className="material-symbols-outlined text-sm">
+                                                        {scheduleStatus === 'Sem Previsão' ? 'calendar_add_on' : 'edit_calendar'}
+                                                    </span>
+                                                    {scheduleStatus === 'Sem Previsão' ? 'Agendar' : 'Editar Agendamento'}
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 );
@@ -571,7 +706,7 @@ const AssemblyScheduler: React.FC = () => {
             {isScheduleModalOpen && selectedBatch && (() => {
                 const project = projects.find(p => p.id === selectedBatch.projectId);
                 const envCount = selectedBatch.environmentIds?.length || project?.environments.length || 1;
-                const defaultDays = envCount * 4;
+                const defaultDays = envCount * 3;
                 const deadlineChip = getDeadlineChip(selectedBatch.assemblyDeadline);
 
                 return (
@@ -687,7 +822,7 @@ const AssemblyScheduler: React.FC = () => {
                                         className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-primary focus:border-primary outline-none"
                                     />
                                     <p className="text-[10px] text-slate-400 mt-1">
-                                        💡 Estimativa: {envCount} ambientes × 4 dias = <strong>{defaultDays} dias</strong>
+                                        💡 Estimativa automática: {envCount} amb × 3 d.ú. = <strong>{defaultDays} dias úteis</strong>
                                     </p>
                                 </div>
 

@@ -71,6 +71,13 @@ export interface PermissionConfig {
   canChangeSeller?: boolean; // New permission
   viewableStages: number[];
   actionableSteps: string[];
+  // Módulos especiais
+  canViewAssembly?: boolean;      // visualizar módulo Montagens
+  canEditAssembly?: boolean;      // criar/editar agendamentos e equipes
+  canViewPostAssembly?: boolean;  // visualizar módulo Pós-Montagem
+  canEditPostAssembly?: boolean;  // criar/editar avaliações pós-montagem
+  canViewAssistance?: boolean;    // visualizar módulo Assistência
+  canEditAssistance?: boolean;    // criar/editar chamados de assistência
 }
 
 export interface WorkflowStep {

@@ -90,6 +90,10 @@ interface ProjectContextType {
     canUserAdvanceStep: (stepId: string) => boolean;
     canUserViewStage: (stageId: number) => boolean;
     canUserEditAssistance: () => boolean;
+    canUserViewAssembly: () => boolean;
+    canUserEditAssembly: () => boolean;
+    canUserViewPostAssembly: () => boolean;
+    canUserEditPostAssembly: () => boolean;
     resetStoreDefaults: (type: 'origins' | 'assistance' | 'all') => Promise<boolean>;
     getBranchingOptions: (stepId: string) => any[];
 
@@ -307,7 +311,12 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
                 }
                 if (data.origins) setOrigins(data.origins);
                 if (data.permissions) {
-                    setPermissions(data.permissions);
+                    // Merge with DEFAULT_PERMISSIONS for backward compat — ensures new fields get default values
+                    const merged = data.permissions.map((p: PermissionConfig) => {
+                        const defaultPerm = DEFAULT_PERMISSIONS.find(dp => dp.role === p.role);
+                        return { ...defaultPerm, ...p };
+                    });
+                    setPermissions(merged);
                 }
                 if (data.lastPostAssemblyNumber !== undefined) setLastPostAssemblyNumber(data.lastPostAssemblyNumber);
                 if (data.lastAssistanceNumber !== undefined) setLastAssistanceNumber(data.lastAssistanceNumber);
@@ -744,8 +753,32 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     const canUserEditAssistance = (): boolean => {
         if (!currentUser) return false;
-        if (currentUser.role === 'Vendedor') return false;
-        return true;
+        const userPerms = permissions.find(p => p.role === currentUser.role);
+        return userPerms?.canEditAssistance ?? false;
+    };
+
+    const canUserViewAssembly = (): boolean => {
+        if (!currentUser) return false;
+        const userPerms = permissions.find(p => p.role === currentUser.role);
+        return userPerms?.canViewAssembly ?? false;
+    };
+
+    const canUserEditAssembly = (): boolean => {
+        if (!currentUser) return false;
+        const userPerms = permissions.find(p => p.role === currentUser.role);
+        return userPerms?.canEditAssembly ?? false;
+    };
+
+    const canUserViewPostAssembly = (): boolean => {
+        if (!currentUser) return false;
+        const userPerms = permissions.find(p => p.role === currentUser.role);
+        return userPerms?.canViewPostAssembly ?? false;
+    };
+
+    const canUserEditPostAssembly = (): boolean => {
+        if (!currentUser) return false;
+        const userPerms = permissions.find(p => p.role === currentUser.role);
+        return userPerms?.canEditPostAssembly ?? false;
     };
 
     const moveBatchToStep = (batchId: string, targetStepId: string) => {
@@ -1474,6 +1507,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             updateEnvironmentDetails, updateClientData, updateProjectBriefing, formalizeContract, updateProjectSeller, updateProjectPostAssembly, updateProjectPostAssemblyItems,
             addAssistanceTicket, updateAssistanceTicket,
             canUserAdvanceStep, canUserViewStage, canUserEditAssistance,
+            canUserViewAssembly, canUserEditAssembly, canUserViewPostAssembly, canUserEditPostAssembly,
             saveStoreConfig, resetStoreDefaults,
             getBranchingOptions,
             // Assembly Scheduling

@@ -128,84 +128,96 @@ export const DEFAULT_PERMISSIONS: PermissionConfig[] = [
         canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: true, canEditProject: true,
         canChangeSeller: true,
         viewableStages: ALL_STAGES,
-        actionableSteps: ALL_STEPS
+        actionableSteps: ALL_STEPS,
+        canViewAssembly: true, canEditAssembly: true, canViewPostAssembly: true, canEditPostAssembly: true, canViewAssistance: true, canEditAssistance: true,
     },
     {
         role: 'Vendedor',
         canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: false, canEditProject: true,
         canChangeSeller: false,
         viewableStages: [1, 2, 4, 8, 9],
-        actionableSteps: ['1.1', '1.2', '1.3', '2.5', '2.7', '2.8', '2.9', '2.10', '4.5', '8.7', '8.8']
+        actionableSteps: ['1.1', '1.2', '1.3', '2.5', '2.7', '2.8', '2.9', '2.10', '4.5', '8.7', '8.8'],
+        canViewAssembly: true, canEditAssembly: false, canViewPostAssembly: true, canEditPostAssembly: false, canViewAssistance: true, canEditAssistance: false,
     },
     {
         role: 'Projetista',
         canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: false, canEditProject: true,
         canChangeSeller: false,
         viewableStages: [1, 2, 3, 4],
-        actionableSteps: ['2.1', '2.2', '2.3', '2.4', '2.6', '4.1']
+        actionableSteps: ['2.1', '2.2', '2.3', '2.4', '2.6', '4.1'],
+        canViewAssembly: false, canEditAssembly: false, canViewPostAssembly: false, canEditPostAssembly: false, canViewAssistance: false, canEditAssistance: false,
     },
     {
         role: 'Gerente',
         canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: true, canEditProject: true,
         canChangeSeller: true,
         viewableStages: ALL_STAGES,
-        actionableSteps: ALL_STEPS
+        actionableSteps: ALL_STEPS,
+        canViewAssembly: true, canEditAssembly: true, canViewPostAssembly: true, canEditPostAssembly: true, canViewAssistance: true, canEditAssistance: true,
     },
     {
         role: 'Coordenador de Montagem',
         canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: false, canEditProject: true,
         canChangeSeller: false,
         viewableStages: [6, 7, 8],
-        actionableSteps: ['7.2', '8.5']
+        actionableSteps: ['7.2', '8.5'],
+        canViewAssembly: true, canEditAssembly: true, canViewPostAssembly: true, canEditPostAssembly: true, canViewAssistance: true, canEditAssistance: true,
     },
     {
         role: 'Montador',
         canViewDashboard: true, canViewKanban: false, canViewClients: false, canViewSettings: false, canEditProject: false,
         canChangeSeller: false,
         viewableStages: [7, 8],
-        actionableSteps: ['7.1', '8.1', '8.4']
+        actionableSteps: ['7.1', '8.1', '8.4'],
+        canViewAssembly: false, canEditAssembly: false, canViewPostAssembly: true, canEditPostAssembly: false, canViewAssistance: true, canEditAssistance: false,
     },
     {
         role: 'Logistica',
         canViewDashboard: true, canViewKanban: true, canViewClients: false, canViewSettings: false, canEditProject: false,
         canChangeSeller: false,
         viewableStages: [5, 6, 8],
-        actionableSteps: ['5.1', '6.1', '6.2', '6.3', '8.3']
+        actionableSteps: ['5.1', '6.1', '6.2', '6.3', '8.3'],
+        canViewAssembly: true, canEditAssembly: true, canViewPostAssembly: true, canEditPostAssembly: true, canViewAssistance: true, canEditAssistance: true,
     },
     {
         role: 'Medidor',
         canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: false, canEditProject: false,
         canChangeSeller: false,
         viewableStages: [3],
-        actionableSteps: ['3.1', '3.2']
+        actionableSteps: ['3.1', '3.2'],
+        canViewAssembly: false, canEditAssembly: false, canViewPostAssembly: false, canEditPostAssembly: false, canViewAssistance: false, canEditAssistance: false,
     },
     {
         role: 'Proprietario',
         canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: true, canEditProject: true,
         canChangeSeller: true,
         viewableStages: ALL_STAGES,
-        actionableSteps: ALL_STEPS
+        actionableSteps: ALL_STEPS,
+        canViewAssembly: true, canEditAssembly: true, canViewPostAssembly: true, canEditPostAssembly: true, canViewAssistance: true, canEditAssistance: true,
     },
     {
         role: 'Liberador',
         canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: false, canEditProject: true,
         canChangeSeller: false,
         viewableStages: [4, 8, 9],
-        actionableSteps: ['4.2', '4.4', '4.6', '8.2']
+        actionableSteps: ['4.2', '4.4', '4.6', '8.2'],
+        canViewAssembly: false, canEditAssembly: false, canViewPostAssembly: false, canEditPostAssembly: false, canViewAssistance: false, canEditAssistance: false,
     },
     {
         role: 'Financeiro',
         canViewDashboard: true, canViewKanban: true, canViewClients: true, canViewSettings: false, canEditProject: false,
         canChangeSeller: false,
         viewableStages: [4, 5],
-        actionableSteps: ['4.3', '5.2']
+        actionableSteps: ['4.3', '5.2'],
+        canViewAssembly: true, canEditAssembly: false, canViewPostAssembly: true, canEditPostAssembly: false, canViewAssistance: true, canEditAssistance: false,
     },
     {
         role: 'Industria',
         canViewDashboard: true, canViewKanban: true, canViewClients: false, canViewSettings: false, canEditProject: false,
         canChangeSeller: false,
         viewableStages: [5, 8],
-        actionableSteps: []
+        actionableSteps: [],
+        canViewAssembly: false, canEditAssembly: false, canViewPostAssembly: false, canEditPostAssembly: false, canViewAssistance: false, canEditAssistance: false,
     },
 ];
 

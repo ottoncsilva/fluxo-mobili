@@ -99,6 +99,9 @@ const AppContent: React.FC = () => {
       case ViewState.KANBAN: return userPerms.canViewKanban;
       case ViewState.CLIENT_LIST: return userPerms.canViewClients;
       case ViewState.SETTINGS: return userPerms.canViewSettings;
+      case ViewState.ASSEMBLY_SCHEDULER: return userPerms.canViewAssembly ?? false;
+      case ViewState.POST_ASSEMBLY: return userPerms.canViewPostAssembly ?? false;
+      case ViewState.ASSISTANCE: return userPerms.canViewAssistance ?? false;
       default: return true;
     }
   };
@@ -154,10 +157,10 @@ const AppContent: React.FC = () => {
     if (canAccess(ViewState.DASHBOARD)) navItems.push({ icon: 'dashboard', view: ViewState.DASHBOARD, label: 'Início' });
     if (canAccess(ViewState.KANBAN)) navItems.push({ icon: 'view_kanban', view: ViewState.KANBAN, label: 'Kanban' });
     navItems.push({ icon: 'calendar_month', view: ViewState.AGENDA, label: 'Agenda' });
-    navItems.push({ icon: 'construction', view: ViewState.ASSEMBLY_SCHEDULER, label: 'Montagens' });
+    if (canAccess(ViewState.ASSEMBLY_SCHEDULER)) navItems.push({ icon: 'construction', view: ViewState.ASSEMBLY_SCHEDULER, label: 'Montagens' });
     if (canAccess(ViewState.CLIENT_LIST)) navItems.push({ icon: 'groups', view: ViewState.CLIENT_LIST, label: 'Clientes' });
-    navItems.push({ icon: 'checklist', view: ViewState.POST_ASSEMBLY, label: 'Pós-Montagem' });
-    navItems.push({ icon: 'handyman', view: ViewState.ASSISTANCE, label: 'Assistência' });
+    if (canAccess(ViewState.POST_ASSEMBLY)) navItems.push({ icon: 'checklist', view: ViewState.POST_ASSEMBLY, label: 'Pós-Montagem' });
+    if (canAccess(ViewState.ASSISTANCE)) navItems.push({ icon: 'handyman', view: ViewState.ASSISTANCE, label: 'Assistência' });
     if (canAccess(ViewState.SETTINGS)) navItems.push({ icon: 'settings', view: ViewState.SETTINGS, label: 'Config' });
   }
 

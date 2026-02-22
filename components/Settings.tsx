@@ -653,6 +653,46 @@ const Settings: React.FC = () => {
                                         ))}
                                     </div>
                                 </div>
+
+                                {/* Módulos Especiais */}
+                                <div className="space-y-4 mt-6">
+                                    <h4 className="text-sm font-bold text-primary uppercase tracking-wider border-b border-slate-100 dark:border-slate-800 pb-2">Módulos Especiais</h4>
+                                    <p className="text-xs text-slate-500 mb-3">Controle o acesso aos módulos de Montagens, Pós-Montagem e Assistência Técnica.</p>
+                                    <div className="space-y-3">
+                                        {[
+                                            { label: 'Montagens', icon: 'construction', viewKey: 'canViewAssembly' as const, editKey: 'canEditAssembly' as const },
+                                            { label: 'Pós-Montagem', icon: 'checklist', viewKey: 'canViewPostAssembly' as const, editKey: 'canEditPostAssembly' as const },
+                                            { label: 'Assistência Técnica', icon: 'handyman', viewKey: 'canViewAssistance' as const, editKey: 'canEditAssistance' as const },
+                                        ].map(({ label, icon, viewKey, editKey }) => (
+                                            <div key={viewKey} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-lg">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="material-symbols-outlined text-slate-400 text-[18px]">{icon}</span>
+                                                    <span className="font-medium text-sm text-slate-800 dark:text-white">{label}</span>
+                                                </div>
+                                                <div className="flex gap-6">
+                                                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={activeRolePerms?.[viewKey] ?? false}
+                                                            onChange={e => handlePermissionChange(selectedRoleForPerms, viewKey, e.target.checked)}
+                                                            className="rounded text-primary focus:ring-primary"
+                                                        />
+                                                        <span className="text-slate-600 dark:text-slate-300">Visualizar</span>
+                                                    </label>
+                                                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={activeRolePerms?.[editKey] ?? false}
+                                                            onChange={e => handlePermissionChange(selectedRoleForPerms, editKey, e.target.checked)}
+                                                            className="rounded text-primary focus:ring-primary"
+                                                        />
+                                                        <span className="text-slate-600 dark:text-slate-300">Editar</span>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
                         </div>
 

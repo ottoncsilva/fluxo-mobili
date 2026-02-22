@@ -11,8 +11,11 @@ const PostAssembly: React.FC = () => {
         currentUser,
         updateProjectPostAssemblyItems,
         companySettings,
-        workflowOrder
+        workflowOrder,
+        canUserEditPostAssembly
     } = useProjects();
+
+    const canEdit = canUserEditPostAssembly();
 
     // Define Post-Assembly Columns (Stage 8) dynamically
     const POST_ASSEMBLY_STEP_IDS = useMemo(() => {
@@ -371,12 +374,14 @@ const PostAssembly: React.FC = () => {
                             <p className="text-xs text-slate-500">Fluxo de resolução e qualidade (Etapa 8).</p>
                         </div>
                     </div>
-                    <button
-                        onClick={() => setIsStartOpen(true)}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/20"
-                    >
-                        <span className="material-symbols-outlined text-sm">play_arrow</span> Iniciar Pós-Montagem
-                    </button>
+                    {canEdit && (
+                        <button
+                            onClick={() => setIsStartOpen(true)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/20"
+                        >
+                            <span className="material-symbols-outlined text-sm">play_arrow</span> Iniciar Pós-Montagem
+                        </button>
+                    )}
                 </div>
 
                 {/* Filter Bar */}
@@ -746,9 +751,11 @@ const PostAssembly: React.FC = () => {
                                                                 <span className="font-bold text-sm text-slate-800 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">{item.environmentName}</span>
                                                                 {item.costType && <span className="text-[10px] font-bold px-2 py-0.5 rounded border border-slate-200 text-slate-500">{item.costType}</span>}
                                                             </div>
-                                                            <button onClick={() => handleStartEditingItem(item)} className="p-1 text-slate-400 hover:text-blue-500 rounded hover:bg-blue-50">
-                                                                <span className="material-symbols-outlined text-sm">edit</span>
-                                                            </button>
+                                                            {canEdit && (
+                                                                <button onClick={() => handleStartEditingItem(item)} className="p-1 text-slate-400 hover:text-blue-500 rounded hover:bg-blue-50">
+                                                                    <span className="material-symbols-outlined text-sm">edit</span>
+                                                                </button>
+                                                            )}
                                                         </div>
                                                         <p className="text-slate-600 dark:text-slate-300 font-medium mb-3">{item.problemDescription}</p>
 
@@ -870,7 +877,7 @@ const PostAssembly: React.FC = () => {
                             </p>
                             <div className="flex gap-3">
                                 <button onClick={() => { setIsInspectionOpen(false); setSelectedProject(null); }} className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 font-bold text-sm">Fechar</button>
-                                {(() => {
+                                {canEdit && (() => {
                                     const batch = getProjectBatch(selectedProject.id);
                                     if (batch && batch.phase !== '8.7') {
                                         return (
