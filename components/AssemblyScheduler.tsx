@@ -285,15 +285,22 @@ const AssemblyScheduler: React.FC = () => {
     const handleSaveSchedule = () => {
         if (!selectedBatch) return;
         setIsSavingSchedule(true);
+
+        // Build schedule object without undefined properties
         const schedule: AssemblySchedule = {
             status: scheduleForm.status || 'Sem Previsão',
-            teamId: scheduleForm.teamId || undefined,  // Allow undefined to unset team
-            teamName: scheduleForm.teamId ? assemblyTeams.find(t => t.id === scheduleForm.teamId)?.name : undefined,
             forecastDate: scheduleForm.forecastDate,
             scheduledDate: scheduleForm.scheduledDate,
             estimatedDays: scheduleForm.estimatedDays,
             notes: scheduleForm.notes,
         };
+
+        // Only add teamId and teamName if they have values
+        if (scheduleForm.teamId) {
+            schedule.teamId = scheduleForm.teamId;
+            schedule.teamName = assemblyTeams.find(t => t.id === scheduleForm.teamId)?.name;
+        }
+
         updateBatchAssemblySchedule(selectedBatch.id, schedule);
         setTimeout(() => {
             setIsSavingSchedule(false);
