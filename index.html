@@ -62,6 +62,11 @@
       font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
     }
 
+    /* Dark mode: força scrollbars nativos do browser para o tema escuro */
+    .dark {
+      color-scheme: dark;
+    }
+
     /* Custom scrollbar */
     .custom-scrollbar::-webkit-scrollbar {
       width: 6px;
@@ -87,6 +92,11 @@
 
     .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
       background-color: #475569;
+    }
+
+    /* Firefox: scrollbar-color para todos os elementos com overflow */
+    .dark * {
+      scrollbar-color: #334155 transparent;
     }
 
     input[type="checkbox"]:checked {

@@ -11,6 +11,9 @@ const TechnicalAssistance: React.FC = () => {
     const [hideCompleted, setHideCompleted] = useState(false);
     const [filterClient, setFilterClient] = useState('');
     const [filterAssembler, setFilterAssembler] = useState('');
+    const [filterPriority, setFilterPriority] = useState<'' | 'Normal' | 'Urgente'>('');
+    const [filterDateFrom, setFilterDateFrom] = useState('');
+    const [filterDateTo, setFilterDateTo] = useState('');
 
     // Modals
     const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -360,8 +363,9 @@ const TechnicalAssistance: React.FC = () => {
                 </div>
 
                 {/* Filter Bar */}
-                <div className="flex flex-wrap items-center gap-4 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg">
-                    <div className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-3 py-1.5 flex-1 min-w-[200px]">
+                <div className="flex flex-wrap items-center gap-2 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg">
+                    {/* Cliente */}
+                    <div className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-3 py-1.5 flex-1 min-w-[160px]">
                         <span className="material-symbols-outlined text-slate-400 text-sm">search</span>
                         <input
                             type="text"
@@ -371,7 +375,8 @@ const TechnicalAssistance: React.FC = () => {
                             className="bg-transparent border-none text-sm w-full focus:ring-0 p-0 text-slate-700 dark:text-slate-200"
                         />
                     </div>
-                    <div className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-3 py-1.5 flex-1 min-w-[200px]">
+                    {/* Montador */}
+                    <div className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-3 py-1.5 flex-1 min-w-[160px]">
                         <span className="material-symbols-outlined text-slate-400 text-sm">person</span>
                         <input
                             type="text"
@@ -381,7 +386,52 @@ const TechnicalAssistance: React.FC = () => {
                             className="bg-transparent border-none text-sm w-full focus:ring-0 p-0 text-slate-700 dark:text-slate-200"
                         />
                     </div>
-                    <label className="flex items-center gap-2 cursor-pointer select-none px-2">
+                    {/* Prioridade */}
+                    <div className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-3 py-1.5">
+                        <span className="material-symbols-outlined text-slate-400 text-sm">flag</span>
+                        <select
+                            value={filterPriority}
+                            onChange={(e) => setFilterPriority(e.target.value as '' | 'Normal' | 'Urgente')}
+                            className="bg-transparent border-none text-sm focus:ring-0 p-0 text-slate-700 dark:text-slate-200 cursor-pointer"
+                        >
+                            <option value="">Todas as prioridades</option>
+                            <option value="Normal">Normal</option>
+                            <option value="Urgente">Urgente</option>
+                        </select>
+                    </div>
+                    {/* Data de */}
+                    <div className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-3 py-1.5">
+                        <span className="material-symbols-outlined text-slate-400 text-sm">calendar_today</span>
+                        <input
+                            type="date"
+                            value={filterDateFrom}
+                            onChange={(e) => setFilterDateFrom(e.target.value)}
+                            title="Data de abertura — de"
+                            className="bg-transparent border-none text-sm focus:ring-0 p-0 text-slate-700 dark:text-slate-200 cursor-pointer"
+                        />
+                    </div>
+                    {/* Data até */}
+                    <div className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-3 py-1.5">
+                        <span className="material-symbols-outlined text-slate-400 text-sm">event</span>
+                        <input
+                            type="date"
+                            value={filterDateTo}
+                            onChange={(e) => setFilterDateTo(e.target.value)}
+                            title="Data de abertura — até"
+                            className="bg-transparent border-none text-sm focus:ring-0 p-0 text-slate-700 dark:text-slate-200 cursor-pointer"
+                        />
+                    </div>
+                    {/* Limpar filtros */}
+                    {(filterClient || filterAssembler || filterPriority || filterDateFrom || filterDateTo) && (
+                        <button
+                            onClick={() => { setFilterClient(''); setFilterAssembler(''); setFilterPriority(''); setFilterDateFrom(''); setFilterDateTo(''); }}
+                            className="flex items-center gap-1 px-2 py-1.5 text-xs font-bold text-rose-500 hover:text-rose-600 transition-colors"
+                        >
+                            <span className="material-symbols-outlined text-sm">filter_alt_off</span>
+                            Limpar
+                        </button>
+                    )}
+                    <label className="flex items-center gap-2 cursor-pointer select-none px-2 ml-auto">
                         <input
                             type="checkbox"
                             checked={hideCompleted}
@@ -406,7 +456,11 @@ const TechnicalAssistance: React.FC = () => {
                             if (t.status !== col.id) return false;
                             const matchClient = t.clientName.toLowerCase().includes(filterClient.toLowerCase());
                             const matchAssembler = filterAssembler ? t.assemblerName?.toLowerCase().includes(filterAssembler.toLowerCase()) : true;
-                            return matchClient && matchAssembler;
+                            const matchPriority = filterPriority ? t.priority === filterPriority : true;
+                            const ticketDate = new Date(t.createdAt);
+                            const matchDateFrom = filterDateFrom ? ticketDate >= new Date(filterDateFrom) : true;
+                            const matchDateTo = filterDateTo ? ticketDate <= new Date(filterDateTo + 'T23:59:59') : true;
+                            return matchClient && matchAssembler && matchPriority && matchDateFrom && matchDateTo;
                         });
 
                         return (

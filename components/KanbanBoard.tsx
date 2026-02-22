@@ -5,6 +5,7 @@ import AuditDrawer from './AuditDrawer';
 import LotModal from './LotModal';
 import StepDecisionModal from './StepDecisionModal';
 import { addBusinessDays, getBusinessDaysDifference } from '../utils/dateUtils';
+import { useToast } from '../context/ToastContext';
 
 // Define UI Columns. 
 // IDs 1-8 match the 'stage' property in workflowConfig.
@@ -34,7 +35,13 @@ const KanbanBoard: React.FC = () => {
     const [showCompleted, setShowCompleted] = useState(false);
     const [showLost, setShowLost] = useState(false);
 
-    const { batches, projects, workflowConfig, workflowOrder, setCurrentProjectId, canUserViewStage, splitBatch, advanceBatch, moveBatchToStep, canUserAdvanceStep, getBranchingOptions } = useProjects();
+    // Filtros de busca
+    const [searchQuery, setSearchQuery] = useState('');
+    const [filterSeller, setFilterSeller] = useState('');
+    const [showMyTasksOnly, setShowMyTasksOnly] = useState(false);
+
+    const { batches, projects, workflowConfig, workflowOrder, setCurrentProjectId, canUserViewStage, splitBatch, advanceBatch, moveBatchToStep, canUserAdvanceStep, getBranchingOptions, currentUser } = useProjects();
+    const { showToast } = useToast();
 
     const handleCardClick = (batchId: string, phase: string, projectId: string) => {
         setCurrentProjectId(projectId);
@@ -55,8 +62,17 @@ const KanbanBoard: React.FC = () => {
             setDecisionModalData({ batch, step: workflowConfig[batch.phase] });
         } else {
             await advanceBatch(batch.id);
+            const stepLabel = workflowConfig[batch.phase]?.label || 'Etapa';
+            showToast(`✓ ${stepLabel} concluída`);
         }
     };
+
+    // Lista única de vendedores para o filtro
+    const sellerOptions = useMemo(() => {
+        const sellers = new Set<string>();
+        projects.forEach((p: Project) => { if (p.sellerName) sellers.add(p.sellerName); });
+        return Array.from(sellers).sort();
+    }, [projects]);
 
     // Filter Columns based on User Permissions and Toggles
     const visibleUiColumns = useMemo(() => {
@@ -104,10 +120,29 @@ const KanbanBoard: React.FC = () => {
                 });
             }
 
-            // Apply Substep Filter if this is the active column and filter is set
-            const filteredBatches = (col.id === selectedColumnId && subStepFilter)
+            // Apply Substep Filter
+            let filteredBatches = (col.id === selectedColumnId && subStepFilter)
                 ? colBatches.filter((b: Batch) => b.phase === subStepFilter)
                 : colBatches;
+
+            // Apply search + seller + my-tasks filters
+            if (searchQuery.trim()) {
+                const q = searchQuery.toLowerCase();
+                filteredBatches = filteredBatches.filter((b: Batch) => {
+                    const project = projects.find((p: Project) => p.id === b.projectId);
+                    return project?.client.name.toLowerCase().includes(q) ||
+                           b.name?.toLowerCase().includes(q);
+                });
+            }
+            if (filterSeller) {
+                filteredBatches = filteredBatches.filter((b: Batch) => {
+                    const project = projects.find((p: Project) => p.id === b.projectId);
+                    return project?.sellerName === filterSeller;
+                });
+            }
+            if (showMyTasksOnly && currentUser) {
+                filteredBatches = filteredBatches.filter((b: Batch) => canUserAdvanceStep(b.phase));
+            }
 
             return {
                 ...col,
@@ -154,7 +189,7 @@ const KanbanBoard: React.FC = () => {
                 })
             };
         });
-    }, [visibleUiColumns, batches, projects, workflowConfig, subStepFilter, selectedColumnId]);
+    }, [visibleUiColumns, batches, projects, workflowConfig, subStepFilter, selectedColumnId, searchQuery, filterSeller, showMyTasksOnly, currentUser, canUserAdvanceStep]);
 
 
     // Get Substeps for the Sidebar
@@ -235,26 +270,62 @@ const KanbanBoard: React.FC = () => {
 
                 {/* Kanban Board Area */}
                 <div className="flex-1 flex flex-col overflow-hidden bg-slate-50 dark:bg-[#101922]">
-                    {/* Header with Stats & Visibility Toggles */}
-                    <div className="h-12 md:h-14 flex items-center justify-between px-3 md:px-6 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1a2632] shrink-0">
-                        <div className="flex items-center gap-2 md:gap-4">
-                            {/* Mobile: button to open sidebar drawer */}
+                    {/* Header com filtros */}
+                    <div className="flex flex-col border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1a2632] shrink-0">
+                        {/* Linha 1: busca + vendedor + botões */}
+                        <div className="flex items-center gap-2 px-3 md:px-4 py-2 flex-wrap">
+                            {/* Mobile: botão sidebar */}
                             <button
                                 onClick={() => setIsMobileSidebarOpen(true)}
-                                className="md:hidden flex items-center gap-1 text-sm font-bold text-slate-600 hover:text-primary transition-colors"
+                                className="md:hidden flex items-center gap-1 text-sm font-bold text-slate-600 hover:text-primary transition-colors shrink-0"
                             >
                                 <span className="material-symbols-outlined text-lg">tune</span>
                             </button>
-                            <button className="hidden md:flex items-center gap-1 text-sm font-bold text-slate-600 hover:text-primary transition-colors">
-                                <span className="material-symbols-outlined text-lg">filter_list</span>
-                                Filtros
-                            </button>
-                            <div className="hidden h-4 w-px bg-slate-300 dark:bg-slate-600"></div>
 
-                            {/* Visibility Toggles */}
-                            {/* Visibility Toggles */}
-                            <div className="flex items-center gap-4">
-                                <label className="flex items-center gap-2 cursor-pointer select-none">
+                            {/* Busca por cliente */}
+                            <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-1.5 flex-1 min-w-[160px] max-w-xs">
+                                <span className="material-symbols-outlined text-slate-400 text-[16px]">search</span>
+                                <input
+                                    type="text"
+                                    placeholder="Buscar cliente..."
+                                    value={searchQuery}
+                                    onChange={e => setSearchQuery(e.target.value)}
+                                    className="bg-transparent text-xs w-full focus:ring-0 border-none p-0 text-slate-700 dark:text-slate-200 outline-none placeholder-slate-400"
+                                />
+                                {searchQuery && (
+                                    <button onClick={() => setSearchQuery('')} className="text-slate-400 hover:text-slate-600">
+                                        <span className="material-symbols-outlined text-[14px]">close</span>
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Filtro por vendedor */}
+                            <div className="hidden md:flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-1.5">
+                                <span className="material-symbols-outlined text-slate-400 text-[16px]">sell</span>
+                                <select
+                                    value={filterSeller}
+                                    onChange={e => setFilterSeller(e.target.value)}
+                                    className="bg-transparent text-xs text-slate-700 dark:text-slate-200 border-none focus:ring-0 p-0 outline-none cursor-pointer"
+                                >
+                                    <option value="">Todos os vendedores</option>
+                                    {sellerOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                            </div>
+
+                            {/* Toggle: Minhas Tarefas */}
+                            <button
+                                onClick={() => setShowMyTasksOnly(v => !v)}
+                                className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${showMyTasksOnly ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-primary/10 hover:text-primary'}`}
+                            >
+                                <span className="material-symbols-outlined text-[15px]">person_check</span>
+                                Minhas tarefas
+                            </button>
+
+                            <div className="flex-1" />
+
+                            {/* Ocultar concluídos/perdidos */}
+                            <div className="hidden md:flex items-center gap-3">
+                                <label className="flex items-center gap-1.5 cursor-pointer select-none">
                                     <input
                                         type="checkbox"
                                         checked={!showCompleted}
@@ -263,8 +334,7 @@ const KanbanBoard: React.FC = () => {
                                     />
                                     <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Ocultar Concluídos</span>
                                 </label>
-
-                                <label className="flex items-center gap-2 cursor-pointer select-none">
+                                <label className="flex items-center gap-1.5 cursor-pointer select-none">
                                     <input
                                         type="checkbox"
                                         checked={!showLost}
@@ -274,12 +344,26 @@ const KanbanBoard: React.FC = () => {
                                     <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Ocultar Perdidos</span>
                                 </label>
                             </div>
+
+                            <span className="text-xs text-slate-400 shrink-0">{batches.length} lotes</span>
+                            <button onClick={() => setIsAuditOpen(true)} className="text-slate-500 hover:text-primary transition-colors shrink-0">
+                                <span className="material-symbols-outlined text-xl">history</span>
+                            </button>
                         </div>
 
-                        <div className="flex items-center gap-2 md:gap-4">
-                            <span className="text-xs md:text-sm text-slate-500">{batches.length} lotes</span>
-                            <button onClick={() => setIsAuditOpen(true)} className="text-slate-500 hover:text-primary transition-colors">
-                                <span className="material-symbols-outlined text-xl">history</span>
+                        {/* Linha 2 mobile: toggles de visibilidade */}
+                        <div className="md:hidden flex items-center gap-3 px-3 py-1.5 border-t border-slate-100 dark:border-slate-800">
+                            <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                <input type="checkbox" checked={!showCompleted} onChange={e => setShowCompleted(!e.target.checked)} className="rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-slate-600" />
+                                <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Ocultar Concluídos</span>
+                            </label>
+                            <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                <input type="checkbox" checked={!showLost} onChange={e => setShowLost(!e.target.checked)} className="rounded text-slate-600 focus:ring-slate-500 border-slate-300 dark:border-slate-600" />
+                                <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Ocultar Perdidos</span>
+                            </label>
+                            <button onClick={() => setShowMyTasksOnly(v => !v)} className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-bold ${showMyTasksOnly ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600'}`}>
+                                <span className="material-symbols-outlined text-[13px]">person_check</span>
+                                Minhas
                             </button>
                         </div>
                     </div>
