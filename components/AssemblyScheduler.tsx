@@ -245,12 +245,12 @@ const AssemblyScheduler: React.FC = () => {
     const getDeadlineChip = (assemblyDeadline?: string) => {
         if (!assemblyDeadline) return null;
         const days = getBusinessDaysDifference(new Date(), new Date(assemblyDeadline), companySettings?.holidays);
-        const dateStr = format(new Date(assemblyDeadline), 'dd/MM');
+        const dateStr = format(new Date(assemblyDeadline), 'dd/MM/yyyy');
         if (days > 15) {
-            return { cls: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400', icon: 'event', label: `Início até: ${dateStr} (+${days} d.ú.)`, pulse: false };
+            return { cls: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold', icon: 'event', label: `📅 Data Limite: ${dateStr} (+${days} d.ú.)`, pulse: false };
         }
         if (days >= 0 && days <= 15) {
-            return { cls: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 font-bold', icon: 'warning', label: `⚠ Início até: ${dateStr} (+${days} d.ú.)`, pulse: false };
+            return { cls: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 font-bold', icon: 'warning', label: `⚠ Data Limite: ${dateStr} (+${days} d.ú.)`, pulse: false };
         }
         // overdue
         return { cls: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 font-bold animate-pulse', icon: 'alarm', label: `🚨 URGENTE — Prazo vencido há ${Math.abs(days)} d.ú.`, pulse: true };
@@ -284,8 +284,8 @@ const AssemblyScheduler: React.FC = () => {
         setIsSavingSchedule(true);
         const schedule: AssemblySchedule = {
             status: scheduleForm.status || 'Sem Previsão',
-            teamId: scheduleForm.teamId,
-            teamName: assemblyTeams.find(t => t.id === scheduleForm.teamId)?.name,
+            teamId: scheduleForm.teamId || undefined,  // Allow undefined to unset team
+            teamName: scheduleForm.teamId ? assemblyTeams.find(t => t.id === scheduleForm.teamId)?.name : undefined,
             forecastDate: scheduleForm.forecastDate,
             scheduledDate: scheduleForm.scheduledDate,
             estimatedDays: scheduleForm.estimatedDays,
@@ -525,11 +525,14 @@ const AssemblyScheduler: React.FC = () => {
                                         );
                                     })}
 
-                                    {/* Today line */}
+                                    {/* Today column - full width with orange overlay */}
                                     {isInGanttRange(new Date().toISOString()) && (
                                         <div
-                                            className="absolute top-0 bottom-0 w-0.5 bg-rose-500 z-20 pointer-events-none"
-                                            style={{ left: `${dateToPercent(new Date())}%` }}
+                                            className="absolute top-0 bottom-0 bg-orange-200/50 dark:bg-orange-900/30 z-10 pointer-events-none"
+                                            style={{
+                                                left: `${dateToPercent(new Date())}%`,
+                                                width: `${(1 / totalDays) * 100}%`
+                                            }}
                                         />
                                     )}
 
@@ -563,7 +566,7 @@ const AssemblyScheduler: React.FC = () => {
                                                         <div
                                                             className="absolute -top-1 w-2 h-2 bg-rose-600 rotate-45 z-30 pointer-events-none"
                                                             style={{ left: `${clamp(relPct, 0, 92)}%` }}
-                                                            title={`Prazo: ${format(new Date(deadlineStr), 'dd/MM')}`}
+                                                            title={`Prazo: ${format(new Date(deadlineStr), 'dd/MM/yyyy')}`}
                                                         />
                                                     );
                                                 })()}
@@ -574,7 +577,7 @@ const AssemblyScheduler: React.FC = () => {
                             </div>
                             {/* Team separator - horizontal line between team rows */}
                             {idx < ganttRows.length - 1 && (
-                                <div className="w-full h-1.5 bg-slate-400 dark:bg-slate-600" />
+                                <div className="w-full h-1 bg-slate-400 dark:bg-slate-600" />
                             )}
                         </React.Fragment>
                         ))}
