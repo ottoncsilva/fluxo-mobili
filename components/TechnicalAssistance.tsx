@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useProjects } from '../context/ProjectContext';
-import { AssistanceTicket, AssistanceStatus, AssistanceItem, AssistanceEvent, AssistanceWorkflowStep } from '../types';
+import { AssistanceTicket, AssistanceStatus, AssistanceItem, AssistanceEvent, AssistanceWorkflowStep, AssemblyTeam } from '../types';
 
 
 
 const TechnicalAssistance: React.FC = () => {
-    const { assistanceTickets, updateAssistanceTicket, addAssistanceTicket, projects, assistanceWorkflow, canUserEditAssistance, currentUser, companySettings } = useProjects();
+    const { assistanceTickets, updateAssistanceTicket, addAssistanceTicket, projects, assistanceWorkflow, canUserEditAssistance, currentUser, companySettings, assemblyTeams } = useProjects();
 
     // Filters
     const [hideCompleted, setHideCompleted] = useState(false);
@@ -49,6 +49,7 @@ const TechnicalAssistance: React.FC = () => {
 
     // New Ticket State
     const [selectedClient, setSelectedClient] = useState('');
+    const [selectedTeam, setSelectedTeam] = useState('');
     const [ticketTitle, setTicketTitle] = useState('');
     const [ticketPriority, setTicketPriority] = useState<'Normal' | 'Urgente'>('Normal');
 
@@ -97,6 +98,8 @@ const TechnicalAssistance: React.FC = () => {
         }
         const clientName = projects.find(p => p.client.id === selectedClient)?.client.name || 'Cliente';
 
+        const team = selectedTeam ? assemblyTeams.find(t => t.id === selectedTeam) : null;
+
         addAssistanceTicket({
             clientId: selectedClient,
             clientName: clientName,
@@ -105,10 +108,11 @@ const TechnicalAssistance: React.FC = () => {
             priority: ticketPriority,
             items: newItems as AssistanceItem[],
             assemblerName: '', // Can be assigned later
+            teamId: selectedTeam || undefined,
             events: [
                 {
                     id: `evt-${Date.now()}`,
-                    description: `Chamado aberto com ${newItems.length} itens.`,
+                    description: `Chamado aberto${team ? ` e atribuído para ${team.name}` : ''} com ${newItems.length} itens.`,
                     date: new Date().toISOString(),
                     authorName: currentUser?.name || 'Sistema',
                     type: 'STATUS_CHANGE'
@@ -120,6 +124,7 @@ const TechnicalAssistance: React.FC = () => {
         setTicketTitle('');
         setNewItems([]);
         setSelectedClient('');
+        setSelectedTeam('');
     };
 
     const handleCardClick = (ticket: AssistanceTicket) => {
@@ -562,6 +567,23 @@ const TechnicalAssistance: React.FC = () => {
                                     <select value={ticketPriority} onChange={e => setTicketPriority(e.target.value as 'Normal' | 'Urgente')} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm">
                                         <option>Normal</option>
                                         <option>Urgente</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Equipe Responsável</label>
+                                    <select
+                                        value={selectedTeam}
+                                        onChange={e => setSelectedTeam(e.target.value)}
+                                        className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm"
+                                    >
+                                        <option value="">Sem atribuição</option>
+                                        {assemblyTeams
+                                            .filter(team => team.serviceTypes?.includes('assistance') !== false)
+                                            .map(team => (
+                                                <option key={team.id} value={team.id}>
+                                                    {team.name}
+                                                </option>
+                                            ))}
                                     </select>
                                 </div>
                                 <div className="col-span-2">

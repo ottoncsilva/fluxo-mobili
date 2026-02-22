@@ -746,7 +746,6 @@ const AssemblyScheduler: React.FC = () => {
                                         })}
                                     </div>
                                 </div>
-                            </div>
                             {/* Team separator */}
                             {idx < assistanceRows.length - 1 && (
                                 <div className="w-full h-1 bg-slate-400 dark:bg-slate-600" />
