@@ -144,24 +144,28 @@ const AppContent: React.FC = () => {
       case ViewState.SETTINGS: return "Configurações";
       case ViewState.AGENDA: return "Minha Agenda";
       case ViewState.ASSISTANCE: return "Assistência";
-      case ViewState.POST_ASSEMBLY: return "Pós-Montagem";
+      case ViewState.POST_ASSEMBLY: return "Pós-Montagem"; // título completo no header
       case ViewState.ASSEMBLY_SCHEDULER: return "Montagens";
       default: return "FluxoERP";
     }
   };
 
-  const navItems: { icon: string; view: ViewState; label: string }[] = [];
+  // group: 1=Operacional, 2=Pós-produção, 3=Pessoal/Admin
+  const navItems: { icon: string; view: ViewState; label: string; group: number }[] = [];
   if (currentUser.role === 'SuperAdmin') {
-    navItems.push({ icon: 'domain', view: ViewState.SUPER_ADMIN, label: 'Lojas' });
+    navItems.push({ icon: 'domain', view: ViewState.SUPER_ADMIN, label: 'Lojas', group: 1 });
   } else {
-    if (canAccess(ViewState.DASHBOARD)) navItems.push({ icon: 'dashboard', view: ViewState.DASHBOARD, label: 'Início' });
-    if (canAccess(ViewState.KANBAN)) navItems.push({ icon: 'view_kanban', view: ViewState.KANBAN, label: 'Kanban' });
-    navItems.push({ icon: 'calendar_month', view: ViewState.AGENDA, label: 'Agenda' });
-    if (canAccess(ViewState.ASSEMBLY_SCHEDULER)) navItems.push({ icon: 'construction', view: ViewState.ASSEMBLY_SCHEDULER, label: 'Montagens' });
-    if (canAccess(ViewState.CLIENT_LIST)) navItems.push({ icon: 'groups', view: ViewState.CLIENT_LIST, label: 'Clientes' });
-    if (canAccess(ViewState.POST_ASSEMBLY)) navItems.push({ icon: 'checklist', view: ViewState.POST_ASSEMBLY, label: 'Pós-Montagem' });
-    if (canAccess(ViewState.ASSISTANCE)) navItems.push({ icon: 'handyman', view: ViewState.ASSISTANCE, label: 'Assistência' });
-    if (canAccess(ViewState.SETTINGS)) navItems.push({ icon: 'settings', view: ViewState.SETTINGS, label: 'Config' });
+    // Grupo 1 — Operacional
+    if (canAccess(ViewState.DASHBOARD)) navItems.push({ icon: 'home', view: ViewState.DASHBOARD, label: 'Início', group: 1 });
+    if (canAccess(ViewState.KANBAN)) navItems.push({ icon: 'view_kanban', view: ViewState.KANBAN, label: 'Kanban', group: 1 });
+    if (canAccess(ViewState.CLIENT_LIST)) navItems.push({ icon: 'contacts', view: ViewState.CLIENT_LIST, label: 'Clientes', group: 1 });
+    // Grupo 2 — Pós-produção
+    if (canAccess(ViewState.ASSEMBLY_SCHEDULER)) navItems.push({ icon: 'carpenter', view: ViewState.ASSEMBLY_SCHEDULER, label: 'Montagens', group: 2 });
+    if (canAccess(ViewState.POST_ASSEMBLY)) navItems.push({ icon: 'fact_check', view: ViewState.POST_ASSEMBLY, label: 'Pós-Mont.', group: 2 });
+    if (canAccess(ViewState.ASSISTANCE)) navItems.push({ icon: 'support_agent', view: ViewState.ASSISTANCE, label: 'Assistência', group: 2 });
+    // Grupo 3 — Pessoal/Admin
+    navItems.push({ icon: 'calendar_month', view: ViewState.AGENDA, label: 'Agenda', group: 3 });
+    if (canAccess(ViewState.SETTINGS)) navItems.push({ icon: 'settings', view: ViewState.SETTINGS, label: 'Config', group: 3 });
   }
 
   return (
@@ -172,15 +176,21 @@ const AppContent: React.FC = () => {
         <div className="mb-4"></div> {/* Spacer instead of logo */}
 
         <nav className="flex flex-col gap-6 w-full px-4">
-          {navItems.map(item => (
-            <SidebarButton
-              key={item.view}
-              icon={item.icon}
-              isActive={currentView === item.view || (item.view === ViewState.CLIENT_LIST && currentView === ViewState.CLIENT_REGISTRATION)}
-              onClick={() => setCurrentView(item.view)}
-              tooltip={item.label}
-            />
-          ))}
+          {navItems.map((item, idx) => {
+            const prev = navItems[idx - 1];
+            const showSeparator = prev && prev.group !== item.group;
+            return (
+              <React.Fragment key={item.view}>
+                {showSeparator && <div className="h-px bg-slate-200 dark:bg-slate-700 w-full -my-2" />}
+                <SidebarButton
+                  icon={item.icon}
+                  isActive={currentView === item.view || (item.view === ViewState.CLIENT_LIST && currentView === ViewState.CLIENT_REGISTRATION)}
+                  onClick={() => setCurrentView(item.view)}
+                  tooltip={item.label}
+                />
+              </React.Fragment>
+            );
+          })}
           <div className="h-px bg-slate-200 dark:bg-slate-700 w-full my-2"></div>
           <button
             onClick={logout}
