@@ -59,6 +59,12 @@ export interface CompanySettings {
     notifyStatus: boolean;
     notifySla: boolean;
   };
+  holidays?: Array<{
+    date: string;        // Formato: "YYYY-MM-DD" para móveis ou "MM-DD" para fixos
+    name: string;        // Ex: "Carnaval", "Corpus Christi"
+    type: 'fixed' | 'movable';  // fixed = todo ano, movable = específico de ano
+    year?: number;       // Opcional, para feriados móveis de um ano específico
+  }>;
 }
 
 export interface PermissionConfig {

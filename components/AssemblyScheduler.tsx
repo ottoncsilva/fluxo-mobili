@@ -41,7 +41,7 @@ const STATUS_STYLES: Record<AssemblyStatus, string> = {
 const GANTT_WEEKS = 6; // visible window width
 
 // ─── Non-working day helpers ──────────────────────────────────────────────────
-const isNonWorkingDay = (day: Date): boolean => isWeekend(day) || isHoliday(day);
+// Note: Will be defined inside component to access companySettings
 
 const NON_WORKING_HEADER_STYLE: React.CSSProperties = {
     backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(100,116,139,0.35) 4px, rgba(100,116,139,0.35) 5px)'
@@ -59,10 +59,15 @@ const AssemblyScheduler: React.FC = () => {
     const {
         batches, projects, workflowConfig,
         assemblyTeams, updateBatchAssemblySchedule, saveAssemblyTeams,
-        canUserEditAssembly
+        canUserEditAssembly, companySettings
     } = useProjects();
 
     const canEdit = canUserEditAssembly();
+
+    // Helper function to check non-working days (weekends + holidays)
+    // Uses company settings for customized holidays
+    const isNonWorkingDay = (day: Date): boolean =>
+        isWeekend(day) || isHoliday(day, companySettings?.holidays);
 
     // ── Gantt state ────────────────────────────────────────────────────────────
     const [ganttAnchor, setGanttAnchor] = useState(new Date()); // start of visible range
@@ -110,8 +115,15 @@ const AssemblyScheduler: React.FC = () => {
     const [mobileTab, setMobileTab] = useState<'GANTT' | 'QUEUE'>('QUEUE');
 
     // ── Gantt helpers ──────────────────────────────────────────────────────────
+    // Helper to parse date strings correctly (avoiding timezone issues)
+    // "2026-03-16" should be interpreted as local 00:00, not UTC
+    const parseLocalDate = (dateStr: string): Date => {
+        const parts = dateStr.split('T')[0].split('-');
+        return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    };
+
     const dateToPercent = (date: Date | string): number => {
-        const d = typeof date === 'string' ? new Date(date) : date;
+        const d = typeof date === 'string' ? parseLocalDate(date) : date;
         const diff = differenceInDays(d, ganttStartDate);
         return clamp((diff / totalDays) * 100, 0, 100);
     };
@@ -123,7 +135,7 @@ const AssemblyScheduler: React.FC = () => {
 
     const isInGanttRange = (date: string | undefined): boolean => {
         if (!date) return false;
-        const d = new Date(date);
+        const d = parseLocalDate(date);
         return d >= ganttStartDate && d <= ganttEndDate;
     };
 
@@ -200,7 +212,7 @@ const AssemblyScheduler: React.FC = () => {
             const team = assemblyTeams.find(t => t.id === s?.teamId);
             const bizDays = s?.estimatedDays || 1;
             const startDateObj = new Date(date);
-            const endDateObj = addBusinessDays(startDateObj, bizDays);
+            const endDateObj = addBusinessDays(startDateObj, bizDays, companySettings?.holidays);
             const calendarDays = Math.max(1, differenceInDays(endDateObj, startDateObj));
             return [{
                 batchId: batch.id,
@@ -232,7 +244,7 @@ const AssemblyScheduler: React.FC = () => {
     // ── Deadline urgency ───────────────────────────────────────────────────────
     const getDeadlineChip = (assemblyDeadline?: string) => {
         if (!assemblyDeadline) return null;
-        const days = getBusinessDaysDifference(new Date(), new Date(assemblyDeadline));
+        const days = getBusinessDaysDifference(new Date(), new Date(assemblyDeadline), companySettings?.holidays);
         const dateStr = format(new Date(assemblyDeadline), 'dd/MM');
         if (days > 15) {
             return { cls: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400', icon: 'event', label: `Início até: ${dateStr} (+${days} d.ú.)`, pulse: false };
@@ -475,10 +487,11 @@ const AssemblyScheduler: React.FC = () => {
                         onTouchMove={handleGanttTouchMove}
                         onTouchEnd={handleGanttTouchEnd}
                     >
-                        {ganttRows.map(({ team, events }) => (
-                            <div key={team?.id || 'no-team'} className="flex border-b border-slate-100 dark:border-slate-800 last:border-b-0">
-                                {/* Row label */}
-                                <div className="w-32 shrink-0 px-3 py-2 border-r border-slate-200 dark:border-slate-700 flex items-start gap-2">
+                        {ganttRows.map(({ team, events }, idx) => (
+                            <React.Fragment key={team?.id || 'no-team'}>
+                                <div className="flex border-b border-slate-100 dark:border-slate-800 last:border-b-0">
+                                    {/* Row label */}
+                                    <div className="w-32 shrink-0 px-3 py-2 border-r border-slate-200 dark:border-slate-700 flex items-start gap-2">
                                     {team ? (
                                         <>
                                             <div className={`w-2.5 h-2.5 rounded-full shrink-0 mt-0.5 ${TEAM_COLOR_MAP[team.color]?.bg || 'bg-slate-400'}`} />
@@ -559,6 +572,11 @@ const AssemblyScheduler: React.FC = () => {
                                     })}
                                 </div>
                             </div>
+                            {/* Team separator - horizontal line between team rows */}
+                            {idx < ganttRows.length - 1 && (
+                                <div className="w-full h-1.5 bg-slate-400 dark:bg-slate-600" />
+                            )}
+                        </React.Fragment>
                         ))}
 
                         {ganttRows.every(r => r.events.length === 0) && (

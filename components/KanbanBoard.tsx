@@ -42,7 +42,7 @@ const KanbanBoard: React.FC = () => {
     const [filterSeller, setFilterSeller] = useState('');
     const [showMyTasksOnly, setShowMyTasksOnly] = useState(false);
 
-    const { batches, projects, workflowConfig, workflowOrder, setCurrentProjectId, canUserViewStage, splitBatch, advanceBatch, moveBatchToStep, canUserAdvanceStep, getBranchingOptions, currentUser, updateEnvironmentDetails } = useProjects();
+    const { batches, projects, workflowConfig, workflowOrder, setCurrentProjectId, canUserViewStage, splitBatch, advanceBatch, moveBatchToStep, canUserAdvanceStep, getBranchingOptions, currentUser, updateEnvironmentDetails, companySettings } = useProjects();
     const { showToast } = useToast();
 
     const handleCardClick = (batchId: string, phase: string, projectId: string) => {
@@ -194,10 +194,10 @@ const KanbanBoard: React.FC = () => {
                     const lastUpdate = new Date(b.lastUpdated);
 
                     // Deadline is N business days after last update
-                    const deadline = addBusinessDays(lastUpdate, step.sla);
+                    const deadline = addBusinessDays(lastUpdate, step.sla, companySettings?.holidays);
 
                     // Dias úteis restantes: positivo = no prazo, negativo = atrasado
-                    const remainingDays = getBusinessDaysDifference(now, deadline);
+                    const remainingDays = getBusinessDaysDifference(now, deadline, companySettings?.holidays);
                     let slaStatus: 'No Prazo' | 'Atenção' | 'Atrasado' = 'No Prazo';
                     let slaColor: 'emerald' | 'orange' | 'rose' = 'emerald';
 

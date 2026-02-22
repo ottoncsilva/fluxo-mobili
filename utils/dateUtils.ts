@@ -21,39 +21,71 @@ const formatMonthDay = (date: Date): string => {
 };
 
 /**
- * Verifica se uma data é feriado nacional fixo.
- * (Nota: Feriados móveis como Carnaval e Corpus Christi não estão incluídos nesta versão simples)
+ * Verifica se uma data é feriado (nacional fixo ou customizado).
+ * Suporta feriados fixos (todo ano) e móveis (específicos de um ano).
  */
-export const isHoliday = (date: Date): boolean => {
+export const isHoliday = (
+    date: Date,
+    customHolidays?: Array<{ date: string; name: string; type: 'fixed' | 'movable'; year?: number }>
+): boolean => {
+    // Verificar feriados fixos (hardcoded)
     const key = formatMonthDay(date);
-    return !!FIXED_HOLIDAYS[key];
+    if (FIXED_HOLIDAYS[key]) return true;
+
+    // Verificar feriados customizados
+    if (customHolidays && customHolidays.length > 0) {
+        const year = date.getFullYear();
+        const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD
+
+        for (const holiday of customHolidays) {
+            if (holiday.type === 'fixed') {
+                // Para fixos, comparar apenas MM-DD
+                const holidayMonthDay = holiday.date.length === 5
+                    ? holiday.date  // Já em formato MM-DD
+                    : holiday.date.substring(5);  // Extrair MM-DD de YYYY-MM-DD
+                if (key === holidayMonthDay) return true;
+            } else if (holiday.type === 'movable' && holiday.year === year) {
+                // Para móveis, comparar YYYY-MM-DD completo
+                if (dateStr === holiday.date) return true;
+            }
+        }
+    }
+
+    return false;
 };
 
 /**
  * Verifica se é dia útil (Segunda a Sexta, exceto feriados).
  */
-export const isBusinessDay = (date: Date): boolean => {
+export const isBusinessDay = (
+    date: Date,
+    customHolidays?: Array<{ date: string; name: string; type: 'fixed' | 'movable'; year?: number }>
+): boolean => {
     const dayOfWeek = date.getDay();
     // 0 = Domingo, 6 = Sábado
     if (dayOfWeek === 0 || dayOfWeek === 6) return false;
-    if (isHoliday(date)) return false;
+    if (isHoliday(date, customHolidays)) return false;
     return true;
 };
 
 /**
  * Adiciona dias úteis a uma data.
  */
-export const addBusinessDays = (startDate: Date | string, daysToAdd: number): Date => {
+export const addBusinessDays = (
+    startDate: Date | string,
+    daysToAdd: number,
+    customHolidays?: Array<{ date: string; name: string; type: 'fixed' | 'movable'; year?: number }>
+): Date => {
     const date = new Date(startDate);
     let daysAdded = 0;
 
-    // Se dias a adicionar for 0, retorna a data original (mas verifique se cai em fds/feriado se necessário? 
+    // Se dias a adicionar for 0, retorna a data original (mas verifique se cai em fds/feriado se necessário?
     // SLA 0 geralmente significa "mesmo dia", então se cair no domingo, deve ir pra segunda?
     // Pela lógica de prazo, sim. Mas vamos manter simples: soma dias úteis.
 
     // Se daysToAdd for 0, e hoje não for útil, move para o próximo útil.
     if (daysToAdd === 0) {
-        while (!isBusinessDay(date)) {
+        while (!isBusinessDay(date, customHolidays)) {
             date.setDate(date.getDate() + 1);
         }
         return date;
@@ -61,7 +93,7 @@ export const addBusinessDays = (startDate: Date | string, daysToAdd: number): Da
 
     while (daysAdded < daysToAdd) {
         date.setDate(date.getDate() + 1);
-        if (isBusinessDay(date)) {
+        if (isBusinessDay(date, customHolidays)) {
             daysAdded++;
         }
     }
@@ -74,7 +106,11 @@ export const addBusinessDays = (startDate: Date | string, daysToAdd: number): Da
  * Retorna valor positivo se endDate > startDate (prazo no futuro),
  * negativo se startDate > endDate (prazo já vencido), e 0 se iguais.
  */
-export const getBusinessDaysDifference = (startDate: Date | string, endDate: Date | string): number => {
+export const getBusinessDaysDifference = (
+    startDate: Date | string,
+    endDate: Date | string,
+    customHolidays?: Array<{ date: string; name: string; type: 'fixed' | 'movable'; year?: number }>
+): number => {
     const start = new Date(startDate);
     const end = new Date(endDate);
 
@@ -93,7 +129,7 @@ export const getBusinessDaysDifference = (startDate: Date | string, endDate: Dat
     current.setDate(current.getDate() + 1); // Começa a contar do dia seguinte
 
     while (current <= to) {
-        if (isBusinessDay(current)) {
+        if (isBusinessDay(current, customHolidays)) {
             count++;
         }
         current.setDate(current.getDate() + 1);

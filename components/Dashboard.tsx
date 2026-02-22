@@ -16,7 +16,7 @@ interface DashboardTask {
 }
 
 const Dashboard: React.FC = () => {
-    const { batches, workflowConfig, currentUser, projects, setCurrentProjectId, assistanceTickets, assistanceWorkflow } = useProjects();
+    const { batches, workflowConfig, currentUser, projects, setCurrentProjectId, assistanceTickets, assistanceWorkflow, companySettings } = useProjects();
 
     // Filter tasks relevant to the user's role AND exclude Completed/Lost
     const myTasks: DashboardTask[] = useMemo(() => {
@@ -105,9 +105,9 @@ const Dashboard: React.FC = () => {
                             <div className="p-8 text-center text-slate-400">Tudo em dia!</div>
                         ) : (
                             myTasks.map(task => {
-                                const deadline = addBusinessDays(task.lastUpdated, task.sla);
+                                const deadline = addBusinessDays(task.lastUpdated, task.sla, companySettings?.holidays);
                                 const now = new Date();
-                                const diffDays = getBusinessDaysDifference(now, deadline);
+                                const diffDays = getBusinessDaysDifference(now, deadline, companySettings?.holidays);
 
                                 return (
                                     <div key={task.id} className="p-3 bg-white dark:bg-[#1e293b] border border-slate-100 dark:border-slate-700/50 rounded-xl hover:shadow-md transition-all group cursor-pointer" onClick={() => task.projectId && setCurrentProjectId(task.projectId)}>
