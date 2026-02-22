@@ -43,6 +43,9 @@ const GANTT_WEEKS = 6; // visible window width
 // ─── Non-working day helpers ──────────────────────────────────────────────────
 // Note: Will be defined inside component to access companySettings
 
+// Abbreviated weekday names (dom, seg, ter, qua, qui, sex, sab)
+const WEEKDAY_ABBR = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+
 const NON_WORKING_HEADER_STYLE: React.CSSProperties = {
     backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(100,116,139,0.35) 4px, rgba(100,116,139,0.35) 5px)'
 };
@@ -453,10 +456,10 @@ const AssemblyScheduler: React.FC = () => {
                                                 style={nonWorking ? NON_WORKING_HEADER_STYLE : {}}
                                             >
                                                 <div className={nonWorking
-                                                    ? 'text-[8px] font-bold uppercase text-slate-300 dark:text-slate-600'
-                                                    : 'text-[9px] font-bold uppercase text-slate-400 dark:text-slate-500'
+                                                    ? 'text-[10px] font-bold uppercase text-slate-300 dark:text-slate-600'
+                                                    : 'text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400'
                                                 }>
-                                                    {format(day, 'EEE', { locale: ptBR })}
+                                                    {WEEKDAY_ABBR[day.getDay()]}
                                                 </div>
                                                 <div className={`font-bold ${
                                                     format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
