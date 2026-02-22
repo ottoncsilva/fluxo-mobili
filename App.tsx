@@ -10,6 +10,7 @@ import ProjectDetails from './components/ProjectDetails';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import Agenda from './components/Agenda';
+import AssemblyScheduler from './components/AssemblyScheduler';
 import SuperAdminDashboard from './components/SuperAdminDashboard';
 import { ProjectProvider, useProjects } from './context/ProjectContext';
 import { AuthProvider } from './context/AuthContext';
@@ -121,6 +122,7 @@ const AppContent: React.FC = () => {
       case ViewState.CLIENT_REGISTRATION: return <RegistrationForm onComplete={handleBackToClientList} />;
       case ViewState.ASSISTANCE: return <TechnicalAssistance />;
       case ViewState.POST_ASSEMBLY: return <PostAssembly />;
+      case ViewState.ASSEMBLY_SCHEDULER: return <AssemblyScheduler />;
       case ViewState.CLIENT_LIST: return <ClientList />;
       case ViewState.SETTINGS: return <Settings />;
       case ViewState.AGENDA: return <Agenda />;
@@ -140,6 +142,7 @@ const AppContent: React.FC = () => {
       case ViewState.AGENDA: return "Minha Agenda";
       case ViewState.ASSISTANCE: return "Assistência";
       case ViewState.POST_ASSEMBLY: return "Pós-Montagem";
+      case ViewState.ASSEMBLY_SCHEDULER: return "Montagens";
       default: return "FluxoERP";
     }
   };
@@ -151,6 +154,7 @@ const AppContent: React.FC = () => {
     if (canAccess(ViewState.DASHBOARD)) navItems.push({ icon: 'dashboard', view: ViewState.DASHBOARD, label: 'Início' });
     if (canAccess(ViewState.KANBAN)) navItems.push({ icon: 'view_kanban', view: ViewState.KANBAN, label: 'Kanban' });
     navItems.push({ icon: 'calendar_month', view: ViewState.AGENDA, label: 'Agenda' });
+    navItems.push({ icon: 'construction', view: ViewState.ASSEMBLY_SCHEDULER, label: 'Montagens' });
     if (canAccess(ViewState.CLIENT_LIST)) navItems.push({ icon: 'groups', view: ViewState.CLIENT_LIST, label: 'Clientes' });
     navItems.push({ icon: 'checklist', view: ViewState.POST_ASSEMBLY, label: 'Pós-Montagem' });
     navItems.push({ icon: 'handyman', view: ViewState.ASSISTANCE, label: 'Assistência' });

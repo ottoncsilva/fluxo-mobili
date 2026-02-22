@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { KanbanColumn, Batch, KanbanCard, WorkflowStep, Project } from '../types';
+import { KanbanColumn, Batch, KanbanCard, WorkflowStep, Project, EnvironmentValueEntry } from '../types';
 import { useProjects } from '../context/ProjectContext';
 import AuditDrawer from './AuditDrawer';
 import LotModal from './LotModal';
 import StepDecisionModal from './StepDecisionModal';
+import EnvironmentValuesModal from './EnvironmentValuesModal';
 import { addBusinessDays, getBusinessDaysDifference } from '../utils/dateUtils';
 import { useToast } from '../context/ToastContext';
 
@@ -30,6 +31,7 @@ const KanbanBoard: React.FC = () => {
     const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
     const [subStepFilter, setSubStepFilter] = useState<string | null>(null);
     const [decisionModalData, setDecisionModalData] = useState<{ batch: Batch, step: WorkflowStep } | null>(null);
+    const [envValuesData, setEnvValuesData] = useState<{ batch: Batch; project: Project } | null>(null);
 
     // Visibility Toggles
     const [showCompleted, setShowCompleted] = useState(false);
@@ -40,7 +42,7 @@ const KanbanBoard: React.FC = () => {
     const [filterSeller, setFilterSeller] = useState('');
     const [showMyTasksOnly, setShowMyTasksOnly] = useState(false);
 
-    const { batches, projects, workflowConfig, workflowOrder, setCurrentProjectId, canUserViewStage, splitBatch, advanceBatch, moveBatchToStep, canUserAdvanceStep, getBranchingOptions, currentUser } = useProjects();
+    const { batches, projects, workflowConfig, workflowOrder, setCurrentProjectId, canUserViewStage, splitBatch, advanceBatch, moveBatchToStep, canUserAdvanceStep, getBranchingOptions, currentUser, updateEnvironmentDetails } = useProjects();
     const { showToast } = useToast();
 
     const handleCardClick = (batchId: string, phase: string, projectId: string) => {
@@ -57,6 +59,16 @@ const KanbanBoard: React.FC = () => {
 
     const handleAdvanceClick = async (e: React.MouseEvent, batch: Batch) => {
         e.stopPropagation();
+
+        // Interceptar etapa 2.3 para preencher valores dos ambientes antes da decisão
+        if (batch.phase === '2.3') {
+            const project = projects.find((p: Project) => p.id === batch.projectId);
+            if (project) {
+                setEnvValuesData({ batch, project });
+                return;
+            }
+        }
+
         const options = getBranchingOptions(batch.phase);
         if (options.length > 0) {
             setDecisionModalData({ batch, step: workflowConfig[batch.phase] });
@@ -65,6 +77,33 @@ const KanbanBoard: React.FC = () => {
             const stepLabel = workflowConfig[batch.phase]?.label || 'Etapa';
             showToast(`✓ ${stepLabel} concluída`);
         }
+    };
+
+    // Salva os valores de cada ambiente e segue para o StepDecisionModal
+    const handleEnvValuesConfirm = (values: Record<string, number>) => {
+        if (!envValuesData) return;
+        const { batch, project } = envValuesData;
+
+        for (const [envId, value] of Object.entries(values)) {
+            const env = project.environments.find(e => e.id === envId);
+            if (!env || !value || value <= 0) continue;
+
+            const newVersion = (env.version || 0) + 1;
+            const newEntry: EnvironmentValueEntry = {
+                version: newVersion,
+                value,
+                date: new Date().toISOString()
+            };
+            updateEnvironmentDetails(project.id, envId, {
+                estimated_value: value,
+                version: newVersion,
+                valueHistory: [...(env.valueHistory || []), newEntry]
+            });
+        }
+
+        setEnvValuesData(null);
+        // Abre o StepDecisionModal normalmente (Aprovar → 2.4 | Revisar → 2.2)
+        setDecisionModalData({ batch, step: workflowConfig[batch.phase] });
     };
 
     // Lista única de vendedores para o filtro
@@ -496,6 +535,14 @@ const KanbanBoard: React.FC = () => {
             </div>
 
             <AuditDrawer isOpen={isAuditOpen} onClose={() => setIsAuditOpen(false)} />
+            {envValuesData && (
+                <EnvironmentValuesModal
+                    isOpen={true}
+                    onClose={() => setEnvValuesData(null)} // cancela — lote permanece em 2.3
+                    onConfirm={handleEnvValuesConfirm}
+                    project={envValuesData.project}
+                />
+            )}
             {selectedBatchId && (
                 <LotModal
                     isOpen={isLotModalOpen}

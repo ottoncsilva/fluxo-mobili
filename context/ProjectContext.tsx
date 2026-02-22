@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo } from 'react';
-import { Project, Batch, WorkflowStep, Environment, Client, User, Role, Note, FactoryOrder, PermissionConfig, AssistanceTicket, CompanySettings, AssistanceWorkflowStep, Store, StoreConfig, PostAssemblyEvaluation, AssistanceItem, AssistanceEvent } from '../types';
+import { Project, Batch, WorkflowStep, Environment, Client, User, Role, Note, FactoryOrder, PermissionConfig, AssistanceTicket, CompanySettings, AssistanceWorkflowStep, Store, StoreConfig, PostAssemblyEvaluation, AssistanceItem, AssistanceEvent, AssemblyTeam, AssemblySchedule } from '../types';
+import { addBusinessDays } from '../utils/dateUtils';
 import { db } from '../firebase'; // Import Firebase DB
 import { collection, onSnapshot, addDoc, setDoc, doc, updateDoc, deleteDoc, query, where, getDoc, Firestore } from "firebase/firestore";
 import { useAuth } from './AuthContext';
@@ -91,6 +92,11 @@ interface ProjectContextType {
     canUserEditAssistance: () => boolean;
     resetStoreDefaults: (type: 'origins' | 'assistance' | 'all') => Promise<boolean>;
     getBranchingOptions: (stepId: string) => any[];
+
+    // Assembly Scheduling
+    assemblyTeams: AssemblyTeam[];
+    updateBatchAssemblySchedule: (batchId: string, schedule: AssemblySchedule) => void;
+    saveAssemblyTeams: (teams: AssemblyTeam[]) => Promise<boolean>;
 }
 
 export const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -243,6 +249,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     const [assistanceWorkflow, setAssistanceWorkflow] = useState<AssistanceWorkflowStep[]>(INITIAL_ASSISTANCE_WORKFLOW);
     const [lastPostAssemblyNumber, setLastPostAssemblyNumber] = useState<number>(0);
     const [lastAssistanceNumber, setLastAssistanceNumber] = useState<number>(0);
+    const [assemblyTeams, setAssemblyTeams] = useState<AssemblyTeam[]>([]);
 
     const currentStore = useMemo(() => {
         if (!currentUser) return null;
@@ -304,6 +311,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
                 }
                 if (data.lastPostAssemblyNumber !== undefined) setLastPostAssemblyNumber(data.lastPostAssemblyNumber);
                 if (data.lastAssistanceNumber !== undefined) setLastAssistanceNumber(data.lastAssistanceNumber);
+                if (data.assemblyTeams) setAssemblyTeams(data.assemblyTeams);
             } else {
                 console.log("No remote config found, using defaults.");
             }
@@ -322,6 +330,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             setAssistanceWorkflow(INITIAL_ASSISTANCE_WORKFLOW);
             setLastPostAssemblyNumber(0);
             setLastAssistanceNumber(0);
+            setAssemblyTeams([]);
         }
     }, [currentUser]);
 
@@ -758,10 +767,17 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
         addNote(batch.projectId, `Movimentação direta: ${currentStepLabel} → ${nextStepLabel}`, currentUser?.id || 'sys');
 
-        const updateData = {
+        const now = new Date().toISOString();
+        const updateData: Partial<Batch> & { phase: string; lastUpdated: string } = {
             phase: targetStepId,
-            lastUpdated: new Date().toISOString()
+            lastUpdated: now
         };
+
+        // When departing from step 4.5, store deadline = now + 45 business days
+        if (batch.phase === '4.5') {
+            updateData.phase45CompletedAt = now;
+            updateData.assemblyDeadline = addBusinessDays(new Date(), 45).toISOString();
+        }
 
         if (useCloud) {
             persist("batches", batchId, updateData);
@@ -817,10 +833,17 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
         addNote(batch.projectId, `Etapa concluída: ${currentStep.label} → ${nextStep?.label || 'Finalizado'}`, currentUser?.id || 'sys');
 
-        const updateData = {
+        const now = new Date().toISOString();
+        const updateData: Partial<Batch> & { phase: string; lastUpdated: string } = {
             phase: finalNextStepId,
-            lastUpdated: new Date().toISOString()
+            lastUpdated: now
         };
+
+        // When completing step 4.5, store deadline = now + 45 business days
+        if (batch.phase === '4.5') {
+            updateData.phase45CompletedAt = now;
+            updateData.assemblyDeadline = addBusinessDays(new Date(), 45).toISOString();
+        }
 
         if (useCloud) {
             persist("batches", batchId, updateData);
@@ -1165,6 +1188,29 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         return true;
     };
 
+    // Assembly Scheduling Functions
+    const updateBatchAssemblySchedule = (batchId: string, schedule: AssemblySchedule) => {
+        const payload = { assemblySchedule: schedule, lastUpdated: new Date().toISOString() };
+        if (useCloud) {
+            persist("batches", batchId, payload);
+        } else {
+            setAllBatches(prev => prev.map(b => b.id === batchId ? { ...b, ...payload } : b));
+        }
+    };
+
+    const saveAssemblyTeams = async (teams: AssemblyTeam[]): Promise<boolean> => {
+        setAssemblyTeams(teams);
+        if (!currentStore || !db) return false;
+        try {
+            const configRef = doc(db, 'store_configs', currentStore.id);
+            await setDoc(configRef, { assemblyTeams: teams, updatedAt: new Date().toISOString() }, { merge: true });
+            return true;
+        } catch (e) {
+            console.error("Error saving assembly teams:", e);
+            return false;
+        }
+    };
+
     const getBranchingOptions = (stepId: string): { label: string, description: string, targetStepId: string, color: 'primary' | 'rose' | 'orange' | 'emerald', icon: string }[] => {
         if (stepId === '1.1') {
             return [
@@ -1429,7 +1475,9 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             addAssistanceTicket, updateAssistanceTicket,
             canUserAdvanceStep, canUserViewStage, canUserEditAssistance,
             saveStoreConfig, resetStoreDefaults,
-            getBranchingOptions
+            getBranchingOptions,
+            // Assembly Scheduling
+            assemblyTeams, updateBatchAssemblySchedule, saveAssemblyTeams
         }}>
             {children}
         </ProjectContext.Provider>

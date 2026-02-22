@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useProjects } from '../context/ProjectContext';
-import { Batch, Client, Project, Note, WorkflowStep, Environment, Role } from '../types';
+import { Batch, Client, Project, Note, WorkflowStep, Environment, Role, EnvironmentValueEntry } from '../types';
 import { maskPhone, maskCPF, maskCEP } from '../utils/masks';
 import StepDecisionModal from './StepDecisionModal';
 import LotModal from './LotModal';
 import ContractModal from './ContractModal';
 import EditableField from './EditableField'; // Assuming this component is available
+import EnvironmentValuesModal from './EnvironmentValuesModal';
 
 interface ProjectDetailsProps {
     onBack: () => void;
@@ -74,6 +75,10 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
     const [decisionModalData, setDecisionModalData] = useState<{ batch: Batch, step: WorkflowStep } | null>(null);
     const [selectedBatchIdForSplit, setSelectedBatchIdForSplit] = useState<string | null>(null);
     const [isLotModalOpen, setIsLotModalOpen] = useState(false);
+
+    // Environment Values Modal (etapa 2.3)
+    const [pendingAdvanceBatch, setPendingAdvanceBatch] = useState<Batch | null>(null);
+    const [showEnvValuesModal, setShowEnvValuesModal] = useState(false);
 
     // Contract Modal
     const [isContractOpen, setIsContractOpen] = useState(false);
@@ -177,6 +182,13 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
     };
 
     const handleAdvance = (batch: Batch) => {
+        // Interceptar etapa 2.3: mostrar modal de valores antes da decisão
+        if (batch.phase === '2.3') {
+            setPendingAdvanceBatch(batch);
+            setShowEnvValuesModal(true);
+            return;
+        }
+
         const step = workflowConfig[batch.phase];
 
         // CHECK FOR BRANCHING using context logic
@@ -192,6 +204,49 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
             setIsUpdatingStep(null);
         }, 300);
     };
+
+    // Continua o fluxo após fechar o EnvironmentValuesModal (com ou sem valores)
+    const continueAfterEnvValues = (batch: Batch) => {
+        const step = workflowConfig[batch.phase];
+        const options = getBranchingOptions(batch.phase);
+        if (options.length > 0) {
+            setDecisionModalData({ batch, step });
+        } else {
+            setIsUpdatingStep(batch.id);
+            setTimeout(() => {
+                advanceBatch(batch.id);
+                setIsUpdatingStep(null);
+            }, 300);
+        }
+    };
+
+    // Confirmar valores e seguir para StepDecisionModal
+    const handleEnvValuesConfirm = (values: Record<string, number>) => {
+        if (!pendingAdvanceBatch || !project) return;
+
+        for (const [envId, value] of Object.entries(values)) {
+            const env = project.environments.find(e => e.id === envId);
+            if (!env || !value || value <= 0) continue;
+
+            const newVersion = (env.version || 0) + 1;
+            const newEntry: EnvironmentValueEntry = {
+                version: newVersion,
+                value,
+                date: new Date().toISOString()
+            };
+            updateEnvironmentDetails(project.id, envId, {
+                estimated_value: value,
+                version: newVersion,
+                valueHistory: [...(env.valueHistory || []), newEntry]
+            });
+        }
+
+        const batch = pendingAdvanceBatch;
+        setShowEnvValuesModal(false);
+        setPendingAdvanceBatch(null);
+        continueAfterEnvValues(batch);
+    };
+
 
     const handleDecisionSelect = (targetStepId: string) => {
         if (!decisionModalData) return;
@@ -558,6 +613,7 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                     <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Nome do Ambiente</th>
                                     <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Valor Atual (R$)</th>
                                     <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Versão</th>
+                                    <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Histórico</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -576,17 +632,26 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                             />
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-xs text-slate-400 font-bold">V</span>
-                                                <input
-                                                    type="number"
-                                                    min="1"
-                                                    value={env.version || 1}
-                                                    onChange={(e) => updateEnvironmentDetails(project.id, env.id, { version: Number(e.target.value) })}
-                                                    disabled={!canEditClient}
-                                                    className="bg-transparent border border-slate-200 dark:border-slate-700 rounded px-2 py-1 text-sm font-bold text-slate-700 dark:text-slate-300 w-16 focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-50"
-                                                />
-                                            </div>
+                                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-primary/10 text-primary">
+                                                V{env.version || 1}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {env.valueHistory && env.valueHistory.length > 0 ? (
+                                                <div className="flex gap-1 flex-wrap">
+                                                    {env.valueHistory.map((entry: EnvironmentValueEntry) => (
+                                                        <span
+                                                            key={entry.version}
+                                                            className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 font-mono"
+                                                            title={`Registrado em ${new Date(entry.date).toLocaleString('pt-BR')}`}
+                                                        >
+                                                            V{entry.version}: R${entry.value.toLocaleString('pt-BR')}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <span className="text-xs text-slate-400 italic">—</span>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}
@@ -594,10 +659,10 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                             <tfoot className="bg-slate-50 dark:bg-slate-900 border-t-2 border-slate-200 dark:border-slate-700">
                                 <tr>
                                     <td className="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Total Geral</td>
-                                    <td></td>
                                     <td className="px-6 py-4 font-bold text-emerald-600 dark:text-emerald-400 text-base font-mono">
-                                        R$ {totalEnvironmentsValue.toLocaleString()}
+                                        R$ {totalEnvironmentsValue.toLocaleString('pt-BR')}
                                     </td>
+                                    <td></td>
                                     <td></td>
                                 </tr>
                             </tfoot>
@@ -1227,6 +1292,16 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                     </div>
                 </div>
             )}
+            {/* Modal de valores dos ambientes (etapa 2.3) */}
+            {showEnvValuesModal && project && pendingAdvanceBatch && (
+                <EnvironmentValuesModal
+                    isOpen={true}
+                    onClose={() => { setShowEnvValuesModal(false); setPendingAdvanceBatch(null); }} // cancela — lote permanece em 2.3
+                    onConfirm={handleEnvValuesConfirm}
+                    project={project}
+                />
+            )}
+
             {decisionModalData && (
                 <StepDecisionModal
                     isOpen={!!decisionModalData}

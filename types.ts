@@ -10,6 +10,7 @@ export enum ViewState {
   AGENDA = 'AGENDA',
   SUPER_ADMIN = 'SUPER_ADMIN',
   POST_ASSEMBLY = 'POST_ASSEMBLY', // New View
+  ASSEMBLY_SCHEDULER = 'ASSEMBLY_SCHEDULER', // Assembly Scheduling Module
 }
 
 export type Role = 'Admin' | 'Proprietario' | 'Gerente' | 'Vendedor' | 'Projetista' | 'Medidor' | 'Coordenador de Montagem' | 'Montador' | 'Logistica' | 'Liberador' | 'Financeiro' | 'Industria' | 'SuperAdmin';
@@ -99,6 +100,13 @@ export interface FactoryOrder {
   createdAt: string;
 }
 
+// Registra cada versão do valor de um ambiente (V1, V2, V3...)
+export interface EnvironmentValueEntry {
+  version: number;  // número sequencial: 1, 2, 3...
+  value: number;    // valor estimado nessa versão
+  date: string;     // ISO string da data do registro
+}
+
 export interface Environment {
   id: string;
   name: string;
@@ -109,6 +117,7 @@ export interface Environment {
   status: 'Pending' | 'InBatch' | 'PostAssembly' | 'Completed' | 'Lost';
   version?: number;
   final_value?: number; // Added to store the finalized value of the environment
+  valueHistory?: EnvironmentValueEntry[]; // histórico de versões do valor
 }
 
 export interface StoreConfig {
@@ -120,6 +129,7 @@ export interface StoreConfig {
   permissions: PermissionConfig[];
   lastPostAssemblyNumber?: number; // Counter for POS-XXXXX
   lastAssistanceNumber?: number; // Counter for ASS-XXXXX
+  assemblyTeams?: AssemblyTeam[];  // Assembly team definitions
   updatedAt: string;
 }
 
@@ -217,6 +227,10 @@ export interface Batch {
   createdAt?: string; // Date
   lastUpdated: string; // Date
   slaNotificationSent?: boolean; // New flag for SLA
+  // Assembly Scheduling
+  assemblySchedule?: AssemblySchedule;
+  phase45CompletedAt?: string; // ISO date: when step 4.5 was completed
+  assemblyDeadline?: string;   // ISO date: phase45CompletedAt + 45 business days
 }
 
 // Assistance Types
@@ -275,6 +289,26 @@ export interface AssistanceWorkflowStep {
   label: string;
   sla: number;
   ownerRole?: Role;
+}
+
+// Assembly Scheduling Types
+export interface AssemblyTeam {
+  id: string;
+  name: string;
+  members: string[]; // free-text names (not user IDs)
+  color: string;     // 'blue' | 'emerald' | 'violet' | 'orange' | 'rose' | 'amber' | 'cyan' | 'indigo' | 'teal' | 'pink'
+}
+
+export type AssemblyStatus = 'Sem Previsão' | 'Previsto' | 'Agendado' | 'Concluído';
+
+export interface AssemblySchedule {
+  teamId?: string;
+  teamName?: string;      // denormalised for display even if team is later deleted
+  forecastDate?: string;  // ISO date — status "Previsto"
+  scheduledDate?: string; // ISO date — status "Agendado" (confirmed)
+  estimatedDays?: number; // duration in calendar days (for Gantt bar width)
+  status: AssemblyStatus;
+  notes?: string;
 }
 
 // UI Types
