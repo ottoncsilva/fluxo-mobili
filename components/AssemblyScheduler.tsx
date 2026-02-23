@@ -990,7 +990,7 @@ const AssemblyScheduler: React.FC = () => {
                             <div className="flex flex-wrap gap-1">
                                 {[
                                     { key: 'Todos', label: 'Todos' },
-                                    ...assistanceWorkflow.slice(0, 6).map(step => ({ key: step.id, label: step.label }))
+                                    ...assistanceWorkflow.filter(step => step.id !== '10.8').map(step => ({ key: step.id, label: step.label }))
                                 ].map(f => (
                                     <button
                                         key={f.key}
