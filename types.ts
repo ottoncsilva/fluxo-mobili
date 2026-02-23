@@ -296,7 +296,11 @@ export interface AssistanceTicket {
   assemblerName?: string;
   events: AssistanceEvent[]; // History
   teamId?: string; // Link to AssemblyTeam for scheduling
+  teamName?: string; // denormalised para exibição
   estimatedDays?: number; // dias úteis até conclusão (SLA acumulado até 10.6)
+  forecastDate?: string; // ISO date — status "Previsto"
+  scheduledDate?: string; // ISO date — status "Agendado" (confirmado)
+  schedulingNotes?: string; // Notas específicas do agendamento
 }
 
 export interface AssistanceWorkflowStep {
