@@ -150,7 +150,8 @@ const AssemblyScheduler: React.FC = () => {
     const dateToPercent = (date: Date | string): number => {
         const d = typeof date === 'string' ? parseLocalDate(date) : date;
         const diff = differenceInDays(d, ganttStartDate);
-        return clamp((diff / totalDays) * 100, 0, 100);
+        // Don't clamp — allow negative/100%+ values so cards disappear off-screen
+        return (diff / totalDays) * 100;
     };
 
     const durationToPercent = (startDate: Date | string, days: number): number => {
