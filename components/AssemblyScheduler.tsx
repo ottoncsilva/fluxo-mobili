@@ -115,6 +115,7 @@ const AssemblyScheduler: React.FC = () => {
 
     // ── Queue state ────────────────────────────────────────────────────────────
     const [queueFilter, setQueueFilter] = useState<AssemblyStatus | 'Todos'>('Todos');
+    const [assistanceFilter, setAssistanceFilter] = useState<string>('Todos');
 
     // ── Schedule modal state ───────────────────────────────────────────────────
     const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
@@ -175,7 +176,8 @@ const AssemblyScheduler: React.FC = () => {
         if (!dragRef.current || !ganttBodyRef.current) return;
         const deltaX = e.clientX - dragRef.current.startX;
         if (Math.abs(deltaX) > 5) hasDraggedRef.current = true;
-        const colWidth = ganttBodyRef.current.clientWidth / totalDays;
+        // Subtract 128px (label column width) to use only the bar area width
+        const colWidth = (ganttBodyRef.current.clientWidth - 128) / totalDays;
         const daysDelta = Math.round(-deltaX / colWidth);
         setGanttAnchor(addDays(dragRef.current.startAnchor, daysDelta));
     };
@@ -194,7 +196,8 @@ const AssemblyScheduler: React.FC = () => {
         if (!dragRef.current || !ganttBodyRef.current) return;
         const deltaX = e.touches[0].clientX - dragRef.current.startX;
         if (Math.abs(deltaX) > 5) hasDraggedRef.current = true;
-        const colWidth = ganttBodyRef.current.clientWidth / totalDays;
+        // Subtract 128px (label column width) to use only the bar area width
+        const colWidth = (ganttBodyRef.current.clientWidth - 128) / totalDays;
         const daysDelta = Math.round(-deltaX / colWidth);
         setGanttAnchor(addDays(dragRef.current.startAnchor, daysDelta));
     };
@@ -274,6 +277,13 @@ const AssemblyScheduler: React.FC = () => {
             t.status !== '10.8'    // Excluir concluídas
         ),
         [assistanceTickets]
+    );
+
+    const filteredAssistances = useMemo(() =>
+        relevantAssistances.filter(t =>
+            assistanceFilter === 'Todos' || t.status === assistanceFilter
+        ),
+        [relevantAssistances, assistanceFilter]
     );
 
     const enrichedAssistances = useMemo(() =>
@@ -552,42 +562,45 @@ const AssemblyScheduler: React.FC = () => {
                                 ))}
                             </div>
                         </div>
-                        {/* Day header row */}
+                        {/* Day header row — absolute positioning matches body grid exactly */}
                         <div className="flex">
                             {/* Row label column */}
                             <div className="w-32 shrink-0 px-3 py-2 border-r border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                                 Equipe
                             </div>
-                            {/* Date columns */}
-                            <div className="flex-1 relative overflow-hidden">
-                                <div className="flex">
-                                    {ganttDays.map((day, i) => {
-                                        const nonWorking = isNonWorkingDay(day);
-                                        return (
-                                            <div
-                                                key={i}
-                                                className={`flex-1 py-1.5 text-center border-r border-slate-200 dark:border-slate-700 last:border-r-0 ${nonWorking ? 'bg-slate-50 dark:bg-slate-800/60' : ''}`}
-                                                style={nonWorking ? NON_WORKING_HEADER_STYLE : {}}
-                                            >
-                                                <div className={nonWorking
-                                                    ? 'text-[10px] font-bold uppercase text-slate-300 dark:text-slate-600'
-                                                    : 'text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400'
-                                                }>
-                                                    {WEEKDAY_ABBR[day.getDay()]}
-                                                </div>
-                                                <div className={`font-bold ${
-                                                    format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
-                                                        ? 'text-[11px] text-rose-600 dark:text-rose-400'
-                                                        : nonWorking
-                                                            ? 'text-[9px] text-slate-300 dark:text-slate-600'
-                                                            : 'text-[11px] text-slate-600 dark:text-slate-400'
-                                                }`}>
-                                                    {format(day, 'd')}
-                                                </div>
+                            {/* Date columns: use absolute positioning same as body grid */}
+                            <div className="flex-1 relative overflow-hidden" style={{ height: 38 }}>
+                                {ganttDays.map((day, i) => {
+                                    const nonWorking = isNonWorkingDay(day);
+                                    const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+                                    return (
+                                        <div
+                                            key={i}
+                                            className={`absolute top-0 bottom-0 flex flex-col items-center justify-center border-r border-slate-200 dark:border-slate-700 ${nonWorking ? 'bg-slate-50 dark:bg-slate-800/60' : ''}`}
+                                            style={{
+                                                left: `${(i / totalDays) * 100}%`,
+                                                width: `${(1 / totalDays) * 100}%`,
+                                                ...(nonWorking ? NON_WORKING_HEADER_STYLE : {})
+                                            }}
+                                        >
+                                            <div className={nonWorking
+                                                ? 'text-[10px] font-bold uppercase text-slate-300 dark:text-slate-600 leading-tight'
+                                                : 'text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 leading-tight'
+                                            }>
+                                                {WEEKDAY_ABBR[day.getDay()]}
                                             </div>
-                                        );
-                                    })}
-                                </div>
+                                            <div className={`font-bold leading-tight ${
+                                                isToday
+                                                    ? 'text-[11px] text-rose-600 dark:text-rose-400'
+                                                    : nonWorking
+                                                        ? 'text-[9px] text-slate-300 dark:text-slate-600'
+                                                        : 'text-[11px] text-slate-600 dark:text-slate-400'
+                                            }`}>
+                                                {format(day, 'd')}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     </div>
@@ -613,8 +626,8 @@ const AssemblyScheduler: React.FC = () => {
                                     )}
                                 </div>
 
-                                {/* Gantt bar area */}
-                                <div className="flex-1 relative" style={{ minHeight: 68 }}>
+                                {/* Gantt bar area — minHeight reduced 30% (68→48) */}
+                                <div className="flex-1 relative" style={{ minHeight: 48 }}>
                                     {/* Background grid */}
                                     {ganttDays.map((day, i) => {
                                         const nonWorking = isNonWorkingDay(day);
@@ -652,7 +665,7 @@ const AssemblyScheduler: React.FC = () => {
                                         return (
                                             <div
                                                 key={evt.batchId}
-                                                className={`absolute top-2 bottom-2 rounded-md px-2 flex items-center z-10 overflow-hidden transition-transform hover:scale-y-105 ${colorMap.bg} ${isDashed ? 'border-2 border-dashed border-white/60 opacity-80' : 'shadow-md'} ${canEdit ? 'cursor-pointer' : 'cursor-default'}`}
+                                                className={`absolute top-1.5 bottom-1.5 rounded-md px-2 flex items-center z-10 overflow-hidden transition-transform hover:scale-y-105 ${colorMap.bg} ${isDashed ? 'border-2 border-dashed border-white/60 opacity-80' : 'shadow-md'} ${canEdit ? 'cursor-pointer' : 'cursor-default'}`}
                                                 style={{ left: `${left}%`, width: `${Math.max(width, 1.5)}%`, minWidth: '44px' }}
                                                 onClick={() => {
                                                     if (hasDraggedRef.current) return;
@@ -715,8 +728,8 @@ const AssemblyScheduler: React.FC = () => {
                                         )}
                                     </div>
 
-                                    {/* Gantt bar area */}
-                                    <div className="flex-1 relative" style={{ minHeight: 68 }}>
+                                    {/* Gantt bar area — minHeight reduced 30% (68→48) */}
+                                    <div className="flex-1 relative" style={{ minHeight: 48 }}>
                                         {/* Background grid */}
                                         {ganttDays.map((day, i) => {
                                             const nonWorking = isNonWorkingDay(day);
@@ -744,18 +757,16 @@ const AssemblyScheduler: React.FC = () => {
                                             />
                                         )}
 
-                                        {/* Assistance bars (green-based colors) */}
+                                        {/* Assistance bars */}
                                         {events.map(evt => {
                                             const left = dateToPercent(evt.date);
                                             const width = durationToPercent(evt.date, evt.calendarDays);
-                                            const baseColor = TEAM_COLOR_MAP[evt.teamColor] || TEAM_COLOR_MAP.slate;
-                                            // Use a green-based color for assistance to distinguish from assembly
                                             const isUrgent = evt.priority === 'Urgente';
 
                                             return (
                                                 <div
                                                     key={evt.ticketId}
-                                                    className={`absolute top-2 bottom-2 rounded-md px-2 flex items-center z-10 overflow-hidden transition-transform hover:scale-y-105 ${isUrgent ? 'bg-rose-500 shadow-md' : 'bg-emerald-500 shadow-md'} ${canEdit ? 'cursor-pointer' : 'cursor-default'}`}
+                                                    className={`absolute top-1.5 bottom-1.5 rounded-md px-2 flex items-center z-10 overflow-hidden transition-transform hover:scale-y-105 ${isUrgent ? 'bg-rose-500 shadow-md' : 'bg-emerald-500 shadow-md'} ${canEdit ? 'cursor-pointer' : 'cursor-default'}`}
                                                     style={{ left: `${left}%`, width: `${Math.max(width, 1.5)}%`, minWidth: '44px' }}
                                                     title={`${evt.clientName} — ${evt.code} (${evt.status}) - ${evt.estimatedDays} d.ú.`}
                                                 >
@@ -790,243 +801,252 @@ const AssemblyScheduler: React.FC = () => {
 
                 {/* ── Queue panel ─────────────────────────────────────────────── */}
                 <div className={`w-full md:w-64 lg:w-80 xl:w-96 shrink-0 border-l border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden bg-slate-50/50 dark:bg-[#1a2632] ${mobileTab === 'GANTT' ? 'hidden md:flex' : 'flex'}`}>
-                    {/* Queue header + filters */}
-                    <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1e2936] shrink-0">
-                        <div className="flex items-center justify-between mb-2">
-                            <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">
-                                Fila de Montagens
-                            </h3>
-                            <span className="text-xs text-slate-400 font-medium">{relevantBatches.length} lotes</span>
-                        </div>
-                        {/* Filter chips */}
-                        <div className="flex flex-wrap gap-1">
-                            {(['Todos', 'Sem Previsão', 'Previsto', 'Agendado', 'Concluído'] as const).map(f => (
-                                <button
-                                    key={f}
-                                    onClick={() => setQueueFilter(f)}
-                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors ${queueFilter === f ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
-                                >
-                                    {f}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+                    {/* Unified scroll container: assembly + assistance */}
+                    <div className="flex-1 overflow-y-auto custom-scrollbar">
 
-                    {/* Queue cards */}
-                    <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-3">
-                        {queueBatches.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-12 text-center">
-                                <span className="material-symbols-outlined text-slate-300 dark:text-slate-600 text-4xl mb-2">construction</span>
-                                <p className="text-xs text-slate-400">Nenhum lote para este filtro</p>
+                        {/* ── MONTAGENS section ────────────────────────────────────── */}
+                        <div className="sticky top-0 z-10 px-3 py-2 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1e2936]">
+                            <div className="flex items-center justify-between mb-1.5">
+                                <div className="flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-primary text-sm">construction</span>
+                                    <h3 className="text-xs font-bold text-slate-700 dark:text-slate-200">Fila de Montagens</h3>
+                                </div>
+                                <span className="text-[10px] text-slate-400 font-medium">{relevantBatches.length} lotes</span>
                             </div>
-                        ) : (
-                            queueBatches.map(({ batch, project }) => {
-                                const scheduleStatus = (batch.assemblySchedule?.status || 'Sem Previsão') as AssemblyStatus;
-                                const team = assemblyTeams.find(t => t.id === batch.assemblySchedule?.teamId);
-                                const deadlineChip = getDeadlineChip(batch.assemblyDeadline);
-                                const stageBadge = getStageBadge(batch.phase);
-                                const step = workflowConfig[batch.phase];
-                                const envCount = batch.environmentIds?.length || project.environments.length;
-                                const defaultDays = envCount * 3;
-                                const estimatedDays = batch.assemblySchedule?.estimatedDays ?? defaultDays;
-                                const isCustomEstimate = batch.assemblySchedule?.estimatedDays !== undefined && batch.assemblySchedule.estimatedDays !== defaultDays;
+                            <div className="flex flex-wrap gap-1">
+                                {(['Todos', 'Sem Previsão', 'Previsto', 'Agendado', 'Concluído'] as const).map(f => (
+                                    <button
+                                        key={f}
+                                        onClick={() => setQueueFilter(f)}
+                                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors ${queueFilter === f ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+                                    >
+                                        {f}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
 
-                                return (
-                                    <div key={batch.id} className="bg-white dark:bg-[#1e2936] rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                                        {/* Status bar */}
-                                        <div className={`px-3 py-1.5 flex items-center justify-between ${STATUS_STYLES[scheduleStatus]}`}>
-                                            <span className="text-[10px] font-bold uppercase tracking-wide">{scheduleStatus}</span>
-                                            {team && (
-                                                <div className="flex items-center gap-1">
-                                                    <div className={`w-2 h-2 rounded-full ${TEAM_COLOR_MAP[team.color]?.bg || 'bg-slate-400'}`} />
-                                                    <span className="text-[10px] font-bold">{team.name}</span>
-                                                </div>
-                                            )}
-                                        </div>
+                        {/* Assembly cards — compacted ~20% */}
+                        <div className="p-2 space-y-2">
+                            {queueBatches.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-8 text-center">
+                                    <span className="material-symbols-outlined text-slate-300 dark:text-slate-600 text-4xl mb-2">construction</span>
+                                    <p className="text-xs text-slate-400">Nenhum lote para este filtro</p>
+                                </div>
+                            ) : (
+                                queueBatches.map(({ batch, project }) => {
+                                    const scheduleStatus = (batch.assemblySchedule?.status || 'Sem Previsão') as AssemblyStatus;
+                                    const team = assemblyTeams.find(t => t.id === batch.assemblySchedule?.teamId);
+                                    const deadlineChip = getDeadlineChip(batch.assemblyDeadline);
+                                    const stageBadge = getStageBadge(batch.phase);
+                                    const step = workflowConfig[batch.phase];
+                                    const envCount = batch.environmentIds?.length || project.environments.length;
+                                    const defaultDays = envCount * 3;
+                                    const estimatedDays = batch.assemblySchedule?.estimatedDays ?? defaultDays;
+                                    const isCustomEstimate = batch.assemblySchedule?.estimatedDays !== undefined && batch.assemblySchedule.estimatedDays !== defaultDays;
 
-                                        <div className="p-3">
-                                            {/* Client name */}
-                                            <div className="font-bold text-slate-800 dark:text-white text-sm truncate">{project.client.name}</div>
-                                            <div className="text-[11px] text-slate-400 mb-2">
-                                                {batch.name || 'Lote'} · {envCount} ambiente{envCount !== 1 ? 's' : ''}
+                                    return (
+                                        <div key={batch.id} className="bg-white dark:bg-[#1e2936] rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                                            {/* Status bar */}
+                                            <div className={`px-2.5 py-1 flex items-center justify-between ${STATUS_STYLES[scheduleStatus]}`}>
+                                                <span className="text-[10px] font-bold uppercase tracking-wide">{scheduleStatus}</span>
+                                                {team && (
+                                                    <div className="flex items-center gap-1">
+                                                        <div className={`w-2 h-2 rounded-full ${TEAM_COLOR_MAP[team.color]?.bg || 'bg-slate-400'}`} />
+                                                        <span className="text-[10px] font-bold">{team.name}</span>
+                                                    </div>
+                                                )}
                                             </div>
 
-                                            {/* Stage badge */}
-                                            {stageBadge && (
-                                                <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold mb-2 ${stageBadge.cls}`}>
-                                                    <span className="material-symbols-outlined text-[12px]">{stageBadge.icon}</span>
-                                                    {step?.label || stageBadge.label}
+                                            <div className="p-2">
+                                                {/* Client name */}
+                                                <div className="font-bold text-slate-800 dark:text-white text-sm truncate">{project.client.name}</div>
+                                                <div className="text-[10px] text-slate-400 mb-1.5">
+                                                    {batch.name || 'Lote'} · {envCount} amb{envCount !== 1 ? 's' : ''}
                                                 </div>
-                                            )}
 
-                                            {/* Deadline section */}
-                                            {deadlineChip && (
-                                                <div className="mb-2">
-                                                    <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-                                                        <span className="material-symbols-outlined text-[11px]">calendar_month</span>
-                                                        Limite para início da montagem
+                                                {/* Stage badge */}
+                                                {stageBadge && (
+                                                    <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold mb-1.5 ${stageBadge.cls}`}>
+                                                        <span className="material-symbols-outlined text-[11px]">{stageBadge.icon}</span>
+                                                        {step?.label || stageBadge.label}
                                                     </div>
-                                                    <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] ${deadlineChip.cls}`}>
-                                                        <span className="material-symbols-outlined text-[13px]">{deadlineChip.icon}</span>
+                                                )}
+
+                                                {/* Deadline */}
+                                                {deadlineChip && (
+                                                    <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] mb-1.5 ${deadlineChip.cls}`}>
+                                                        <span className="material-symbols-outlined text-[11px]">{deadlineChip.icon}</span>
                                                         {deadlineChip.label}
                                                     </div>
-                                                </div>
-                                            )}
+                                                )}
 
-                                            {/* Estimated duration */}
-                                            <div className={`text-[11px] mb-2 flex items-center gap-1 ${isCustomEstimate ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}>
-                                                <span className="material-symbols-outlined text-[13px]">timer</span>
-                                                {isCustomEstimate
-                                                    ? `Estimativa: ${estimatedDays} d.ú. (ajustado)`
-                                                    : `Estimativa: ${envCount} amb × 3d = ${defaultDays} d.ú.`
-                                                }
+                                                {/* Estimated duration */}
+                                                <div className={`text-[10px] mb-1.5 flex items-center gap-1 ${isCustomEstimate ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}>
+                                                    <span className="material-symbols-outlined text-[12px]">timer</span>
+                                                    {isCustomEstimate
+                                                        ? `${estimatedDays} d.ú. (ajustado)`
+                                                        : `${envCount}×3 = ${defaultDays} d.ú.`
+                                                    }
+                                                </div>
+
+                                                {/* Schedule info */}
+                                                {batch.assemblySchedule?.scheduledDate && (
+                                                    <div className="text-[10px] text-slate-500 mb-1.5 flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-[12px]">event</span>
+                                                        {format(new Date(batch.assemblySchedule.scheduledDate), "dd/MM/yy", { locale: ptBR })}
+                                                    </div>
+                                                )}
+                                                {!batch.assemblySchedule?.scheduledDate && batch.assemblySchedule?.forecastDate && (
+                                                    <div className="text-[10px] text-amber-600 mb-1.5 flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-[12px]">event_available</span>
+                                                        Prev: {format(new Date(batch.assemblySchedule.forecastDate), "dd/MM/yy", { locale: ptBR })}
+                                                    </div>
+                                                )}
+
+                                                {/* CTA */}
+                                                {canEdit && (
+                                                    <button
+                                                        onClick={() => handleOpenScheduleModal(batch)}
+                                                        className="w-full mt-1 py-1 rounded-lg text-[10px] font-bold bg-primary text-white hover:bg-primary/90 transition-colors flex items-center justify-center gap-1"
+                                                    >
+                                                        <span className="material-symbols-outlined text-[13px]">
+                                                            {scheduleStatus === 'Sem Previsão' ? 'calendar_add_on' : 'edit_calendar'}
+                                                        </span>
+                                                        {scheduleStatus === 'Sem Previsão' ? 'Agendar' : 'Editar'}
+                                                    </button>
+                                                )}
                                             </div>
-
-                                            {/* Schedule info */}
-                                            {batch.assemblySchedule?.scheduledDate && (
-                                                <div className="text-[11px] text-slate-500 mb-2 flex items-center gap-1">
-                                                    <span className="material-symbols-outlined text-[13px]">event</span>
-                                                    Confirmado: {format(new Date(batch.assemblySchedule.scheduledDate), "dd/MM/yyyy", { locale: ptBR })}
-                                                </div>
-                                            )}
-                                            {!batch.assemblySchedule?.scheduledDate && batch.assemblySchedule?.forecastDate && (
-                                                <div className="text-[11px] text-amber-600 mb-2 flex items-center gap-1">
-                                                    <span className="material-symbols-outlined text-[13px]">event_available</span>
-                                                    Previsão: {format(new Date(batch.assemblySchedule.forecastDate), "dd/MM/yyyy", { locale: ptBR })}
-                                                </div>
-                                            )}
-
-                                            {/* CTA — only if canEdit */}
-                                            {canEdit && (
-                                                <button
-                                                    onClick={() => handleOpenScheduleModal(batch)}
-                                                    className="w-full mt-1 py-1.5 rounded-lg text-xs font-bold bg-primary text-white hover:bg-primary/90 transition-colors flex items-center justify-center gap-1.5"
-                                                >
-                                                    <span className="material-symbols-outlined text-sm">
-                                                        {scheduleStatus === 'Sem Previsão' ? 'calendar_add_on' : 'edit_calendar'}
-                                                    </span>
-                                                    {scheduleStatus === 'Sem Previsão' ? 'Agendar' : 'Editar Agendamento'}
-                                                </button>
-                                            )}
                                         </div>
-                                    </div>
-                                );
-                            })
-                        )}
+                                    );
+                                })
+                            )}
+                        </div>
 
-                        {/* Separator between Assembly and Assistance queues */}
-                        {relevantAssistances.length > 0 && queueBatches.length > 0 && (
-                            <div className="my-2 h-px bg-slate-300 dark:bg-slate-700 mx-1" />
-                        )}
+                        {/* ── Separator ────────────────────────────────────────────── */}
+                        <div className="mx-2 my-1 h-px bg-slate-200 dark:bg-slate-700" />
 
-                        {/* Assistance queue header */}
-                        {relevantAssistances.length > 0 && (
-                            <div className="sticky top-0 px-3 py-2 bg-slate-50 dark:bg-[#0f1419] border-t border-slate-200 dark:border-slate-800">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-green-600 text-sm">support_agent</span>
-                                        <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200">Fila de Assistências</h4>
-                                    </div>
-                                    <span className="text-xs text-slate-400 font-medium">{relevantAssistances.length} chamados</span>
+                        {/* ── ASSISTÊNCIAS section ─────────────────────────────────── */}
+                        <div className="sticky top-0 z-10 px-3 py-2 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1e2936]">
+                            <div className="flex items-center justify-between mb-1.5">
+                                <div className="flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-emerald-600 text-sm">support_agent</span>
+                                    <h3 className="text-xs font-bold text-slate-700 dark:text-slate-200">Fila de Assistências</h3>
                                 </div>
+                                <span className="text-[10px] text-slate-400 font-medium">{relevantAssistances.length} chamados</span>
                             </div>
-                        )}
+                            {/* Assistance filter chips */}
+                            <div className="flex flex-wrap gap-1">
+                                {[
+                                    { key: 'Todos', label: 'Todos' },
+                                    { key: '10.1', label: 'Aberto' },
+                                    { key: '10.2', label: 'Diag.' },
+                                    { key: '10.3', label: 'Orç.' },
+                                    { key: '10.4', label: 'Aprov.' },
+                                    { key: '10.5', label: 'Prod.' },
+                                    { key: '10.6', label: 'Inst.' },
+                                ].map(f => (
+                                    <button
+                                        key={f.key}
+                                        onClick={() => setAssistanceFilter(f.key)}
+                                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors ${assistanceFilter === f.key ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+                                    >
+                                        {f.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
 
-                        {/* Assistance cards */}
-                        {relevantAssistances.map(ticket => {
-                            const project = projects.find(p => p.client.id === ticket.clientId);
-                            const team = assemblyTeams.find(t => t.id === ticket.teamId);
-                            const createdDate = new Date(ticket.createdAt);
-                            const deadline = addBusinessDays(createdDate, ASSISTANCE_SLA_DAYS, companySettings?.holidays);
-                            const daysRemaining = getBusinessDaysDifference(new Date(), deadline, companySettings?.holidays);
-                            const statusLabel = {
-                                '10.1': 'Aberto',
-                                '10.2': 'Diagnóstico',
-                                '10.3': 'Orçamento',
-                                '10.4': 'Aprovado',
-                                '10.5': 'Produção',
-                                '10.6': 'Instalação',
-                                '10.7': 'Finalizado',
-                                '10.8': 'Fechado'
-                            }[ticket.status] || ticket.status;
-
-                            const statusColor = {
-                                '10.1': 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300',
-                                '10.2': 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300',
-                                '10.3': 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300',
-                                '10.4': 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300',
-                                '10.5': 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300',
-                                '10.6': 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300',
-                                '10.7': 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300',
-                                '10.8': 'bg-slate-50 dark:bg-slate-900/20 text-slate-700 dark:text-slate-300'
-                            }[ticket.status] || 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400';
-
-                            const urgencyColor = ticket.priority === 'Urgente'
-                                ? 'text-rose-600 dark:text-rose-400 font-bold'
-                                : 'text-slate-500 dark:text-slate-400';
-
-                            if (!project) return null;
-
-                            return (
-                                <div key={ticket.id} className="bg-white dark:bg-[#1e2936] rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                                    {/* Status bar */}
-                                    <div className={`px-3 py-1.5 flex items-center justify-between ${statusColor} border-b border-slate-200/50 dark:border-slate-700/50`}>
-                                        <span className="text-[10px] font-bold uppercase tracking-wide">{statusLabel}</span>
-                                        {team && (
-                                            <div className="flex items-center gap-1">
-                                                <div className={`w-2 h-2 rounded-full ${TEAM_COLOR_MAP[team.color]?.bg || 'bg-slate-400'}`} />
-                                                <span className="text-[10px] font-bold">{team.name}</span>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="p-3">
-                                        {/* Ticket code and client */}
-                                        <div className="flex items-start justify-between gap-2 mb-1">
-                                            <div className="flex-1">
-                                                <div className="font-bold text-slate-800 dark:text-white text-sm truncate">{project.client.name}</div>
-                                                <div className="text-[10px] text-slate-400">{ticket.code || `ASS-${ticket.id.substring(0, 5)}`}</div>
-                                            </div>
-                                            {ticket.priority === 'Urgente' && (
-                                                <span className="material-symbols-outlined text-rose-500 text-sm animate-pulse">priority_high</span>
-                                            )}
-                                        </div>
-
-                                        {/* Priority and SLA */}
-                                        <div className={`text-[10px] mb-2 ${urgencyColor}`}>
-                                            {ticket.priority === 'Urgente' ? '⚠️ Urgente' : 'Normal'}
-                                        </div>
-
-                                        {/* SLA countdown */}
-                                        <div className={`text-[10px] mb-2 flex items-center gap-1 ${daysRemaining < 7 ? 'text-rose-600 dark:text-rose-400 font-bold' : daysRemaining < 15 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                                            <span className="material-symbols-outlined text-[12px]">schedule</span>
-                                            SLA: {daysRemaining} dias úteis restantes
-                                        </div>
-
-                                        {/* Created date */}
-                                        <div className="text-[10px] text-slate-400 mb-2 flex items-center gap-1">
-                                            <span className="material-symbols-outlined text-[12px]">calendar_month</span>
-                                            Aberto em {format(createdDate, 'dd/MM/yyyy', { locale: ptBR })}
-                                        </div>
-
-                                        {/* Item count if available */}
-                                        {ticket.items?.length > 0 && (
-                                            <div className="text-[10px] text-slate-500 mb-2 flex items-center gap-1">
-                                                <span className="material-symbols-outlined text-[12px]">list_alt</span>
-                                                {ticket.items.length} item{ticket.items.length !== 1 ? 'ns' : ''}
-                                            </div>
-                                        )}
-                                    </div>
+                        {/* Assistance cards — compacted ~20%, always renders */}
+                        <div className="p-2 space-y-2">
+                            {filteredAssistances.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-8 text-center">
+                                    <span className="material-symbols-outlined text-slate-300 dark:text-slate-600 text-4xl mb-2">support_agent</span>
+                                    <p className="text-xs text-slate-400">
+                                        {relevantAssistances.length === 0
+                                            ? 'Nenhuma assistência técnica ativa'
+                                            : 'Nenhum chamado para este filtro'}
+                                    </p>
                                 </div>
-                            );
-                        })}
+                            ) : (
+                                filteredAssistances.map(ticket => {
+                                    const project = projects.find(p => p.client.id === ticket.clientId);
+                                    const clientName = project?.client.name || ticket.clientId || 'Cliente';
+                                    const team = assemblyTeams.find(t => t.id === ticket.teamId);
+                                    const createdDate = new Date(ticket.createdAt);
+                                    const deadline = addBusinessDays(createdDate, ASSISTANCE_SLA_DAYS, companySettings?.holidays);
+                                    const daysRemaining = getBusinessDaysDifference(new Date(), deadline, companySettings?.holidays);
+                                    const statusLabel = {
+                                        '10.1': 'Aberto',
+                                        '10.2': 'Diagnóstico',
+                                        '10.3': 'Orçamento',
+                                        '10.4': 'Aprovado',
+                                        '10.5': 'Produção',
+                                        '10.6': 'Instalação',
+                                        '10.7': 'Finalizado',
+                                        '10.8': 'Fechado'
+                                    }[ticket.status] || ticket.status;
 
-                        {relevantAssistances.length === 0 && queueBatches.length > 0 && (
-                            <div className="flex flex-col items-center justify-center py-8 text-center text-xs text-slate-400">
-                                <span className="material-symbols-outlined text-slate-300 dark:text-slate-600 text-3xl mb-1">support_agent</span>
-                                <p>Nenhuma assistência técnica em progresso</p>
-                            </div>
-                        )}
+                                    const statusColor = ({
+                                        '10.1': 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300',
+                                        '10.2': 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300',
+                                        '10.3': 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300',
+                                        '10.4': 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300',
+                                        '10.5': 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300',
+                                        '10.6': 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300',
+                                        '10.7': 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300',
+                                    } as Record<string, string>)[ticket.status] || 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400';
+
+                                    const slaColor = daysRemaining < 7
+                                        ? 'text-rose-600 dark:text-rose-400 font-bold'
+                                        : daysRemaining < 15
+                                            ? 'text-amber-600 dark:text-amber-400'
+                                            : 'text-emerald-600 dark:text-emerald-400';
+
+                                    return (
+                                        <div key={ticket.id} className="bg-white dark:bg-[#1e2936] rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                                            {/* Status bar */}
+                                            <div className={`px-2.5 py-1 flex items-center justify-between ${statusColor} border-b border-slate-200/50 dark:border-slate-700/50`}>
+                                                <span className="text-[10px] font-bold uppercase tracking-wide">{statusLabel}</span>
+                                                <div className="flex items-center gap-1.5">
+                                                    {ticket.priority === 'Urgente' && (
+                                                        <span className="material-symbols-outlined text-rose-500 text-sm animate-pulse">priority_high</span>
+                                                    )}
+                                                    {team && (
+                                                        <div className="flex items-center gap-1">
+                                                            <div className={`w-2 h-2 rounded-full ${TEAM_COLOR_MAP[team.color]?.bg || 'bg-slate-400'}`} />
+                                                            <span className="text-[10px] font-bold">{team.name}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="p-2">
+                                                {/* Client + code */}
+                                                <div className="font-bold text-slate-800 dark:text-white text-sm truncate">{clientName}</div>
+                                                <div className="text-[10px] text-slate-400 mb-1.5">{ticket.code || `ASS-${ticket.id.substring(0, 5)}`}</div>
+
+                                                {/* SLA countdown */}
+                                                <div className={`text-[10px] mb-1.5 flex items-center gap-1 ${slaColor}`}>
+                                                    <span className="material-symbols-outlined text-[12px]">schedule</span>
+                                                    SLA: {daysRemaining} d.ú. restantes
+                                                </div>
+
+                                                {/* Created date */}
+                                                <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                                                    <span className="material-symbols-outlined text-[12px]">calendar_month</span>
+                                                    Aberto {format(createdDate, 'dd/MM/yy', { locale: ptBR })}
+                                                    {ticket.items?.length > 0 && (
+                                                        <span className="ml-1">· {ticket.items.length} item{ticket.items.length !== 1 ? 'ns' : ''}</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+
                     </div>
                 </div>
             </div>
