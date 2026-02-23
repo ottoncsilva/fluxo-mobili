@@ -526,7 +526,7 @@ const AssemblyScheduler: React.FC = () => {
                     {/* Gantt: unified scroll container (header sticky + body) — fixes scrollbar alignment */}
                     <div
                         ref={ganttBodyRef}
-                        className={`flex-1 overflow-y-auto custom-scrollbar select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                        className={`flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
                         onMouseDown={handleGanttMouseDown}
                         onMouseMove={handleGanttMouseMove}
                         onMouseUp={handleGanttMouseUp}
