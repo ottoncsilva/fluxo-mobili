@@ -23,6 +23,9 @@ const AppContent: React.FC = () => {
   const { currentProjectId, setCurrentProjectId, currentUser, logout, permissions, companySettings, projects } = useProjects();
   const { unreadCount, notifications, markAllAsRead } = useNotifications();
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showMobileSearch, setShowMobileSearch] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const mobileSearchRef = useRef<HTMLInputElement>(null);
 
   // Busca global
   const [searchQuery, setSearchQuery] = useState('');
@@ -52,11 +55,13 @@ const AppContent: React.FC = () => {
         if (currentProjectId) setCurrentProjectId(null);
         else if (showNotifications) setShowNotifications(false);
         else if (showSearchResults) setShowSearchResults(false);
+        else if (showMobileSearch) { setShowMobileSearch(false); setSearchQuery(''); }
+        else if (showMoreMenu) setShowMoreMenu(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentProjectId, showNotifications, showSearchResults, setCurrentProjectId]);
+  }, [currentProjectId, showNotifications, showSearchResults, showMobileSearch, showMoreMenu, setCurrentProjectId]);
 
   // Fechar busca ao clicar fora
   useEffect(() => {
@@ -205,7 +210,56 @@ const AppContent: React.FC = () => {
       {/* === Main Content Area === */}
       <div className="flex-1 flex flex-col h-full overflow-hidden relative">
         {/* Header */}
-        <header className="h-14 md:h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1a2632] flex items-center justify-between px-4 md:px-6 shrink-0 z-20 gap-3">
+        <header className="h-14 md:h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1a2632] flex items-center justify-between px-4 md:px-6 shrink-0 z-20 gap-3 relative">
+          {/* Mobile search overlay */}
+          {showMobileSearch && (
+            <div className="absolute inset-0 z-30 bg-white dark:bg-[#1a2632] flex items-center px-3 gap-2 md:hidden">
+              <button onClick={() => { setShowMobileSearch(false); setSearchQuery(''); setShowSearchResults(false); }} className="p-1.5 text-slate-400">
+                <span className="material-symbols-outlined">arrow_back</span>
+              </button>
+              <div ref={searchRef} className="flex-1 relative">
+                <input
+                  ref={mobileSearchRef}
+                  type="text"
+                  placeholder="Buscar cliente, vendedor..."
+                  value={searchQuery}
+                  onChange={e => { setSearchQuery(e.target.value); setShowSearchResults(true); }}
+                  onFocus={() => setShowSearchResults(true)}
+                  className="w-full bg-slate-100 dark:bg-slate-800 rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-200 placeholder-slate-400 outline-none border-none"
+                  autoFocus
+                />
+                {showSearchResults && searchQuery.length >= 2 && (
+                  <div className="absolute top-full mt-1 left-0 right-0 bg-white dark:bg-[#1e293b] rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden z-50">
+                    {searchResults.length === 0 ? (
+                      <div className="px-4 py-3 text-sm text-slate-400 text-center">Nenhum cliente encontrado</div>
+                    ) : (
+                      searchResults.map(project => (
+                        <button
+                          key={project.id}
+                          onMouseDown={() => {
+                            setCurrentProjectId(project.id);
+                            setSearchQuery('');
+                            setShowSearchResults(false);
+                            setShowMobileSearch(false);
+                          }}
+                          className="w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800 border-b border-slate-100 dark:border-slate-800 last:border-0 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-slate-400 text-[16px]">person</span>
+                            <div>
+                              <div className="text-sm font-semibold text-slate-800 dark:text-white">{project.client.name}</div>
+                              <div className="text-xs text-slate-400">{project.sellerName} · {project.environments.length} amb.</div>
+                            </div>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center gap-3 shrink-0">
             <h1 className="text-lg md:text-xl font-bold text-slate-800 dark:text-white">
               {getTitle()}
@@ -214,7 +268,7 @@ const AppContent: React.FC = () => {
 
           {/* Busca Global — desktop */}
           {currentUser.role !== 'SuperAdmin' && (
-            <div ref={searchRef} className="hidden md:flex flex-1 max-w-sm relative mx-4">
+            <div ref={!showMobileSearch ? searchRef : undefined} className="hidden md:flex flex-1 max-w-sm relative mx-4">
               <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-xl px-3 py-2 w-full border border-transparent focus-within:border-primary/40 transition-colors">
                 <span className="material-symbols-outlined text-slate-400 text-[18px]">search</span>
                 <input
@@ -264,6 +318,16 @@ const AppContent: React.FC = () => {
           )}
 
           <div className="flex items-center gap-3 md:gap-4 shrink-0">
+            {/* Mobile search button */}
+            {currentUser.role !== 'SuperAdmin' && (
+              <button
+                onClick={() => setShowMobileSearch(true)}
+                className="md:hidden p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors"
+              >
+                <span className="material-symbols-outlined text-xl">search</span>
+              </button>
+            )}
+
             {/* Company Name - desktop only */}
             <div className="hidden md:flex flex-col items-end">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
@@ -273,7 +337,7 @@ const AppContent: React.FC = () => {
                 {currentUser.role === 'SuperAdmin' ? 'Administrador' : companySettings.name}
               </span>
             </div>
-            <div className="hidden md:block h-8 w-px bg-slate-200 dark:border-slate-700"></div>
+            <div className="hidden md:block h-8 w-px bg-slate-200 dark:bg-slate-700"></div>
 
             {/* Notifications */}
             <div className="relative">
@@ -287,9 +351,9 @@ const AppContent: React.FC = () => {
                 )}
               </button>
 
-              {/* Notification Dropdown */}
+              {/* Notification Dropdown — responsive */}
               {showNotifications && (
-                <div className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-[#1e293b] rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden z-50 animate-fade-in origin-top-right">
+                <div className="fixed md:absolute inset-x-3 md:inset-x-auto md:right-0 top-16 md:top-full md:mt-2 md:w-80 bg-white dark:bg-[#1e293b] rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden z-50 animate-fade-in origin-top-right">
                   <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
                     <h3 className="font-bold text-slate-800 dark:text-white">Notificações</h3>
                     {unreadCount > 0 && (
@@ -342,8 +406,8 @@ const AppContent: React.FC = () => {
           </div>
         </header>
 
-        {/* Content - add bottom padding on mobile for the bottom nav */}
-        <div className="flex-1 overflow-hidden relative pb-16 md:pb-0">
+        {/* Content - add bottom padding on mobile for the bottom nav + safe area */}
+        <div className="flex-1 overflow-hidden relative content-bottom-nav md:pb-0">
           {renderContent()}
         </div>
       </div>
@@ -351,24 +415,77 @@ const AppContent: React.FC = () => {
       {/* === Mobile Bottom Navigation (hidden on desktop) === */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-[#1a2632] border-t border-slate-200 dark:border-slate-800 bottom-nav">
         <div className="flex items-center justify-around h-16 px-1">
-          {navItems.map(item => {
-            const isActive = currentView === item.view || (item.view === ViewState.CLIENT_LIST && currentView === ViewState.CLIENT_REGISTRATION);
-            return (
-              <button
-                key={item.view}
-                onClick={() => setCurrentView(item.view)}
-                className={`flex flex-col items-center justify-center gap-0.5 flex-1 py-1 transition-colors ${isActive ? 'text-primary' : 'text-slate-400'
-                  }`}
-              >
-                <span className={`material-symbols-outlined text-2xl ${isActive ? 'font-bold' : ''}`} style={isActive ? { fontVariationSettings: "'FILL' 1, 'wght' 600" } : {}}>
-                  {item.icon}
-                </span>
-                <span className={`text-[10px] leading-tight ${isActive ? 'font-bold' : 'font-medium'}`}>
-                  {item.label}
-                </span>
-              </button>
+          {(() => {
+            const MAX_VISIBLE = 5;
+            const needsMore = navItems.length > MAX_VISIBLE;
+            const visibleItems = needsMore ? navItems.slice(0, MAX_VISIBLE - 1) : navItems;
+            const overflowItems = needsMore ? navItems.slice(MAX_VISIBLE - 1) : [];
+            const isOverflowActive = overflowItems.some(item =>
+              currentView === item.view || (item.view === ViewState.CLIENT_LIST && currentView === ViewState.CLIENT_REGISTRATION)
             );
-          })}
+
+            return (
+              <>
+                {visibleItems.map(item => {
+                  const isActive = currentView === item.view || (item.view === ViewState.CLIENT_LIST && currentView === ViewState.CLIENT_REGISTRATION);
+                  return (
+                    <button
+                      key={item.view}
+                      onClick={() => { setCurrentView(item.view); setShowMoreMenu(false); }}
+                      className={`flex flex-col items-center justify-center gap-0.5 flex-1 py-1 transition-colors ${isActive ? 'text-primary' : 'text-slate-400'}`}
+                    >
+                      <span className={`material-symbols-outlined text-2xl ${isActive ? 'font-bold' : ''}`} style={isActive ? { fontVariationSettings: "'FILL' 1, 'wght' 600" } : {}}>
+                        {item.icon}
+                      </span>
+                      <span className={`text-[10px] leading-tight ${isActive ? 'font-bold' : 'font-medium'}`}>
+                        {item.label}
+                      </span>
+                    </button>
+                  );
+                })}
+
+                {needsMore && (
+                  <div className="relative flex-1">
+                    <button
+                      onClick={() => setShowMoreMenu(!showMoreMenu)}
+                      className={`flex flex-col items-center justify-center gap-0.5 w-full py-1 transition-colors ${isOverflowActive || showMoreMenu ? 'text-primary' : 'text-slate-400'}`}
+                    >
+                      <span className="material-symbols-outlined text-2xl" style={isOverflowActive ? { fontVariationSettings: "'FILL' 1, 'wght' 600" } : {}}>
+                        {isOverflowActive ? (overflowItems.find(i => currentView === i.view)?.icon || 'more_horiz') : 'more_horiz'}
+                      </span>
+                      <span className={`text-[10px] leading-tight ${isOverflowActive ? 'font-bold' : 'font-medium'}`}>
+                        Mais
+                      </span>
+                    </button>
+
+                    {/* More menu popup */}
+                    {showMoreMenu && (
+                      <>
+                        <div className="fixed inset-0 z-30" onClick={() => setShowMoreMenu(false)} />
+                        <div className="absolute bottom-full mb-2 right-0 min-w-[160px] bg-white dark:bg-[#1e293b] rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden z-40 animate-fade-in">
+                          {overflowItems.map(item => {
+                            const isActive = currentView === item.view || (item.view === ViewState.CLIENT_LIST && currentView === ViewState.CLIENT_REGISTRATION);
+                            return (
+                              <button
+                                key={item.view}
+                                onClick={() => { setCurrentView(item.view); setShowMoreMenu(false); }}
+                                className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors border-b border-slate-100 dark:border-slate-800 last:border-0 ${isActive ? 'bg-primary/5 text-primary' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                              >
+                                <span className="material-symbols-outlined text-xl" style={isActive ? { fontVariationSettings: "'FILL' 1, 'wght' 600" } : {}}>
+                                  {item.icon}
+                                </span>
+                                <span className={`text-sm ${isActive ? 'font-bold' : 'font-medium'}`}>{item.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
       </nav>
 
@@ -432,7 +549,6 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({ icon, isActive, onClick, 
   return (
     <button
       onClick={onClick}
-      title={tooltip}
       className={`
         w-full aspect-square rounded-xl flex items-center justify-center transition-all duration-200 group relative
         ${isActive
@@ -441,6 +557,10 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({ icon, isActive, onClick, 
       `}
     >
       <span className="material-symbols-outlined text-2xl">{icon}</span>
+      {/* Custom tooltip */}
+      <div className="absolute left-full ml-2 px-2.5 py-1 rounded-lg bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-800 text-xs font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 z-50 shadow-lg">
+        {tooltip}
+      </div>
     </button>
   );
 };

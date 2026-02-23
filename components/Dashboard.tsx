@@ -84,7 +84,7 @@ const Dashboard: React.FC = () => {
 
 
     return (
-        <div className="flex flex-col h-full bg-slate-50 dark:bg-[#101922] overflow-y-auto p-6">
+        <div className="flex flex-col h-full bg-slate-50 dark:bg-[#101922] overflow-y-auto p-3 md:p-6">
             <div className="mb-8">
                 <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Olá, {currentUser?.name}</h1>
                 <p className="text-slate-500">Aqui está o resumo das suas atividades pendentes.</p>
@@ -95,7 +95,7 @@ const Dashboard: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                 {/* Task List - Left Column */}
-                <div className="lg:col-span-1 bg-white dark:bg-[#1a2632] rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[820px]">
+                <div className="lg:col-span-1 bg-white dark:bg-[#1a2632] rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[60vh] lg:max-h-[calc(100vh-240px)]">
                     <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-[#1a2632]">
                         <h3 className="font-bold text-slate-800 dark:text-white">Suas Tarefas</h3>
                         <span className="text-[10px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded uppercase tracking-wide">Prioritárias</span>

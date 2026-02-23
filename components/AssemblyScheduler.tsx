@@ -2,7 +2,7 @@
 // Módulo de Agendamento de Montagens
 // Gantt visual (uma linha por equipe) + Fila lateral (etapas 5/6/7)
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
     startOfWeek, addDays, eachDayOfInterval, differenceInDays,
     isWeekend, format
@@ -72,10 +72,25 @@ const AssemblyScheduler: React.FC = () => {
     const isNonWorkingDay = (day: Date): boolean =>
         isWeekend(day) || isHoliday(day, companySettings?.holidays);
 
+    // ── Responsive weeks (adapta ao tamanho da tela) ────────────────────────────
+    const [ganttWeeks, setGanttWeeks] = useState(GANTT_WEEKS);
+    useEffect(() => {
+        const updateWeeks = () => {
+            const w = window.innerWidth;
+            if (w < 768) setGanttWeeks(2);
+            else if (w < 1024) setGanttWeeks(3);
+            else if (w < 1280) setGanttWeeks(4);
+            else setGanttWeeks(GANTT_WEEKS);
+        };
+        updateWeeks();
+        window.addEventListener('resize', updateWeeks);
+        return () => window.removeEventListener('resize', updateWeeks);
+    }, []);
+
     // ── Gantt state ────────────────────────────────────────────────────────────
     const [ganttAnchor, setGanttAnchor] = useState(new Date()); // start of visible range
     const ganttStartDate = startOfWeek(ganttAnchor, { weekStartsOn: 1 });
-    const totalDays = GANTT_WEEKS * 7;
+    const totalDays = ganttWeeks * 7;
     const ganttEndDate = addDays(ganttStartDate, totalDays - 1);
     const ganttDays = eachDayOfInterval({ start: ganttStartDate, end: ganttEndDate });
 
@@ -450,6 +465,10 @@ const AssemblyScheduler: React.FC = () => {
     // ── Gantt weeks navigation ────────────────────────────────────────────────
     const shiftWeeks = (n: number) => setGanttAnchor(prev => addDays(prev, n * 7));
     const goToToday = () => setGanttAnchor(new Date());
+    const todayInRange = useMemo(() => {
+        const today = new Date();
+        return today >= ganttStartDate && today <= ganttEndDate;
+    }, [ganttStartDate, ganttEndDate]);
 
     // ── Render ─────────────────────────────────────────────────────────────────
     return (
@@ -476,7 +495,7 @@ const AssemblyScheduler: React.FC = () => {
                     </button>
                 </div>
 
-                <button onClick={goToToday} className="px-3 py-1.5 text-xs font-bold rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+                <button onClick={goToToday} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${todayInRange ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'bg-primary text-white hover:bg-primary/90 shadow-sm'}`}>
                     Hoje
                 </button>
 
@@ -504,8 +523,20 @@ const AssemblyScheduler: React.FC = () => {
 
                 {/* ── Gantt (hidden on mobile when queue tab selected) ─────────── */}
                 <div className={`flex-1 flex flex-col overflow-hidden ${mobileTab === 'QUEUE' ? 'hidden md:flex' : 'flex'}`}>
-                    {/* Gantt header: month row + day row */}
-                    <div className="flex flex-col shrink-0 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1a2632]">
+                    {/* Gantt: unified scroll container (header sticky + body) — fixes scrollbar alignment */}
+                    <div
+                        ref={ganttBodyRef}
+                        className={`flex-1 overflow-y-auto custom-scrollbar select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                        onMouseDown={handleGanttMouseDown}
+                        onMouseMove={handleGanttMouseMove}
+                        onMouseUp={handleGanttMouseUp}
+                        onMouseLeave={handleGanttMouseUp}
+                        onTouchStart={handleGanttTouchStart}
+                        onTouchMove={handleGanttTouchMove}
+                        onTouchEnd={handleGanttTouchEnd}
+                    >
+                    {/* Sticky header: month row + day row */}
+                    <div className="sticky top-0 z-20 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1a2632]">
                         {/* Month/year header row */}
                         <div className="flex border-b border-slate-100 dark:border-slate-800">
                             <div className="w-32 shrink-0 border-r border-slate-200 dark:border-slate-700" />
@@ -514,7 +545,7 @@ const AssemblyScheduler: React.FC = () => {
                                     <div
                                         key={i}
                                         style={{ flex: mg.count }}
-                                        className="px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide border-r last:border-r-0 border-slate-400 dark:border-slate-600 truncate"
+                                        className="px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide border-r last:border-r-0 border-slate-200 dark:border-slate-700 truncate"
                                     >
                                         {mg.label}
                                     </div>
@@ -535,7 +566,7 @@ const AssemblyScheduler: React.FC = () => {
                                         return (
                                             <div
                                                 key={i}
-                                                className={`flex-1 py-1.5 text-center border-r border-slate-400 dark:border-slate-600 last:border-r-0 ${nonWorking ? 'bg-slate-50 dark:bg-slate-800/60' : ''}`}
+                                                className={`flex-1 py-1.5 text-center border-r border-slate-200 dark:border-slate-700 last:border-r-0 ${nonWorking ? 'bg-slate-50 dark:bg-slate-800/60' : ''}`}
                                                 style={nonWorking ? NON_WORKING_HEADER_STYLE : {}}
                                             >
                                                 <div className={nonWorking
@@ -561,18 +592,7 @@ const AssemblyScheduler: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Gantt rows scroll area — draggable */}
-                    <div
-                        ref={ganttBodyRef}
-                        className={`flex-1 overflow-y-auto custom-scrollbar select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-                        onMouseDown={handleGanttMouseDown}
-                        onMouseMove={handleGanttMouseMove}
-                        onMouseUp={handleGanttMouseUp}
-                        onMouseLeave={handleGanttMouseUp}
-                        onTouchStart={handleGanttTouchStart}
-                        onTouchMove={handleGanttTouchMove}
-                        onTouchEnd={handleGanttTouchEnd}
-                    >
+                    {/* Gantt body rows */}
                         {ganttRows.map(({ team, events }, idx) => (
                             <React.Fragment key={team?.id || 'no-team'}>
                                 <div className="flex border-b border-slate-100 dark:border-slate-800 last:border-b-0">
@@ -601,7 +621,7 @@ const AssemblyScheduler: React.FC = () => {
                                         return (
                                             <div
                                                 key={i}
-                                                className={`absolute top-0 bottom-0 border-r border-slate-400 dark:border-slate-600 ${nonWorking ? 'bg-slate-50/90 dark:bg-slate-800/50' : ''}`}
+                                                className={`absolute top-0 bottom-0 border-r border-slate-200 dark:border-slate-700 ${nonWorking ? 'bg-slate-50/90 dark:bg-slate-800/50' : ''}`}
                                                 style={{
                                                     left: `${(i / totalDays) * 100}%`,
                                                     width: `${(1 / totalDays) * 100}%`,
@@ -633,7 +653,7 @@ const AssemblyScheduler: React.FC = () => {
                                             <div
                                                 key={evt.batchId}
                                                 className={`absolute top-2 bottom-2 rounded-md px-2 flex items-center z-10 overflow-hidden transition-transform hover:scale-y-105 ${colorMap.bg} ${isDashed ? 'border-2 border-dashed border-white/60 opacity-80' : 'shadow-md'} ${canEdit ? 'cursor-pointer' : 'cursor-default'}`}
-                                                style={{ left: `${left}%`, width: `${Math.max(width, 1.5)}%` }}
+                                                style={{ left: `${left}%`, width: `${Math.max(width, 1.5)}%`, minWidth: '44px' }}
                                                 onClick={() => {
                                                     if (hasDraggedRef.current) return;
                                                     if (!canEdit) return;
@@ -661,16 +681,16 @@ const AssemblyScheduler: React.FC = () => {
                                     })}
                                 </div>
                             </div>
-                            {/* Team separator - horizontal line between team rows */}
+                            {/* Team separator */}
                             {idx < ganttRows.length - 1 && (
-                                <div className="w-full h-1 bg-slate-400 dark:bg-slate-600" />
+                                <div className="w-full h-px bg-slate-200 dark:bg-slate-700" />
                             )}
                         </React.Fragment>
                         ))}
 
                         {/* Separator between Assembly and Assistance sections */}
                         {assistanceRows.length > 0 && ganttRows.some(r => r.events.length > 0) && (
-                            <div className="w-full h-1.5 bg-slate-300 dark:bg-slate-700 my-2" />
+                            <div className="w-full h-px bg-slate-300 dark:bg-slate-600 my-1" />
                         )}
 
                         {/* Assistance rows */}
@@ -703,7 +723,7 @@ const AssemblyScheduler: React.FC = () => {
                                             return (
                                                 <div
                                                     key={`asst-grid-${i}`}
-                                                    className={`absolute top-0 bottom-0 border-r border-slate-400 dark:border-slate-600 ${nonWorking ? 'bg-slate-50/90 dark:bg-slate-800/50' : ''}`}
+                                                    className={`absolute top-0 bottom-0 border-r border-slate-200 dark:border-slate-700 ${nonWorking ? 'bg-slate-50/90 dark:bg-slate-800/50' : ''}`}
                                                     style={{
                                                         left: `${(i / totalDays) * 100}%`,
                                                         width: `${(1 / totalDays) * 100}%`,
@@ -736,7 +756,7 @@ const AssemblyScheduler: React.FC = () => {
                                                 <div
                                                     key={evt.ticketId}
                                                     className={`absolute top-2 bottom-2 rounded-md px-2 flex items-center z-10 overflow-hidden transition-transform hover:scale-y-105 ${isUrgent ? 'bg-rose-500 shadow-md' : 'bg-emerald-500 shadow-md'} ${canEdit ? 'cursor-pointer' : 'cursor-default'}`}
-                                                    style={{ left: `${left}%`, width: `${Math.max(width, 1.5)}%` }}
+                                                    style={{ left: `${left}%`, width: `${Math.max(width, 1.5)}%`, minWidth: '44px' }}
                                                     title={`${evt.clientName} — ${evt.code} (${evt.status}) - ${evt.estimatedDays} d.ú.`}
                                                 >
                                                     <span className="text-white text-[10px] font-bold truncate select-none">{evt.clientName}</span>
@@ -747,7 +767,7 @@ const AssemblyScheduler: React.FC = () => {
                                 </div>
                             {/* Team separator */}
                             {idx < assistanceRows.length - 1 && (
-                                <div className="w-full h-1 bg-slate-400 dark:bg-slate-600" />
+                                <div className="w-full h-px bg-slate-200 dark:bg-slate-700" />
                             )}
                         </React.Fragment>
                         ))}
@@ -759,11 +779,17 @@ const AssemblyScheduler: React.FC = () => {
                                 <p className="text-xs text-slate-300 dark:text-slate-600 mt-1">Adicione agendamentos na fila ao lado</p>
                             </div>
                         )}
+
+                        {/* Drag hint */}
+                        <div className="flex items-center justify-center py-2 gap-1 opacity-40 hover:opacity-70 transition-opacity">
+                            <span className="material-symbols-outlined text-slate-400 dark:text-slate-500 text-sm">swipe</span>
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500">Arraste para navegar</span>
+                        </div>
                     </div>
                 </div>
 
                 {/* ── Queue panel ─────────────────────────────────────────────── */}
-                <div className={`w-full md:w-80 xl:w-96 shrink-0 border-l border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden bg-slate-50/50 dark:bg-[#1a2632] ${mobileTab === 'GANTT' ? 'hidden md:flex' : 'flex'}`}>
+                <div className={`w-full md:w-64 lg:w-80 xl:w-96 shrink-0 border-l border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden bg-slate-50/50 dark:bg-[#1a2632] ${mobileTab === 'GANTT' ? 'hidden md:flex' : 'flex'}`}>
                     {/* Queue header + filters */}
                     <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1e2936] shrink-0">
                         <div className="flex items-center justify-between mb-2">
@@ -1190,9 +1216,9 @@ const AssemblyScheduler: React.FC = () => {
                             </button>
                         </div>
 
-                        <div className="flex flex-1 overflow-hidden">
+                        <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
                             {/* Left: team list */}
-                            <div className="w-56 shrink-0 border-r border-slate-100 dark:border-slate-700 overflow-y-auto custom-scrollbar p-3 space-y-2">
+                            <div className="w-full md:w-56 shrink-0 border-b md:border-b-0 md:border-r border-slate-100 dark:border-slate-700 overflow-y-auto custom-scrollbar p-3 space-y-2 max-h-48 md:max-h-none">
                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Equipes cadastradas</p>
                                 {localTeams.length === 0 && (
                                     <p className="text-xs text-slate-400 italic text-center py-4">Nenhuma equipe ainda</p>
