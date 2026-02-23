@@ -9,7 +9,7 @@ import {
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useProjects } from '../context/ProjectContext';
-import { AssemblyTeam, AssemblySchedule, AssemblyStatus, AssistanceStatus, Batch } from '../types';
+import { AssemblyTeam, AssemblySchedule, AssemblyStatus, AssistanceStatus, AssistanceTicket, Batch } from '../types';
 import { getBusinessDaysDifference, isHoliday, addBusinessDays } from '../utils/dateUtils';
 
 // ─── Color map (static for Tailwind purge safety) ────────────────────────────
@@ -62,7 +62,8 @@ const AssemblyScheduler: React.FC = () => {
     const {
         batches, projects, workflowConfig,
         assemblyTeams, updateBatchAssemblySchedule, saveAssemblyTeams,
-        canUserEditAssembly, companySettings, assistanceTickets, assistanceWorkflow
+        canUserEditAssembly, companySettings, assistanceTickets, assistanceWorkflow,
+        updateAssistanceTicket
     } = useProjects();
 
     const canEdit = canUserEditAssembly();
