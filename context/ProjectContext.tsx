@@ -99,7 +99,7 @@ interface ProjectContextType {
 
     // Assembly Scheduling
     assemblyTeams: AssemblyTeam[];
-    updateBatchAssemblySchedule: (batchId: string, schedule: AssemblySchedule) => void;
+    updateBatchAssemblySchedule: (batchId: string, schedule: AssemblySchedule | null) => void;
     saveAssemblyTeams: (teams: AssemblyTeam[]) => Promise<boolean>;
 }
 
@@ -1222,8 +1222,8 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
 
     // Assembly Scheduling Functions
-    const updateBatchAssemblySchedule = (batchId: string, schedule: AssemblySchedule) => {
-        const payload = { assemblySchedule: schedule, lastUpdated: new Date().toISOString() };
+    const updateBatchAssemblySchedule = (batchId: string, schedule: AssemblySchedule | null) => {
+        const payload = { assemblySchedule: schedule ?? undefined, lastUpdated: new Date().toISOString() };
         if (useCloud) {
             persist("batches", batchId, payload);
         } else {
