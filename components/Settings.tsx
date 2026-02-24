@@ -11,7 +11,8 @@ const Settings: React.FC = () => {
         assistanceWorkflow, addAssistanceStep, updateAssistanceStep, deleteAssistanceStep, reorderAssistanceSteps,
         origins, updateOrigins,
         companySettings, updateCompanySettings, currentStore,
-        saveStoreConfig, resetStoreDefaults
+        saveStoreConfig, resetStoreDefaults,
+        canUserManageUsers
     } = useProjects();
 
     const { appointmentTypes, addAppointmentType, updateAppointmentType, deleteAppointmentType, agendaUsers, toggleAgendaUser } = useAgenda();
@@ -530,13 +531,15 @@ const Settings: React.FC = () => {
                         {/* Header Action */}
                         <div className="flex justify-between items-center">
                             <h3 className="text-lg font-bold text-slate-800 dark:text-white">Colaboradores</h3>
-                            <button
-                                onClick={() => openUserModal()}
-                                className="bg-primary text-white font-bold py-2 px-4 rounded-lg text-sm hover:bg-primary-600 flex items-center gap-2"
-                            >
-                                <span className="material-symbols-outlined">person_add</span>
-                                Novo Colaborador
-                            </button>
+                            {canUserManageUsers() && (
+                                <button
+                                    onClick={() => openUserModal()}
+                                    className="bg-primary text-white font-bold py-2 px-4 rounded-lg text-sm hover:bg-primary-600 flex items-center gap-2"
+                                >
+                                    <span className="material-symbols-outlined">person_add</span>
+                                    Novo Colaborador
+                                </button>
+                            )}
                         </div>
 
                         {/* List */}
@@ -573,12 +576,16 @@ const Settings: React.FC = () => {
                                                 )}
                                             </td>
                                             <td className="px-6 py-4 flex gap-2">
-                                                <button onClick={() => openUserModal(u)} className="p-1 text-slate-400 hover:text-primary transition-colors" title="Editar">
-                                                    <span className="material-symbols-outlined text-lg">edit</span>
-                                                </button>
-                                                <button onClick={() => { if (window.confirm('Excluir usuário?')) deleteUser(u.id); }} className="p-1 text-slate-400 hover:text-rose-500 transition-colors" title="Excluir">
-                                                    <span className="material-symbols-outlined text-lg">delete</span>
-                                                </button>
+                                                {canUserManageUsers() && (
+                                                    <>
+                                                        <button onClick={() => openUserModal(u)} className="p-1 text-slate-400 hover:text-primary transition-colors" title="Editar">
+                                                            <span className="material-symbols-outlined text-lg">edit</span>
+                                                        </button>
+                                                        <button onClick={() => { if (window.confirm('Excluir usuário?')) deleteUser(u.id); }} className="p-1 text-slate-400 hover:text-rose-500 transition-colors" title="Excluir">
+                                                            <span className="material-symbols-outlined text-lg">delete</span>
+                                                        </button>
+                                                    </>
+                                                )}
                                             </td>
                                         </tr>
                                     ))}
@@ -642,29 +649,50 @@ const Settings: React.FC = () => {
                                         <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
                                             <input type="checkbox" checked={activeRolePerms?.canViewClients} onChange={e => handlePermissionChange(selectedRoleForPerms, 'canViewClients', e.target.checked)} className="rounded text-primary focus:ring-primary w-5 h-5" />
                                             <div>
-                                                <p className="font-bold text-slate-800 dark:text-white text-sm">Carteira de Clientes</p>
+                                                <p className="font-bold text-slate-800 dark:text-white text-sm">Visualizar Clientes</p>
                                                 <p className="text-xs text-slate-500">Ver lista completa de clientes</p>
+                                            </div>
+                                        </label>
+                                        <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
+                                            <input type="checkbox" checked={activeRolePerms?.canEditClient ?? false} onChange={e => handlePermissionChange(selectedRoleForPerms, 'canEditClient', e.target.checked)} className="rounded text-primary focus:ring-primary w-5 h-5" />
+                                            <div>
+                                                <p className="font-bold text-slate-800 dark:text-white text-sm">Editar Clientes</p>
+                                                <p className="text-xs text-slate-500">Alterar dados cadastrais de clientes</p>
+                                            </div>
+                                        </label>
+                                        <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
+                                            <input type="checkbox" checked={activeRolePerms?.canDeleteClient ?? false} onChange={e => handlePermissionChange(selectedRoleForPerms, 'canDeleteClient', e.target.checked)} className="rounded text-rose-500 focus:ring-rose-500 w-5 h-5" />
+                                            <div>
+                                                <p className="font-bold text-slate-800 dark:text-white text-sm">Excluir Clientes <span className="text-[10px] text-rose-500 font-bold ml-1">DESTRUTIVO</span></p>
+                                                <p className="text-xs text-slate-500">Remover clientes permanentemente</p>
                                             </div>
                                         </label>
                                         <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
                                             <input type="checkbox" checked={activeRolePerms?.canEditProject} onChange={e => handlePermissionChange(selectedRoleForPerms, 'canEditProject', e.target.checked)} className="rounded text-primary focus:ring-primary w-5 h-5" />
                                             <div>
                                                 <p className="font-bold text-slate-800 dark:text-white text-sm">Editar Projetos</p>
-                                                <p className="text-xs text-slate-500">Alterar dados de clientes e projetos</p>
-                                            </div>
-                                        </label>
-                                        <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
-                                            <input type="checkbox" checked={activeRolePerms?.canViewSettings} onChange={e => handlePermissionChange(selectedRoleForPerms, 'canViewSettings', e.target.checked)} className="rounded text-primary focus:ring-primary w-5 h-5" />
-                                            <div>
-                                                <p className="font-bold text-slate-800 dark:text-white text-sm">Configurações</p>
-                                                <p className="text-xs text-slate-500">Acesso a esta tela (Admin)</p>
+                                                <p className="text-xs text-slate-500">Alterar dados de projetos</p>
                                             </div>
                                         </label>
                                         <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
                                             <input type="checkbox" checked={activeRolePerms?.canChangeSeller} onChange={e => handlePermissionChange(selectedRoleForPerms, 'canChangeSeller', e.target.checked)} className="rounded text-primary focus:ring-primary w-5 h-5" />
                                             <div>
                                                 <p className="font-bold text-slate-800 dark:text-white text-sm">Alterar Vendedor</p>
-                                                <p className="text-xs text-slate-500">Reatribuir projetos</p>
+                                                <p className="text-xs text-slate-500">Reatribuir projetos a outros vendedores</p>
+                                            </div>
+                                        </label>
+                                        <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
+                                            <input type="checkbox" checked={activeRolePerms?.canViewSettings} onChange={e => handlePermissionChange(selectedRoleForPerms, 'canViewSettings', e.target.checked)} className="rounded text-primary focus:ring-primary w-5 h-5" />
+                                            <div>
+                                                <p className="font-bold text-slate-800 dark:text-white text-sm">Configurações</p>
+                                                <p className="text-xs text-slate-500">Acesso à tela de configurações</p>
+                                            </div>
+                                        </label>
+                                        <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
+                                            <input type="checkbox" checked={activeRolePerms?.canManageUsers ?? false} onChange={e => handlePermissionChange(selectedRoleForPerms, 'canManageUsers', e.target.checked)} className="rounded text-primary focus:ring-primary w-5 h-5" />
+                                            <div>
+                                                <p className="font-bold text-slate-800 dark:text-white text-sm">Gerenciar Usuários</p>
+                                                <p className="text-xs text-slate-500">Criar, editar e excluir usuários</p>
                                             </div>
                                         </label>
                                     </div>
@@ -724,38 +752,67 @@ const Settings: React.FC = () => {
                                     <h4 className="text-sm font-bold text-primary uppercase tracking-wider border-b border-slate-100 dark:border-slate-800 pb-2">Módulos Especiais</h4>
                                     <p className="text-xs text-slate-500 mb-3">Controle o acesso aos módulos de Montagens, Pós-Montagem e Assistência Técnica.</p>
                                     <div className="space-y-3">
-                                        {[
-                                            { label: 'Montagens', icon: 'construction', viewKey: 'canViewAssembly' as const, editKey: 'canEditAssembly' as const },
-                                            { label: 'Pós-Montagem', icon: 'checklist', viewKey: 'canViewPostAssembly' as const, editKey: 'canEditPostAssembly' as const },
-                                            { label: 'Assistência Técnica', icon: 'handyman', viewKey: 'canViewAssistance' as const, editKey: 'canEditAssistance' as const },
-                                        ].map(({ label, icon, viewKey, editKey }) => (
-                                            <div key={viewKey} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-lg">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="material-symbols-outlined text-slate-400 text-[18px]">{icon}</span>
-                                                    <span className="font-medium text-sm text-slate-800 dark:text-white">{label}</span>
-                                                </div>
-                                                <div className="flex gap-6">
-                                                    <label className="flex items-center gap-2 text-sm cursor-pointer">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={activeRolePerms?.[viewKey] ?? false}
-                                                            onChange={e => handlePermissionChange(selectedRoleForPerms, viewKey, e.target.checked)}
-                                                            className="rounded text-primary focus:ring-primary"
-                                                        />
-                                                        <span className="text-slate-600 dark:text-slate-300">Visualizar</span>
-                                                    </label>
-                                                    <label className="flex items-center gap-2 text-sm cursor-pointer">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={activeRolePerms?.[editKey] ?? false}
-                                                            onChange={e => handlePermissionChange(selectedRoleForPerms, editKey, e.target.checked)}
-                                                            className="rounded text-primary focus:ring-primary"
-                                                        />
-                                                        <span className="text-slate-600 dark:text-slate-300">Editar</span>
-                                                    </label>
-                                                </div>
+                                        {/* Montagens — sem exclusão */}
+                                        <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-lg">
+                                            <div className="flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-slate-400 text-[18px]">construction</span>
+                                                <span className="font-medium text-sm text-slate-800 dark:text-white">Montagens</span>
                                             </div>
-                                        ))}
+                                            <div className="flex gap-6">
+                                                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                                    <input type="checkbox" checked={activeRolePerms?.canViewAssembly ?? false} onChange={e => handlePermissionChange(selectedRoleForPerms, 'canViewAssembly', e.target.checked)} className="rounded text-primary focus:ring-primary" />
+                                                    <span className="text-slate-600 dark:text-slate-300">Visualizar</span>
+                                                </label>
+                                                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                                    <input type="checkbox" checked={activeRolePerms?.canEditAssembly ?? false} onChange={e => handlePermissionChange(selectedRoleForPerms, 'canEditAssembly', e.target.checked)} className="rounded text-primary focus:ring-primary" />
+                                                    <span className="text-slate-600 dark:text-slate-300">Editar</span>
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        {/* Pós-Montagem — com exclusão */}
+                                        <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-lg">
+                                            <div className="flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-slate-400 text-[18px]">checklist</span>
+                                                <span className="font-medium text-sm text-slate-800 dark:text-white">Pós-Montagem</span>
+                                            </div>
+                                            <div className="flex gap-6">
+                                                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                                    <input type="checkbox" checked={activeRolePerms?.canViewPostAssembly ?? false} onChange={e => handlePermissionChange(selectedRoleForPerms, 'canViewPostAssembly', e.target.checked)} className="rounded text-primary focus:ring-primary" />
+                                                    <span className="text-slate-600 dark:text-slate-300">Visualizar</span>
+                                                </label>
+                                                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                                    <input type="checkbox" checked={activeRolePerms?.canEditPostAssembly ?? false} onChange={e => handlePermissionChange(selectedRoleForPerms, 'canEditPostAssembly', e.target.checked)} className="rounded text-primary focus:ring-primary" />
+                                                    <span className="text-slate-600 dark:text-slate-300">Editar</span>
+                                                </label>
+                                                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                                    <input type="checkbox" checked={activeRolePerms?.canDeletePostAssembly ?? false} onChange={e => handlePermissionChange(selectedRoleForPerms, 'canDeletePostAssembly', e.target.checked)} className="rounded text-rose-500 focus:ring-rose-500" />
+                                                    <span className="text-rose-500 font-semibold">Excluir</span>
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        {/* Assistência Técnica — com exclusão */}
+                                        <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-lg">
+                                            <div className="flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-slate-400 text-[18px]">handyman</span>
+                                                <span className="font-medium text-sm text-slate-800 dark:text-white">Assistência Técnica</span>
+                                            </div>
+                                            <div className="flex gap-6">
+                                                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                                    <input type="checkbox" checked={activeRolePerms?.canViewAssistance ?? false} onChange={e => handlePermissionChange(selectedRoleForPerms, 'canViewAssistance', e.target.checked)} className="rounded text-primary focus:ring-primary" />
+                                                    <span className="text-slate-600 dark:text-slate-300">Visualizar</span>
+                                                </label>
+                                                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                                    <input type="checkbox" checked={activeRolePerms?.canEditAssistance ?? false} onChange={e => handlePermissionChange(selectedRoleForPerms, 'canEditAssistance', e.target.checked)} className="rounded text-primary focus:ring-primary" />
+                                                    <span className="text-slate-600 dark:text-slate-300">Editar</span>
+                                                </label>
+                                                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                                    <input type="checkbox" checked={activeRolePerms?.canDeleteAssistance ?? false} onChange={e => handlePermissionChange(selectedRoleForPerms, 'canDeleteAssistance', e.target.checked)} className="rounded text-rose-500 focus:ring-rose-500" />
+                                                    <span className="text-rose-500 font-semibold">Excluir</span>
+                                                </label>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

@@ -3,7 +3,7 @@ import { useProjects } from '../context/ProjectContext';
 import { ViewState } from '../types';
 
 const ClientList: React.FC = () => {
-  const { projects, batches, workflowConfig, setCurrentProjectId, currentUser, deleteProject, assistanceTickets } = useProjects();
+  const { projects, batches, workflowConfig, setCurrentProjectId, currentUser, deleteProject, assistanceTickets, canUserDeleteClient, canUserEditClient } = useProjects();
   const [filter, setFilter] = useState<'Todos' | 'Ativos' | 'EmAndamento' | 'Concluidos' | 'Perdidos'>('Todos');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -199,7 +199,7 @@ const ClientList: React.FC = () => {
                           Ver Detalhes <span className="material-symbols-outlined text-sm">arrow_forward</span>
                         </button>
 
-                        {(currentUser?.role === 'Admin' || currentUser?.role === 'SuperAdmin') && (
+                        {canUserDeleteClient() && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();

@@ -6,9 +6,7 @@ import { getBusinessDaysDifference } from '../utils/dateUtils';
 
 
 const TechnicalAssistance: React.FC = () => {
-    const { assistanceTickets, updateAssistanceTicket, addAssistanceTicket, deleteAssistanceTicket, projects, assistanceWorkflow, canUserEditAssistance, currentUser, companySettings, assemblyTeams } = useProjects();
-
-    const isOwnerOrAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'Proprietario';
+    const { assistanceTickets, updateAssistanceTicket, addAssistanceTicket, deleteAssistanceTicket, projects, assistanceWorkflow, canUserEditAssistance, canUserDeleteAssistance, currentUser, companySettings, assemblyTeams } = useProjects();
 
     // Filters
     const [hideCompleted, setHideCompleted] = useState(false);
@@ -738,7 +736,7 @@ const TechnicalAssistance: React.FC = () => {
                                 <h2 className="text-xl font-bold text-slate-900 dark:text-white">{activeTicket.clientName} - {activeTicket.title}</h2>
                             </div>
                             <div className="flex gap-2 items-center">
-                                {isOwnerOrAdmin && (
+                                {canUserDeleteAssistance() && (
                                     <button
                                         onClick={handleDeleteTicket}
                                         className="p-2 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-full text-rose-500 hover:text-rose-600 transition-colors"

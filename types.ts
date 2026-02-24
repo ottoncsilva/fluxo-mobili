@@ -72,18 +72,23 @@ export interface PermissionConfig {
   canViewDashboard: boolean;
   canViewKanban: boolean;
   canViewClients: boolean;
+  canEditClient?: boolean;       // editar dados de clientes
+  canDeleteClient?: boolean;     // excluir clientes
   canViewSettings: boolean;
+  canManageUsers?: boolean;      // criar/editar/excluir usuários
   canEditProject: boolean;
-  canChangeSeller?: boolean; // New permission
+  canChangeSeller?: boolean;
   viewableStages: number[];
   actionableSteps: string[];
   // Módulos especiais
-  canViewAssembly?: boolean;      // visualizar módulo Montagens
-  canEditAssembly?: boolean;      // criar/editar agendamentos e equipes
-  canViewPostAssembly?: boolean;  // visualizar módulo Pós-Montagem
-  canEditPostAssembly?: boolean;  // criar/editar avaliações pós-montagem
-  canViewAssistance?: boolean;    // visualizar módulo Assistência
-  canEditAssistance?: boolean;    // criar/editar chamados de assistência
+  canViewAssembly?: boolean;
+  canEditAssembly?: boolean;
+  canViewPostAssembly?: boolean;
+  canEditPostAssembly?: boolean;
+  canDeletePostAssembly?: boolean; // excluir pós-montagens
+  canViewAssistance?: boolean;
+  canEditAssistance?: boolean;
+  canDeleteAssistance?: boolean;   // excluir chamados de assistência técnica
 }
 
 export interface WorkflowStep {
