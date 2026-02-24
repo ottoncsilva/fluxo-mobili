@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useProjects } from '../context/ProjectContext';
 import { useAgenda } from '../context/AgendaContext';
-import { Role, User, PermissionConfig, AssistanceStatus, WorkflowStep, AssistanceWorkflowStep } from '../types';
+import { Role, User, PermissionConfig, AssistanceStatus, WorkflowStep, AssistanceWorkflowStep, ClientWhatsAppTemplate, TeamSlaTemplate, WhatsAppLog } from '../types';
+import { DEFAULT_CLIENT_TEMPLATES, DEFAULT_TEAM_TEMPLATES } from '../context/defaults';
 
 const Settings: React.FC = () => {
     const {
@@ -17,7 +18,7 @@ const Settings: React.FC = () => {
 
     const { appointmentTypes, addAppointmentType, updateAppointmentType, deleteAppointmentType, agendaUsers, toggleAgendaUser } = useAgenda();
 
-    const [activeTab, setActiveTab] = useState<'COMPANY' | 'USERS' | 'PERMISSIONS' | 'ORIGINS' | 'AGENDA' | 'APPEARANCE' | 'ASSISTANCE' | 'WORKFLOW' | 'POST_ASSEMBLY' | 'INTEGRATIONS' | 'HOLIDAYS'>('COMPANY');
+    const [activeTab, setActiveTab] = useState<'COMPANY' | 'USERS' | 'PERMISSIONS' | 'ORIGINS' | 'AGENDA' | 'APPEARANCE' | 'ASSISTANCE' | 'WORKFLOW' | 'POST_ASSEMBLY' | 'INTEGRATIONS' | 'HOLIDAYS' | 'COMMUNICATIONS'>('COMPANY');
 
     // Dark Mode State
     const [theme, setTheme] = useState<'light' | 'dark' | 'auto'>(() => {
@@ -132,6 +133,42 @@ const Settings: React.FC = () => {
     const [evoNotifyStatus, setEvoNotifyStatus] = useState(companySettings.evolutionApi?.notifyStatus || false);
     const [evoNotifySla, setEvoNotifySla] = useState(companySettings.evolutionApi?.notifySla || false);
     const [testConnectionStatus, setTestConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+
+    // Communications State
+    const [clientTemplates, setClientTemplates] = useState<ClientWhatsAppTemplate[]>(() => {
+        const saved = companySettings.whatsappClientTemplates;
+        if (saved && saved.length > 0) return saved;
+        return DEFAULT_CLIENT_TEMPLATES;
+    });
+    const [teamTemplates, setTeamTemplates] = useState<TeamSlaTemplate[]>(() => {
+        const saved = companySettings.whatsappTeamTemplates;
+        if (saved && saved.length > 0) return saved;
+        return DEFAULT_TEAM_TEMPLATES;
+    });
+    const [commLogs] = useState<WhatsAppLog[]>(companySettings.whatsappLogs || []);
+    const [commSaveMsg, setCommSaveMsg] = useState<string | null>(null);
+    const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+
+    const handleSaveCommunications = async () => {
+        setSaving(true);
+        setCommSaveMsg(null);
+        await updateCompanySettings({
+            ...companySettings,
+            evolutionApi: {
+                instanceUrl: evoInstanceUrl,
+                token: evoToken,
+                notifyLead: evoNotifyLead,
+                notifyStatus: evoNotifyStatus,
+                notifySla: evoNotifySla,
+            },
+            whatsappClientTemplates: clientTemplates,
+            whatsappTeamTemplates: teamTemplates,
+        });
+        const success = await saveStoreConfig();
+        setSaving(false);
+        setCommSaveMsg(success ? '✅ Comunicações salvas com sucesso!' : '❌ Erro ao salvar.');
+        setTimeout(() => setCommSaveMsg(null), 3000);
+    };
 
     const handleTestConnection = async () => {
         setTestConnectionStatus('testing');
@@ -438,6 +475,12 @@ const Settings: React.FC = () => {
                         className={`pb-4 px-2 font-bold text-sm transition-colors border-b-2 whitespace-nowrap ${activeTab === 'ASSISTANCE' ? 'border-primary text-primary' : 'border-transparent text-slate-500'}`}
                     >
                         Assistência
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('COMMUNICATIONS')}
+                        className={`pb-4 px-2 font-bold text-sm transition-colors border-b-2 whitespace-nowrap ${activeTab === 'COMMUNICATIONS' ? 'border-primary text-primary' : 'border-transparent text-slate-500'}`}
+                    >
+                        Comunicações
                     </button>
                     <button
                         onClick={() => setActiveTab('APPEARANCE')}
@@ -1123,6 +1166,197 @@ const Settings: React.FC = () => {
                         </div>
                     )
                 }
+
+                {/* COMMUNICATIONS TAB */}
+                {activeTab === 'COMMUNICATIONS' && (
+                    <div className="space-y-6 animate-fade-in">
+                        {/* API Configuration */}
+                        <div className="bg-white dark:bg-[#1a2632] p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+                            <div className="flex items-center gap-4 mb-6">
+                                <span className="material-symbols-outlined text-4xl text-green-500">chat</span>
+                                <div>
+                                    <h3 className="font-bold text-slate-800 dark:text-white text-lg">Configuração da Evolution API</h3>
+                                    <p className="text-sm text-slate-500">Configure a conexão com a Evolution API para envio de mensagens WhatsApp.</p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="md:col-span-2">
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">URL da Instância</label>
+                                    <input type="text" value={evoInstanceUrl} onChange={e => setEvoInstanceUrl(e.target.value)} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm" placeholder="https://api.evolution.com/instance/minha-empresa" />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">API Token</label>
+                                    <input type="password" value={evoToken} onChange={e => setEvoToken(e.target.value)} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm" placeholder="Ex: 4E8Q..." />
+                                </div>
+                            </div>
+                            <div className="mt-4 flex items-center gap-3">
+                                <button
+                                    onClick={handleTestConnection}
+                                    disabled={testConnectionStatus === 'testing' || !evoInstanceUrl || !evoToken}
+                                    className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors ${testConnectionStatus === 'success' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : testConnectionStatus === 'error' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'}`}
+                                >
+                                    <span className="material-symbols-outlined text-sm">{testConnectionStatus === 'testing' ? 'refresh' : testConnectionStatus === 'success' ? 'check_circle' : testConnectionStatus === 'error' ? 'error' : 'wifi_tethering'}</span>
+                                    {testConnectionStatus === 'testing' ? 'Testando...' : testConnectionStatus === 'success' ? 'Conectado!' : testConnectionStatus === 'error' ? 'Falha' : 'Testar Conexão'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Client Messages */}
+                        <div className="bg-white dark:bg-[#1a2632] p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+                            <div className="flex items-center gap-3 mb-2">
+                                <span className="material-symbols-outlined text-2xl text-blue-500">person</span>
+                                <h3 className="font-bold text-slate-800 dark:text-white text-lg">Mensagens para o Cliente</h3>
+                            </div>
+                            <p className="text-sm text-slate-500 mb-4">Escolha quais etapas enviam mensagem automática ao cliente. Personalize o texto de cada uma.</p>
+                            <p className="text-xs text-slate-400 mb-6">Variáveis: <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">{'{nomeCliente}'}</code> <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">{'{data}'}</code> <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">{'{prazo}'}</code> <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">{'{vendedor}'}</code> <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">{'{codigoAss}'}</code> <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">{'{etapa}'}</code></p>
+
+                            <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                                {clientTemplates.map((tpl, idx) => (
+                                    <div key={tpl.stepId} className={`p-3 rounded-lg border transition-colors ${tpl.enabled ? 'border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-900/10' : 'border-slate-100 dark:border-slate-800'}`}>
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={tpl.enabled}
+                                                        onChange={() => {
+                                                            const updated = [...clientTemplates];
+                                                            updated[idx] = { ...tpl, enabled: !tpl.enabled };
+                                                            setClientTemplates(updated);
+                                                        }}
+                                                        className="sr-only peer"
+                                                    />
+                                                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
+                                                </label>
+                                                <span className="text-xs font-mono text-slate-400 w-16 shrink-0">{tpl.stepId}</span>
+                                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate">{tpl.label}</span>
+                                            </div>
+                                            <button
+                                                onClick={() => setEditingTemplateId(editingTemplateId === tpl.stepId ? null : tpl.stepId)}
+                                                className="text-slate-400 hover:text-primary shrink-0"
+                                            >
+                                                <span className="material-symbols-outlined text-sm">{editingTemplateId === tpl.stepId ? 'expand_less' : 'edit'}</span>
+                                            </button>
+                                        </div>
+                                        {editingTemplateId === tpl.stepId && (
+                                            <div className="mt-3">
+                                                <textarea
+                                                    value={tpl.message}
+                                                    onChange={e => {
+                                                        const updated = [...clientTemplates];
+                                                        updated[idx] = { ...tpl, message: e.target.value };
+                                                        setClientTemplates(updated);
+                                                    }}
+                                                    rows={3}
+                                                    className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm p-3"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Team Messages */}
+                        <div className="bg-white dark:bg-[#1a2632] p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+                            <div className="flex items-center gap-3 mb-2">
+                                <span className="material-symbols-outlined text-2xl text-orange-500">groups</span>
+                                <h3 className="font-bold text-slate-800 dark:text-white text-lg">Mensagens para a Equipe (Alertas de SLA)</h3>
+                            </div>
+                            <p className="text-sm text-slate-500 mb-4">Alertas automáticos enviados para o responsável da etapa, vendedor e gerente quando o SLA está prestes a vencer.</p>
+                            <p className="text-xs text-slate-400 mb-6">Variáveis: <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">{'{nomeResponsavel}'}</code> <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">{'{nomeProjeto}'}</code> <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">{'{nomeCliente}'}</code> <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">{'{etapa}'}</code> <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">{'{diasRestantes}'}</code></p>
+
+                            <div className="space-y-3">
+                                {teamTemplates.map((tpl, idx) => (
+                                    <div key={tpl.type} className={`p-4 rounded-lg border transition-colors ${tpl.enabled ? 'border-orange-200 bg-orange-50/50 dark:border-orange-800 dark:bg-orange-900/10' : 'border-slate-100 dark:border-slate-800'}`}>
+                                        <div className="flex items-center justify-between gap-3 mb-3">
+                                            <div className="flex items-center gap-3">
+                                                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={tpl.enabled}
+                                                        onChange={() => {
+                                                            const updated = [...teamTemplates];
+                                                            updated[idx] = { ...tpl, enabled: !tpl.enabled };
+                                                            setTeamTemplates(updated);
+                                                        }}
+                                                        className="sr-only peer"
+                                                    />
+                                                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
+                                                </label>
+                                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{tpl.type === 'sla_d1' ? '⚠️' : '🚨'} {tpl.label}</span>
+                                            </div>
+                                        </div>
+                                        <textarea
+                                            value={tpl.message}
+                                            onChange={e => {
+                                                const updated = [...teamTemplates];
+                                                updated[idx] = { ...tpl, message: e.target.value };
+                                                setTeamTemplates(updated);
+                                            }}
+                                            rows={2}
+                                            className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm p-3"
+                                        />
+                                        <p className="text-xs text-slate-400 mt-2">
+                                            Enviado para: Responsável da etapa + Vendedor do projeto + Gerente/Admin
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Message Logs */}
+                        <div className="bg-white dark:bg-[#1a2632] p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+                            <div className="flex items-center gap-3 mb-4">
+                                <span className="material-symbols-outlined text-2xl text-slate-400">history</span>
+                                <h3 className="font-bold text-slate-800 dark:text-white text-lg">Log de Mensagens Enviadas</h3>
+                                <span className="text-xs text-slate-400 ml-auto">{commLogs.length} registros</span>
+                            </div>
+                            {commLogs.length === 0 ? (
+                                <p className="text-sm text-slate-400 text-center py-8">Nenhuma mensagem enviada ainda.</p>
+                            ) : (
+                                <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                                    <table className="w-full text-sm">
+                                        <thead className="sticky top-0 bg-white dark:bg-[#1a2632]">
+                                            <tr className="text-left text-xs font-bold text-slate-500 uppercase">
+                                                <th className="pb-3 pr-4">Data</th>
+                                                <th className="pb-3 pr-4">Tipo</th>
+                                                <th className="pb-3 pr-4">Etapa</th>
+                                                <th className="pb-3 pr-4">Destinatário</th>
+                                                <th className="pb-3 pr-4">Telefone</th>
+                                                <th className="pb-3">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {commLogs.slice(0, 100).map((log, i) => (
+                                                <tr key={i} className="border-t border-slate-100 dark:border-slate-800">
+                                                    <td className="py-2 pr-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">{new Date(log.sentAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
+                                                    <td className="py-2 pr-4"><span className={`px-2 py-0.5 rounded-full text-xs font-bold ${log.audience === 'client' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'}`}>{log.audience === 'client' ? 'Cliente' : 'Equipe'}</span></td>
+                                                    <td className="py-2 pr-4 text-slate-600 dark:text-slate-300 font-mono text-xs">{log.stepId}</td>
+                                                    <td className="py-2 pr-4 text-slate-700 dark:text-slate-200">{log.recipientName}</td>
+                                                    <td className="py-2 pr-4 text-slate-500 font-mono text-xs">{log.phone}</td>
+                                                    <td className="py-2">{log.success ? <span className="text-green-600 font-bold">✓</span> : <span className="text-rose-500 font-bold">✗</span>}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Save Button */}
+                        <div className="flex justify-between items-center">
+                            {commSaveMsg && <span className="text-sm font-bold">{commSaveMsg}</span>}
+                            <button
+                                onClick={handleSaveCommunications}
+                                disabled={saving}
+                                className="bg-primary text-white font-bold py-2.5 px-6 rounded-lg text-sm hover:bg-primary-600 shadow-lg shadow-primary/20 ml-auto"
+                            >
+                                {saving ? 'Salvando...' : 'Salvar Comunicações'}
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* APPEARANCE TAB */}
                 {

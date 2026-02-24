@@ -59,6 +59,9 @@ export interface CompanySettings {
     notifyStatus: boolean;
     notifySla: boolean;
   };
+  whatsappClientTemplates?: ClientWhatsAppTemplate[];
+  whatsappTeamTemplates?: TeamSlaTemplate[];
+  whatsappLogs?: WhatsAppLog[];
   holidays?: Array<{
     date: string;        // Formato: "YYYY-MM-DD" para móveis ou "MM-DD" para fixos
     name: string;        // Ex: "Carnaval", "Corpus Christi"
@@ -345,6 +348,30 @@ export interface TechnicalAssistanceSchedule {
   estimatedDays?: number; // dias úteis até conclusão (SLA acumulado até 10.6)
   createdAt: string;      // ISO date: quando foi criada
   notes?: string;
+}
+
+// WhatsApp Communication Types
+export interface ClientWhatsAppTemplate {
+    stepId: string;
+    label: string;
+    message: string;
+    enabled: boolean;
+}
+
+export interface TeamSlaTemplate {
+    type: 'sla_d1' | 'sla_d0';
+    label: string;
+    message: string;
+    enabled: boolean;
+}
+
+export interface WhatsAppLog {
+    sentAt: string;
+    audience: 'client' | 'team';
+    stepId: string;
+    recipientName: string;
+    phone: string;
+    success: boolean;
 }
 
 // UI Types

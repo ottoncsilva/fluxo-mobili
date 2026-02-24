@@ -848,12 +848,12 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             setAllBatches((prev: Batch[]) => prev.map(b => b.id !== batchId ? b : { ...b, ...updateData }));
         }
 
-        // Trigger Notification
+        // Trigger WhatsApp notification via template system
         const nextStep = workflowConfig[targetStepId];
         if (nextStep) {
             const project = allProjects.find(p => p.id === batch.projectId);
             if (project) {
-                notifyClientStatusChange(project, nextStep.label);
+                sendStepClientNotification(project, targetStepId);
             }
         }
     };
@@ -914,11 +914,11 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             setAllBatches(prev => prev.map(b => b.id !== batchId ? b : { ...b, ...updateData }));
         }
 
-        // Trigger Notification
+        // Trigger WhatsApp notification via template system
         if (nextStep) {
             const project = allProjects.find(p => p.id === batch.projectId);
             if (project) {
-                notifyClientStatusChange(project, nextStep.label);
+                sendStepClientNotification(project, finalNextStepId);
             }
         }
     };
@@ -1216,11 +1216,22 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
 
     const updateAssistanceTicket = async (ticket: AssistanceTicket) => {
+        const oldTicket = assistanceTickets.find(t => t.id === ticket.id);
         const updatedTicket = { ...ticket, updatedAt: new Date().toISOString() };
         if (useCloud && db) {
             await setDoc(doc(db, "assistance_tickets", ticket.id), updatedTicket);
         } else {
             setAssistanceTickets(prev => prev.map(t => t.id === ticket.id ? updatedTicket : t));
+        }
+
+        // Send WhatsApp notification if status changed (10.x steps)
+        if (oldTicket && oldTicket.status !== ticket.status) {
+            const client = allProjects.find(p => p.client.id === ticket.clientId)?.client
+                ?? { name: ticket.clientName, phone: '' } as Client;
+            if (client.phone) {
+                const fakeProject = { client, sellerName: '', environments: [] } as unknown as Project;
+                sendStepClientNotification(fakeProject, ticket.status, { codigoAss: ticket.code || '' });
+            }
         }
     };
 
@@ -1401,21 +1412,33 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         return [];
     };
 
-    // Helper to send notifications
+    // Helper to send WhatsApp notifications using template system
+    const sendStepClientNotification = async (project: Project, stepId: string, extraVars?: Record<string, string>) => {
+        const templates = companySettings.whatsappClientTemplates;
+        if (!templates || !companySettings.evolutionApi?.instanceUrl) return;
+
+        const { sendClientNotification, addWhatsAppLog } = await import('../services/communicationService');
+
+        const vars: Record<string, string> = {
+            nomeCliente: project.client.name,
+            vendedor: project.sellerName || '',
+            etapa: stepId,
+            prazo: '30',
+            ...(extraVars || {}),
+        };
+
+        const { log } = await sendClientNotification(stepId, project.client.phone, project.client.name, vars, companySettings);
+        if (log.success || log.phone) {
+            const updatedLogs = addWhatsAppLog(companySettings.whatsappLogs || [], log);
+            updateCompanySettings({ ...companySettings, whatsappLogs: updatedLogs });
+        }
+    };
+
+    // Legacy compatibility — calls template-based system
     const notifyClientStatusChange = async (project: Project, newStepLabel: string) => {
-        if (!companySettings.evolutionApi?.notifyStatus || !companySettings.evolutionApi?.instanceUrl) return;
-
-        const message = `Olá ${project.client.name}, seu projeto *${project.environments.map(e => e.name).join(', ')}* mudou de status para: *${newStepLabel}*. \n\nAcompanhe o progresso com a gente! 🚀\n*${companySettings.name}*`;
-
-        await import('../services/evolutionApi').then(({ EvolutionApi }) => {
-            EvolutionApi.sendText({
-                instanceUrl: companySettings.evolutionApi!.instanceUrl,
-                token: companySettings.evolutionApi!.token,
-                phone: project.client.phone,
-                message
-            });
-        });
-    }
+        // Kept for backward compatibility with moveBatchToStep
+        // The new system uses sendStepClientNotification with stepId
+    };
 
 
     const notifySalesNewLead = async (client: Client) => {
@@ -1434,119 +1457,97 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         });
     };
 
-    // --- SLA Checker Logic ---
+    // --- SLA Checker with Template-Based WhatsApp Alerts (D-1 and D-0) ---
     useEffect(() => {
-        if (typeof window === 'undefined') return; // Client-side only check
+        if (typeof window === 'undefined') return;
 
-        const checkSlaBreaches = async () => {
-            if (!companySettings.evolutionApi?.instanceUrl || !companySettings.evolutionApi.token) return;
-
-            // Iterate over batches to check for SLA violations
-            // We use a functional update pattern or just local checks to avoid infinite loops
-            // But here we might need to update the batch in DB/State if a notification is sent.
+        const checkSlaAlerts = async () => {
+            const teamTemplates = companySettings.whatsappTeamTemplates;
+            if (!teamTemplates || teamTemplates.every(t => !t.enabled)) return;
+            if (!companySettings.evolutionApi?.instanceUrl || !companySettings.evolutionApi?.token) return;
 
             const now = new Date();
+            const todayKey = now.toISOString().split('T')[0];
+            const { sendTeamSlaAlert, addWhatsAppLog } = await import('../services/communicationService');
+            let logsToAdd: import('../types').WhatsAppLog[] = [];
 
             for (const batch of allBatches) {
-                // Skip if already notified or if completed/lost
-                if (batch.slaNotificationSent) continue;
                 if (['9.0', '9.1'].includes(batch.phase)) continue;
+                if (batch.status !== 'Active') continue;
 
                 const step = workflowConfig[batch.phase];
-                if (!step || !step.sla) continue; // No SLA for this step
+                if (!step || !step.sla) continue;
 
                 const lastUpdate = new Date(batch.lastUpdated);
-                const deadline = new Date(lastUpdate.getTime() + (step.sla * 24 * 60 * 60 * 1000));
+                const deadlineMs = lastUpdate.getTime() + (step.sla * 24 * 60 * 60 * 1000);
+                const daysRemaining = Math.ceil((deadlineMs - now.getTime()) / (1000 * 3600 * 24));
 
-                if (now > deadline) {
-                    // SLA BREACHED!
-                    console.log(`SLA Breach detected for Batch ${batch.name} (Project ${batch.projectId}) in step ${step.label}`);
+                let alertType: 'sla_d1' | 'sla_d0' | null = null;
+                if (daysRemaining === 1) alertType = 'sla_d1';
+                else if (daysRemaining <= 0) alertType = 'sla_d0';
+                if (!alertType) continue;
 
-                    // 1. Find Responsible Users (by Role)
-                    // We define "Responsible" as users in the current store with the 'ownerRole' of the step.
-                    // If ownerRole is 'Vendedor', we specifically look for the project's seller if possible, otherwise all sellers.
+                // Anti-spam: check localStorage
+                const spamKey = `sla_notified_${batch.id}_${todayKey}_${alertType}`;
+                if (localStorage.getItem(spamKey)) continue;
 
-                    const project = allProjects.find(p => p.id === batch.projectId);
-                    if (!project) continue;
+                const project = allProjects.find(p => p.id === batch.projectId);
+                if (!project) continue;
 
-                    let targetUsers: User[] = [];
+                // Collect recipients: 1) ownerRole users, 2) seller, 3) managers/admins
+                const recipientIds = new Set<string>();
+                const recipients: { name: string; phone: string }[] = [];
 
-                    if (step.ownerRole === 'Vendedor' && project.sellerId) {
-                        const seller = allUsers.find(u => u.id === project.sellerId);
-                        if (seller) targetUsers.push(seller);
-                    }
+                const addRecipient = (user: User) => {
+                    if (recipientIds.has(user.id) || !user.phone) return;
+                    recipientIds.add(user.id);
+                    recipients.push({ name: user.name, phone: user.phone });
+                };
 
-                    if (targetUsers.length === 0) {
-                        // Fallback: Notify all users with the role
-                        targetUsers = allUsers.filter(u => u.storeId === batch.storeId && u.role === step.ownerRole);
-                    }
-
-                    // 2. Send Notification(s)
-                    if (targetUsers.length > 0) {
-                        let notificationSent = false;
-                        const { EvolutionApi } = await import('../services/evolutionApi');
-
-                        for (const user of targetUsers) {
-                            if (!user.phone) continue; // Needs phone to notify via WhatsApp
-
-                            // Format phone for API (assuming it needs just numbers)
-                            const cleanPhone = user.phone.replace(/\D/g, '');
-                            // Basic validation for BR number (10 or 11 digits)
-                            // if (cleanPhone.length < 10) continue; 
-                            // EvolutionAPI usually handles '55' prefix check, but assuming stored phones might need '55' if not present?
-                            // Let's assume user.phone is stored mostly correctly or mask handles it.
-                            // Ideally we prepend 55 if missing.
-                            const finalPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
-
-                            const message = `⚠️ *Alerta de Atraso (SLA)*\n\nO projeto *${project.client.name}* - *${batch.name}* está atrasado na etapa: *${step.label}*.\n\nPrazo era: ${deadline.toLocaleDateString()}\nDias de atraso: ${Math.floor((now.getTime() - deadline.getTime()) / (1000 * 3600 * 24))}\n\nPor favor, verifique!`;
-
-                            try {
-                                await EvolutionApi.sendText({
-                                    instanceUrl: companySettings.evolutionApi!.instanceUrl,
-                                    token: companySettings.evolutionApi!.token,
-                                    phone: finalPhone,
-                                    message
-                                });
-                                notificationSent = true;
-                                console.log(`SLA Notification sent to ${user.name} (${finalPhone})`);
-                            } catch (err) {
-                                console.error(`Failed to send SLA notification to ${user.name}`, err);
-                            }
-                        }
-
-                        // 3. Mark as notified to prevent spam
-                        if (notificationSent) {
-                            const updateData = { slaNotificationSent: true };
-                            if (useCloud && db) {
-                                // We use persist helper or updateDoc directly
-                                // using the existing internal helper if accessible or direct firebase
-                                // persist is defined in scope
-                                persist("batches", batch.id, updateData);
-                            } else {
-                                setAllBatches(prev => prev.map(b => b.id === batch.id ? { ...b, ...updateData } : b));
-                            }
-                        }
-                    }
+                // 1. Users with ownerRole
+                allUsers.filter(u => u.storeId === batch.storeId && u.role === step.ownerRole).forEach(addRecipient);
+                // 2. Seller
+                if (project.sellerId) {
+                    const seller = allUsers.find(u => u.id === project.sellerId);
+                    if (seller) addRecipient(seller);
                 }
+                // 3. Gerente / Admin / Proprietario
+                allUsers.filter(u => u.storeId === batch.storeId && ['Gerente', 'Admin', 'Proprietario'].includes(u.role)).forEach(addRecipient);
+
+                const vars = {
+                    nomeProjeto: batch.name || project.client.name,
+                    nomeCliente: project.client.name,
+                    etapa: step.label,
+                    diasRestantes: String(Math.max(daysRemaining, 0)),
+                };
+
+                for (const r of recipients) {
+                    const { log } = await sendTeamSlaAlert(alertType, r.phone, r.name, vars, companySettings);
+                    logsToAdd.push(log);
+                }
+
+                localStorage.setItem(spamKey, '1');
+            }
+
+            // Persist logs
+            if (logsToAdd.length > 0) {
+                let currentLogs = companySettings.whatsappLogs || [];
+                for (const l of logsToAdd) {
+                    currentLogs = addWhatsAppLog(currentLogs, l);
+                }
+                updateCompanySettings({ ...companySettings, whatsappLogs: currentLogs });
             }
         };
 
-        // Run check every 1 hour (3600000 ms) or just on mount/updates?
-        // If we only run on mount/dependency change, it runs whenever 'allBatches' changes (which includes the update we just made).
-        // To avoid rapid loops if something goes wrong, maybe we stick to a simplified check or use a ref to track last check?
-        // For now, let's trust 'slaNotificationSent' prevents loops.
-        // We also want to check periodically even if no data changes (e.g. time passes).
-        const intervalId = setInterval(checkSlaBreaches, 60 * 60 * 1000); // Check every hour
-
-        // Also run immediately on data change (debounced slightly?)
-        const timeoutId = setTimeout(checkSlaBreaches, 5000); // Run 5s after data load/change to let things settle
+        // Run every 30 minutes + on mount (with 5s delay)
+        const intervalId = setInterval(checkSlaAlerts, 30 * 60 * 1000);
+        const timeoutId = setTimeout(checkSlaAlerts, 5000);
 
         return () => {
             clearInterval(intervalId);
             clearTimeout(timeoutId);
         };
-
-    }, [allBatches, allProjects, allUsers, workflowConfig, companySettings, useCloud]); // Dependencies: if any of these change, re-run checks
+    }, [allBatches, allProjects, allUsers, workflowConfig, companySettings, useCloud]);
 
 
     return (
