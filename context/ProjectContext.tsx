@@ -1224,22 +1224,26 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     // Assembly Scheduling Functions
     const updateBatchAssemblySchedule = (batchId: string, schedule: AssemblySchedule | null) => {
         const lastUpdated = new Date().toISOString();
+
+        // Always update local state immediately (optimistic update)
+        setAllBatches(prev => prev.map(b => {
+            if (b.id !== batchId) return b;
+            if (schedule === null) {
+                const { assemblySchedule: _, ...rest } = b;
+                return { ...rest, lastUpdated };
+            }
+            return { ...b, assemblySchedule: schedule, lastUpdated };
+        }));
+
+        // Persist to Firestore if in cloud mode
         if (useCloud && db) {
             if (schedule === null) {
                 // deleteField() is required — setDoc with merge ignores undefined values
-                updateDoc(doc(db, "batches", batchId), { assemblySchedule: deleteField(), lastUpdated });
+                updateDoc(doc(db, "batches", batchId), { assemblySchedule: deleteField(), lastUpdated })
+                    .catch(err => console.error("Error deleting assembly schedule:", err));
             } else {
                 persist("batches", batchId, { assemblySchedule: schedule, lastUpdated });
             }
-        } else {
-            setAllBatches(prev => prev.map(b => {
-                if (b.id !== batchId) return b;
-                if (schedule === null) {
-                    const { assemblySchedule: _, ...rest } = b;
-                    return { ...rest, lastUpdated };
-                }
-                return { ...b, assemblySchedule: schedule, lastUpdated };
-            }));
         }
     };
 
