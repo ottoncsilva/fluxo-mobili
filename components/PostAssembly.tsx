@@ -188,7 +188,7 @@ const PostAssembly: React.FC = () => {
         if (!selectedProject || !confirm('Tem certeza que deseja excluir este item?')) return;
 
         const updatedItems = (selectedProject.postAssemblyItems || []).filter(item => item.id !== itemId);
-        updateProjectDetails(selectedProject.id, { postAssemblyItems: updatedItems });
+        updateProjectPostAssemblyItems(selectedProject.id, { items: updatedItems });
     };
 
     const handleMoveItem = (itemId: string, direction: 'up' | 'down') => {
@@ -204,7 +204,7 @@ const PostAssembly: React.FC = () => {
         const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
         [items[currentIndex], items[newIndex]] = [items[newIndex], items[currentIndex]];
 
-        updateProjectDetails(selectedProject.id, { postAssemblyItems: items });
+        updateProjectPostAssemblyItems(selectedProject.id, { items: items });
     };
 
     const handleSaveItemEdit = () => {
