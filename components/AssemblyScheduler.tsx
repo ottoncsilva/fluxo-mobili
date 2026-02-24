@@ -9,7 +9,7 @@ import {
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useProjects } from '../context/ProjectContext';
-import { AssemblyTeam, AssemblySchedule, AssemblyStatus, AssistanceStatus, AssistanceTicket, Batch } from '../types';
+import { AssemblyTeam, AssemblySchedule, AssemblyStatus, AssistanceStatus, AssistanceTicket, Batch, WorkflowStep, Project, CompanySettings } from '../types';
 import { getBusinessDaysDifference, isHoliday, addBusinessDays } from '../utils/dateUtils';
 
 // ─── Color map (static for Tailwind purge safety) ────────────────────────────
@@ -57,6 +57,122 @@ const NON_WORKING_GRID_STYLE: React.CSSProperties = {
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+
+// ─── Pure helper functions (outside component for stability) ─────────────────
+const getDeadlineChipPure = (assemblyDeadline: string | undefined, holidays?: string[]) => {
+    if (!assemblyDeadline) return null;
+    const days = getBusinessDaysDifference(new Date(), new Date(assemblyDeadline), holidays);
+    const dateStr = format(new Date(assemblyDeadline), 'dd/MM/yyyy');
+    if (days > 15) {
+        return { cls: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold', icon: 'event', label: `📅 Data Limite: ${dateStr} (+${days} d.ú.)`, pulse: false };
+    }
+    if (days >= 0 && days <= 15) {
+        return { cls: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 font-bold', icon: 'warning', label: `⚠ Data Limite: ${dateStr} (+${days} d.ú.)`, pulse: false };
+    }
+    return { cls: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 font-bold animate-pulse', icon: 'alarm', label: `🚨 URGENTE — Prazo vencido há ${Math.abs(days)} d.ú.`, pulse: true };
+};
+
+const getStageBadgePure = (phase: string, workflowConfig: Record<string, WorkflowStep>) => {
+    const step = workflowConfig[phase];
+    if (!step) return null;
+    const stage = step.stage;
+    if (stage === 5) return { icon: 'precision_manufacturing', cls: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400', label: 'Fabricação' };
+    if (stage === 6) return { icon: 'local_shipping', cls: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300', label: 'Logística' };
+    if (stage === 7) return { icon: 'construction', cls: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300', label: 'Montagem Ativa' };
+    return null;
+};
+
+// ─── QueueBatchCard ───────────────────────────────────────────────────────────
+interface QueueBatchCardProps {
+    batch: Batch;
+    project: Project;
+    assemblyTeams: AssemblyTeam[];
+    workflowConfig: Record<string, WorkflowStep>;
+    holidays?: string[];
+    canEdit: boolean;
+    onOpenScheduleModal: (batch: Batch) => void;
+}
+
+const QueueBatchCard = React.memo(({ batch, project, assemblyTeams, workflowConfig, holidays, canEdit, onOpenScheduleModal }: QueueBatchCardProps) => {
+    const scheduleStatus = (batch.assemblySchedule?.status || 'Sem Previsão') as AssemblyStatus;
+    const team = assemblyTeams.find(t => t.id === batch.assemblySchedule?.teamId);
+    const deadlineChip = getDeadlineChipPure(batch.assemblyDeadline, holidays);
+    const stageBadge = getStageBadgePure(batch.phase, workflowConfig);
+    const step = workflowConfig[batch.phase];
+    const envCount = batch.environmentIds?.length || project.environments.length;
+    const defaultDays = envCount * 3;
+    const estimatedDays = batch.assemblySchedule?.estimatedDays ?? defaultDays;
+    const isCustomEstimate = batch.assemblySchedule?.estimatedDays !== undefined && batch.assemblySchedule.estimatedDays !== defaultDays;
+
+    return (
+        <div className="bg-white dark:bg-[#1e2936] rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+            {/* Status bar */}
+            <div className={`px-2.5 py-1 flex items-center justify-between ${STATUS_STYLES[scheduleStatus]}`}>
+                <span className="text-[10px] font-bold uppercase tracking-wide">{scheduleStatus}</span>
+                {team && (
+                    <div className="flex items-center gap-1">
+                        <div className={`w-2 h-2 rounded-full ${TEAM_COLOR_MAP[team.color]?.bg || 'bg-slate-400'}`} />
+                        <span className="text-[10px] font-bold">{team.name}</span>
+                    </div>
+                )}
+            </div>
+
+            <div className="p-2">
+                <div className="font-bold text-slate-800 dark:text-white text-sm truncate">{project.client.name}</div>
+                <div className="text-[10px] text-slate-400 mb-1.5">
+                    {batch.name || 'Lote'} · {envCount} amb{envCount !== 1 ? 's' : ''}
+                </div>
+
+                {stageBadge && (
+                    <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold mb-1.5 ${stageBadge.cls}`}>
+                        <span className="material-symbols-outlined text-[11px]">{stageBadge.icon}</span>
+                        {step?.label || stageBadge.label}
+                    </div>
+                )}
+
+                {deadlineChip && (
+                    <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] mb-1.5 ${deadlineChip.cls}`}>
+                        <span className="material-symbols-outlined text-[11px]">{deadlineChip.icon}</span>
+                        {deadlineChip.label}
+                    </div>
+                )}
+
+                <div className={`text-[10px] mb-1.5 flex items-center gap-1 ${isCustomEstimate ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}>
+                    <span className="material-symbols-outlined text-[12px]">timer</span>
+                    {isCustomEstimate
+                        ? `${estimatedDays} d.ú. (ajustado)`
+                        : `${envCount}×3 = ${defaultDays} d.ú.`
+                    }
+                </div>
+
+                {batch.assemblySchedule?.scheduledDate && (
+                    <div className="text-[10px] text-slate-500 mb-1.5 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[12px]">event</span>
+                        {format(new Date(batch.assemblySchedule.scheduledDate), "dd/MM/yy", { locale: ptBR })}
+                    </div>
+                )}
+                {!batch.assemblySchedule?.scheduledDate && batch.assemblySchedule?.forecastDate && (
+                    <div className="text-[10px] text-amber-600 mb-1.5 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[12px]">event_available</span>
+                        Prev: {format(new Date(batch.assemblySchedule.forecastDate), "dd/MM/yy", { locale: ptBR })}
+                    </div>
+                )}
+
+                {canEdit && (
+                    <button
+                        onClick={() => onOpenScheduleModal(batch)}
+                        className="w-full mt-1 py-1 rounded-lg text-[10px] font-bold bg-primary text-white hover:bg-primary/90 transition-colors flex items-center justify-center gap-1"
+                    >
+                        <span className="material-symbols-outlined text-[13px]">
+                            {scheduleStatus === 'Sem Previsão' ? 'calendar_add_on' : 'edit_calendar'}
+                        </span>
+                        {scheduleStatus === 'Sem Previsão' ? 'Agendar' : 'Editar'}
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+});
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 const AssemblyScheduler: React.FC = () => {
@@ -349,31 +465,9 @@ const AssemblyScheduler: React.FC = () => {
         return rows.filter(row => row.events.length > 0); // Only show teams with active assistances
     }, [assemblyTeams, assistanceEvents]);
 
-    // ── Deadline urgency ───────────────────────────────────────────────────────
-    const getDeadlineChip = (assemblyDeadline?: string) => {
-        if (!assemblyDeadline) return null;
-        const days = getBusinessDaysDifference(new Date(), new Date(assemblyDeadline), companySettings?.holidays);
-        const dateStr = format(new Date(assemblyDeadline), 'dd/MM/yyyy');
-        if (days > 15) {
-            return { cls: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold', icon: 'event', label: `📅 Data Limite: ${dateStr} (+${days} d.ú.)`, pulse: false };
-        }
-        if (days >= 0 && days <= 15) {
-            return { cls: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 font-bold', icon: 'warning', label: `⚠ Data Limite: ${dateStr} (+${days} d.ú.)`, pulse: false };
-        }
-        // overdue
-        return { cls: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 font-bold animate-pulse', icon: 'alarm', label: `🚨 URGENTE — Prazo vencido há ${Math.abs(days)} d.ú.`, pulse: true };
-    };
-
-    // ── Stage badge ────────────────────────────────────────────────────────────
-    const getStageBadge = (phase: string) => {
-        const step = workflowConfig[phase];
-        if (!step) return null;
-        const stage = step.stage;
-        if (stage === 5) return { icon: 'precision_manufacturing', cls: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400', label: 'Fabricação' };
-        if (stage === 6) return { icon: 'local_shipping', cls: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300', label: 'Logística' };
-        if (stage === 7) return { icon: 'construction', cls: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300', label: 'Montagem Ativa' };
-        return null;
-    };
+    // ── Deadline urgency / Stage badge — delegates to pure helpers outside component
+    const getDeadlineChip = (assemblyDeadline?: string) => getDeadlineChipPure(assemblyDeadline, companySettings?.holidays);
+    const getStageBadge = (phase: string) => getStageBadgePure(phase, workflowConfig);
 
     // ── Open schedule modal ────────────────────────────────────────────────────
     const handleOpenScheduleModal = (batch: Batch) => {
@@ -899,92 +993,18 @@ const AssemblyScheduler: React.FC = () => {
                                     <p className="text-xs text-slate-400">Nenhum lote para este filtro</p>
                                 </div>
                             ) : (
-                                queueBatches.map(({ batch, project }) => {
-                                    const scheduleStatus = (batch.assemblySchedule?.status || 'Sem Previsão') as AssemblyStatus;
-                                    const team = assemblyTeams.find(t => t.id === batch.assemblySchedule?.teamId);
-                                    const deadlineChip = getDeadlineChip(batch.assemblyDeadline);
-                                    const stageBadge = getStageBadge(batch.phase);
-                                    const step = workflowConfig[batch.phase];
-                                    const envCount = batch.environmentIds?.length || project.environments.length;
-                                    const defaultDays = envCount * 3;
-                                    const estimatedDays = batch.assemblySchedule?.estimatedDays ?? defaultDays;
-                                    const isCustomEstimate = batch.assemblySchedule?.estimatedDays !== undefined && batch.assemblySchedule.estimatedDays !== defaultDays;
-
-                                    return (
-                                        <div key={batch.id} className="bg-white dark:bg-[#1e2936] rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                                            {/* Status bar */}
-                                            <div className={`px-2.5 py-1 flex items-center justify-between ${STATUS_STYLES[scheduleStatus]}`}>
-                                                <span className="text-[10px] font-bold uppercase tracking-wide">{scheduleStatus}</span>
-                                                {team && (
-                                                    <div className="flex items-center gap-1">
-                                                        <div className={`w-2 h-2 rounded-full ${TEAM_COLOR_MAP[team.color]?.bg || 'bg-slate-400'}`} />
-                                                        <span className="text-[10px] font-bold">{team.name}</span>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <div className="p-2">
-                                                {/* Client name */}
-                                                <div className="font-bold text-slate-800 dark:text-white text-sm truncate">{project.client.name}</div>
-                                                <div className="text-[10px] text-slate-400 mb-1.5">
-                                                    {batch.name || 'Lote'} · {envCount} amb{envCount !== 1 ? 's' : ''}
-                                                </div>
-
-                                                {/* Stage badge */}
-                                                {stageBadge && (
-                                                    <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold mb-1.5 ${stageBadge.cls}`}>
-                                                        <span className="material-symbols-outlined text-[11px]">{stageBadge.icon}</span>
-                                                        {step?.label || stageBadge.label}
-                                                    </div>
-                                                )}
-
-                                                {/* Deadline */}
-                                                {deadlineChip && (
-                                                    <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] mb-1.5 ${deadlineChip.cls}`}>
-                                                        <span className="material-symbols-outlined text-[11px]">{deadlineChip.icon}</span>
-                                                        {deadlineChip.label}
-                                                    </div>
-                                                )}
-
-                                                {/* Estimated duration */}
-                                                <div className={`text-[10px] mb-1.5 flex items-center gap-1 ${isCustomEstimate ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}>
-                                                    <span className="material-symbols-outlined text-[12px]">timer</span>
-                                                    {isCustomEstimate
-                                                        ? `${estimatedDays} d.ú. (ajustado)`
-                                                        : `${envCount}×3 = ${defaultDays} d.ú.`
-                                                    }
-                                                </div>
-
-                                                {/* Schedule info */}
-                                                {batch.assemblySchedule?.scheduledDate && (
-                                                    <div className="text-[10px] text-slate-500 mb-1.5 flex items-center gap-1">
-                                                        <span className="material-symbols-outlined text-[12px]">event</span>
-                                                        {format(new Date(batch.assemblySchedule.scheduledDate), "dd/MM/yy", { locale: ptBR })}
-                                                    </div>
-                                                )}
-                                                {!batch.assemblySchedule?.scheduledDate && batch.assemblySchedule?.forecastDate && (
-                                                    <div className="text-[10px] text-amber-600 mb-1.5 flex items-center gap-1">
-                                                        <span className="material-symbols-outlined text-[12px]">event_available</span>
-                                                        Prev: {format(new Date(batch.assemblySchedule.forecastDate), "dd/MM/yy", { locale: ptBR })}
-                                                    </div>
-                                                )}
-
-                                                {/* CTA */}
-                                                {canEdit && (
-                                                    <button
-                                                        onClick={() => handleOpenScheduleModal(batch)}
-                                                        className="w-full mt-1 py-1 rounded-lg text-[10px] font-bold bg-primary text-white hover:bg-primary/90 transition-colors flex items-center justify-center gap-1"
-                                                    >
-                                                        <span className="material-symbols-outlined text-[13px]">
-                                                            {scheduleStatus === 'Sem Previsão' ? 'calendar_add_on' : 'edit_calendar'}
-                                                        </span>
-                                                        {scheduleStatus === 'Sem Previsão' ? 'Agendar' : 'Editar'}
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })
+                                queueBatches.map(({ batch, project }) => (
+                                    <QueueBatchCard
+                                        key={batch.id}
+                                        batch={batch}
+                                        project={project}
+                                        assemblyTeams={assemblyTeams}
+                                        workflowConfig={workflowConfig}
+                                        holidays={companySettings?.holidays}
+                                        canEdit={canEdit}
+                                        onOpenScheduleModal={handleOpenScheduleModal}
+                                    />
+                                ))
                             )}
                         </div>
 

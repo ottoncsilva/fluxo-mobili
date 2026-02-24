@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useProjects } from '../context/ProjectContext';
 import { Environment, Client } from '../types';
 import { maskPhone, maskCPF, maskCEP, unmask } from '../utils/masks';
+import { fetchAddressByCEP } from '../utils/cepUtils';
 
 interface RegistrationFormProps {
     onComplete?: (clientId?: string) => void;
@@ -91,32 +92,24 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onComplete }) => {
     const [isSearchingCep, setIsSearchingCep] = useState(false);
 
     const searchCEP = async () => {
-        const cleanCep = unmask(addressFields.cep);
-        if (cleanCep.length !== 8) {
-            alert('CEP inválido. Digite 8 números.');
-            return;
-        }
-
         setIsSearchingCep(true);
         try {
-            const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
-            const data = await response.json();
-
-            if (data.erro) {
+            const address = await fetchAddressByCEP(addressFields.cep);
+            if (address === null) {
                 alert('CEP não encontrado.');
             } else {
                 setAddressFields((prev: typeof addressFields) => ({
                     ...prev,
-                    street: data.logradouro || '',
-                    neighborhood: data.bairro || '',
-                    city: data.localidade || '',
-                    state: data.uf || '',
-                    country: 'Brasil' // Default to Brasil when using ViaCEP
+                    street: address.street,
+                    neighborhood: address.neighborhood,
+                    city: address.city,
+                    state: address.state,
+                    country: 'Brasil'
                 }));
             }
         } catch (error) {
             console.error('Erro ao buscar CEP:', error);
-            alert('Erro ao buscar CEP. Tente novamente mais tarde.');
+            alert((error as Error).message || 'Erro ao buscar CEP. Tente novamente mais tarde.');
         } finally {
             setIsSearchingCep(false);
         }
@@ -159,11 +152,20 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onComplete }) => {
         return true;
     };
 
+    const validateStep2 = () => {
+        if (!formData.property_type) {
+            alert("Por favor, selecione o tipo de imóvel.");
+            return false;
+        }
+        return true;
+    };
+
     const handleNext = () => {
         if (currentStep === 1) {
             if (!validateStep1()) return;
             setCurrentStep(2);
         } else if (currentStep === 2) {
+            if (!validateStep2()) return;
             setCurrentStep(3);
         }
     };

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useProjects } from '../context/ProjectContext';
 import { Batch, Client, Project, Note, WorkflowStep, Environment, Role, EnvironmentValueEntry } from '../types';
 import { maskPhone, maskCPF, maskCEP } from '../utils/masks';
+import { fetchAddressByCEP } from '../utils/cepUtils';
 import StepDecisionModal from './StepDecisionModal';
 import LotModal from './LotModal';
 import ContractModal from './ContractModal';
@@ -150,32 +151,24 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
     };
 
     const searchCEP = async () => {
-        const cleanCep = addressFields.cep.replace(/\D/g, '');
-        if (cleanCep.length !== 8) {
-            alert('CEP inválido. Digite 8 números.');
-            return;
-        }
-
         setIsSearchingCep(true);
         try {
-            const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
-            const data = await response.json();
-
-            if (data.erro) {
+            const address = await fetchAddressByCEP(addressFields.cep);
+            if (address === null) {
                 alert('CEP não encontrado.');
             } else {
                 setAddressFields((prev: typeof addressFields) => ({
                     ...prev,
-                    street: data.logradouro || '',
-                    neighborhood: data.bairro || '',
-                    city: data.localidade || '',
-                    state: data.uf || '',
+                    street: address.street,
+                    neighborhood: address.neighborhood,
+                    city: address.city,
+                    state: address.state,
                     country: 'Brasil'
                 }));
             }
         } catch (error) {
             console.error('Erro ao buscar CEP:', error);
-            alert('Erro ao buscar CEP. Tente novamente mais tarde.');
+            alert((error as Error).message || 'Erro ao buscar CEP. Tente novamente mais tarde.');
         } finally {
             setIsSearchingCep(false);
         }
@@ -338,9 +331,12 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                 {project.client.status}
                             </span>
                         </div>
-                        <p className="text-sm text-slate-500 flex items-center gap-4 mt-1">
+                        <p className="text-sm text-slate-500 flex flex-wrap items-center gap-4 mt-1">
                             <span className="flex items-center gap-1"><span className="material-symbols-outlined text-sm">mail</span> {project.client.email}</span>
                             <span className="flex items-center gap-1"><span className="material-symbols-outlined text-sm">phone</span> {project.client.phone}</span>
+                            {project.sellerName && (
+                                <span className="flex items-center gap-1"><span className="material-symbols-outlined text-sm">person</span> {project.sellerName}</span>
+                            )}
                         </p>
                     </div>
                 </div>
@@ -1238,7 +1234,7 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                             >
                                                 <option value="">Selecione...</option>
                                                 {allUsers
-                                                    .filter(u => u.storeId === currentUser?.storeId && u.role === 'Vendedor')
+                                                    .filter(u => u.storeId === currentUser?.storeId && ['Vendedor', 'Gerente', 'Admin', 'Proprietario'].includes(u.role))
                                                     .map(u => (
                                                         <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
                                                     ))}
