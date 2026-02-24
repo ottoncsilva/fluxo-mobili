@@ -31,9 +31,11 @@ const Settings: React.FC = () => {
     };
 
     // Logo File Upload Handler
+    const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
     const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+        if (!ALLOWED_IMAGE_TYPES.includes(file.type)) { alert('Apenas imagens são permitidas (JPG, PNG, GIF, WEBP, SVG).'); return; }
         if (file.size > 500 * 1024) { alert('A imagem deve ter no máximo 500KB.'); return; }
         const reader = new FileReader();
         reader.onload = (ev) => {

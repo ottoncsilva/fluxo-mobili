@@ -17,6 +17,7 @@ import { AuthProvider } from './context/AuthContext';
 import { NotificationProvider, useNotifications } from './context/NotificationContext';
 import { AgendaProvider } from './context/AgendaContext';
 import { ToastProvider } from './context/ToastContext';
+import ErrorBoundary from './components/ErrorBoundary';
 
 const AppContent: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.DASHBOARD);
@@ -524,17 +525,21 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <AuthProvider>
-      <ProjectProvider>
-        <NotificationProvider>
-          <AgendaProvider>
-            <ToastProvider>
-              <AppContent />
-            </ToastProvider>
-          </AgendaProvider>
-        </NotificationProvider>
-      </ProjectProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <ProjectProvider>
+          <NotificationProvider>
+            <AgendaProvider>
+              <ToastProvider>
+                <ErrorBoundary>
+                  <AppContent />
+                </ErrorBoundary>
+              </ToastProvider>
+            </AgendaProvider>
+          </NotificationProvider>
+        </ProjectProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 };
 

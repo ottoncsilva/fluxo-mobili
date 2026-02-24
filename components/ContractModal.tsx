@@ -17,7 +17,7 @@ interface PaymentParcel {
 }
 
 const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, project }) => {
-    const { currentUser, companySettings } = useProjects();
+    const { currentUser, companySettings, formalizeContract } = useProjects();
     const [step, setStep] = useState<'EDIT' | 'PREVIEW'>('EDIT');
 
     // Form Data
@@ -77,8 +77,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, project 
             return env;
         });
 
-        // Use any to bypass TS context missing if it wasn't refreshed, but it will work
-        (useProjects() as any).formalizeContract?.(project.id, finalEnvironments, totalValue, contractDate);
+        formalizeContract(project.id, finalEnvironments, totalValue, contractDate);
         onClose();
     };
 

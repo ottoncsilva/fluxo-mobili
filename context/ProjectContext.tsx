@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, ReactNode, useEffect, useMe
 import { Project, Batch, WorkflowStep, Environment, Client, User, Role, Note, FactoryOrder, PermissionConfig, AssistanceTicket, CompanySettings, AssistanceWorkflowStep, Store, StoreConfig, PostAssemblyEvaluation, AssistanceItem, AssistanceEvent, AssemblyTeam, AssemblySchedule } from '../types';
 import { addBusinessDays } from '../utils/dateUtils';
 import { db } from '../firebase'; // Import Firebase DB
-import { collection, onSnapshot, addDoc, setDoc, doc, updateDoc, deleteDoc, query, where, getDoc, Firestore, deleteField } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, setDoc, doc, updateDoc, deleteDoc, query, where, getDoc, getDocs, writeBatch, Firestore, deleteField } from "firebase/firestore";
 import { useAuth } from './AuthContext';
 import {
     INITIAL_WORKFLOW_CONFIG,
@@ -62,7 +62,7 @@ interface ProjectContextType {
 
     saveStoreConfig: () => Promise<boolean>;
 
-    addProject: (client: Client, environments: Environment[]) => void;
+    addProject: (client: Client, environments: Environment[]) => Promise<void>;
     deleteProject: (projectId: string) => Promise<void>;
     advanceBatch: (batchId: string) => void;
     moveBatchToStep: (batchId: string, targetStepId: string) => void;
@@ -380,10 +380,10 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     useEffect(() => { if (!useCloud) localStorage.setItem(STORAGE_KEY_PROJECTS, JSON.stringify(allProjects)); }, [allProjects, useCloud]);
     useEffect(() => { if (!useCloud) localStorage.setItem(STORAGE_KEY_BATCHES, JSON.stringify(allBatches)); }, [allBatches, useCloud]);
 
-    // Helper to persist to DB
-    const persist = <T extends object>(collectionName: string, docId: string, data: T) => {
+    // Helper to persist to DB — returns a Promise so callers can await writes
+    const persist = async <T extends object>(collectionName: string, docId: string, data: T): Promise<void> => {
         if (useCloud && db) {
-            setDoc(doc(db, collectionName, docId), data, { merge: true });
+            await setDoc(doc(db, collectionName, docId), data, { merge: true });
         }
     };
 
@@ -429,7 +429,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
                     where("password", "==", pass),
                     where("isSystemUser", "==", true)
                 );
-                const querySnapshot = await import("firebase/firestore").then(mod => mod.getDocs(q));
+                const querySnapshot = await getDocs(q);
                 if (!querySnapshot.empty) {
                     user = { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() } as User;
                 }
@@ -630,7 +630,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     const getProjectById = (id: string) => projects.find(p => p.id === id);
 
-    const addProject = (client: Client, environments: Environment[]) => {
+    const addProject = async (client: Client, environments: Environment[]): Promise<void> => {
         if (!currentUser) return;
 
         const newProject: Project = {
@@ -659,21 +659,15 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         };
 
         if (useCloud && db) {
-            // Firestore Add
-            setDoc(doc(db, "projects", newProject.id), newProject);
-            setDoc(doc(db, "batches", newBatch.id), newBatch);
+            // Use a Firestore batch write to ensure project + batch are created atomically
+            const fbBatch = writeBatch(db);
+            fbBatch.set(doc(db, "projects", newProject.id), newProject);
+            fbBatch.set(doc(db, "batches", newBatch.id), newBatch);
+            await fbBatch.commit();
         } else {
             setAllProjects(prev => [...prev, newProject]);
             setAllBatches(prev => [...prev, newBatch]);
         }
-
-        // Initial Note
-        // Note is already adding in newProject.notes array, so we don't strictly need to call addNote again unless we want it separate. 
-        // But addNote logic also handles persistence.
-        // Actually, addNote appends to existing notes. Since we just created the project, it might be cleaner to just include it in initial state.
-        // However, addNote also handles local state update efficiently if needed.
-        // Let's stick to the generated code which uses `addNote` in previous version, but here I included it in `newProject.notes`.
-        // So I'll SKIP calling addNote again to avoid duplicate notes.
 
         // Notify Sales about new lead
         notifySalesNewLead(client);
@@ -864,7 +858,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         const currentStep = workflowConfig[batch.phase];
         const nextStep = workflowConfig[finalNextStepId];
 
-        addNote(batch.projectId, `Etapa concluída: ${currentStep.label} → ${nextStep?.label || 'Finalizado'}`, currentUser?.id || 'sys');
+        addNote(batch.projectId, `Etapa concluída: ${currentStep?.label || batch.phase} → ${nextStep?.label || 'Finalizado'}`, currentUser?.id || 'sys');
 
         const now = new Date().toISOString();
         const updateData: Partial<Batch> & { phase: string; lastUpdated: string } = {
@@ -1224,22 +1218,26 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     // Assembly Scheduling Functions
     const updateBatchAssemblySchedule = (batchId: string, schedule: AssemblySchedule | null) => {
         const lastUpdated = new Date().toISOString();
+
+        // Always update local state immediately (optimistic update)
+        setAllBatches(prev => prev.map(b => {
+            if (b.id !== batchId) return b;
+            if (schedule === null) {
+                const { assemblySchedule: _, ...rest } = b;
+                return { ...rest, lastUpdated };
+            }
+            return { ...b, assemblySchedule: schedule, lastUpdated };
+        }));
+
+        // Persist to Firestore if in cloud mode
         if (useCloud && db) {
             if (schedule === null) {
                 // deleteField() is required — setDoc with merge ignores undefined values
-                updateDoc(doc(db, "batches", batchId), { assemblySchedule: deleteField(), lastUpdated });
+                updateDoc(doc(db, "batches", batchId), { assemblySchedule: deleteField(), lastUpdated })
+                    .catch(err => console.error("Error deleting assembly schedule:", err));
             } else {
                 persist("batches", batchId, { assemblySchedule: schedule, lastUpdated });
             }
-        } else {
-            setAllBatches(prev => prev.map(b => {
-                if (b.id !== batchId) return b;
-                if (schedule === null) {
-                    const { assemblySchedule: _, ...rest } = b;
-                    return { ...rest, lastUpdated };
-                }
-                return { ...b, assemblySchedule: schedule, lastUpdated };
-            }));
         }
     };
 
