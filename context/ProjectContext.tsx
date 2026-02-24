@@ -82,10 +82,11 @@ interface ProjectContextType {
     updateProjectSeller: (projectId: string, sellerId: string, sellerName: string) => void;
     requestFactoryPart: (projectId: string, envId: string, description: string) => void;
     updateProjectPostAssembly: (projectId: string, evaluation: PostAssemblyEvaluation) => void;
-    updateProjectPostAssemblyItems: (projectId: string, data: { items?: AssistanceItem[], events?: AssistanceEvent[], priority?: 'Normal' | 'Urgente' }) => void;
+    updateProjectPostAssemblyItems: (projectId: string, data: { items?: AssistanceItem[], events?: AssistanceEvent[], priority?: 'Normal' | 'Urgente', startedAt?: string }) => void;
 
     addAssistanceTicket: (ticket: Omit<AssistanceTicket, 'id' | 'createdAt' | 'updatedAt' | 'storeId'>) => void;
     updateAssistanceTicket: (ticket: AssistanceTicket) => void;
+    deleteAssistanceTicket: (id: string) => void;
 
     canUserAdvanceStep: (stepId: string) => boolean;
     canUserViewStage: (stageId: number) => boolean;
@@ -1120,14 +1121,15 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
 
 
-    const updateProjectPostAssemblyItems = async (projectId: string, data: { items?: AssistanceItem[], events?: AssistanceEvent[], priority?: 'Normal' | 'Urgente' }) => {
+    const updateProjectPostAssemblyItems = async (projectId: string, data: { items?: AssistanceItem[], events?: AssistanceEvent[], priority?: 'Normal' | 'Urgente', startedAt?: string }) => {
         const project = allProjects.find(p => p.id === projectId);
         if (!project) return;
 
         const updates: Partial<Project> = {
             postAssemblyItems: data.items !== undefined ? data.items : project.postAssemblyItems,
             postAssemblyEvents: data.events !== undefined ? data.events : project.postAssemblyEvents,
-            postAssemblyPriority: data.priority !== undefined ? data.priority : project.postAssemblyPriority
+            postAssemblyPriority: data.priority !== undefined ? data.priority : project.postAssemblyPriority,
+            postAssemblyStartedAt: data.startedAt !== undefined ? data.startedAt : project.postAssemblyStartedAt
         };
 
         // Geração automática de código POS se ainda não existir
@@ -1184,6 +1186,14 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             await setDoc(doc(db, "assistance_tickets", ticket.id), updatedTicket);
         } else {
             setAssistanceTickets(prev => prev.map(t => t.id === ticket.id ? updatedTicket : t));
+        }
+    };
+
+    const deleteAssistanceTicket = async (id: string) => {
+        if (useCloud && db) {
+            await deleteDoc(doc(db, "assistance_tickets", id));
+        } else {
+            setAssistanceTickets(prev => prev.filter(t => t.id !== id));
         }
     };
 
@@ -1515,7 +1525,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
             addProject, deleteProject, advanceBatch, moveBatchToStep, markProjectAsLost, reactivateProject, isLastStep, splitBatch, getProjectById, addNote, updateWorkflowSla, setCurrentProjectId, updateEnvironmentStatus, requestFactoryPart,
             updateEnvironmentDetails, updateClientData, updateProjectBriefing, formalizeContract, updateProjectSeller, updateProjectPostAssembly, updateProjectPostAssemblyItems,
-            addAssistanceTicket, updateAssistanceTicket,
+            addAssistanceTicket, updateAssistanceTicket, deleteAssistanceTicket,
             canUserAdvanceStep, canUserViewStage, canUserEditAssistance,
             canUserViewAssembly, canUserEditAssembly, canUserViewPostAssembly, canUserEditPostAssembly,
             saveStoreConfig, resetStoreDefaults,

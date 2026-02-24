@@ -221,6 +221,7 @@ export interface Project {
   postAssemblyEvents?: AssistanceEvent[];
   postAssemblyPriority?: 'Normal' | 'Urgente';
   postAssemblyCode?: string; // Example: POS-00001
+  postAssemblyStartedAt?: string; // ISO date: when post-assembly was initiated
 
   factoryOrders: FactoryOrder[];
   total_estimated_value?: number;
@@ -266,7 +267,8 @@ export interface AssistanceItem {
   partNeeded?: string;
   observations?: string; // Added field
 
-  costType?: 'Custo Fábrica' | 'Custo Loja';
+  costType?: 'Custo Fábrica' | 'Custo Loja' | 'Custo Cliente';
+  workType?: 'Ferragens/Acessórios Local' | 'Peça Fábrica' | 'Trabalho Equipe';
   itemType?: 'Compra' | 'Fabricação';
   supplier?: string;
   supplierDeadline?: string;

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useProjects } from '../context/ProjectContext';
 import { Project, Batch, AssistanceItem, AssistanceEvent } from '../types';
+import { getBusinessDaysDifference } from '../utils/dateUtils';
 
 const PostAssembly: React.FC = () => {
     const {
@@ -16,6 +17,7 @@ const PostAssembly: React.FC = () => {
     } = useProjects();
 
     const canEdit = canUserEditPostAssembly();
+    const isOwnerOrAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'Proprietario';
 
     // Define Post-Assembly Columns (Stage 8) dynamically
     const POST_ASSEMBLY_STEP_IDS = useMemo(() => {
@@ -45,7 +47,8 @@ const PostAssembly: React.FC = () => {
     // Temp Item Fields
     const [tempEnv, setTempEnv] = useState('');
     const [tempProb, setTempProb] = useState('');
-    const [tempCostType, setTempCostType] = useState<'Custo Fábrica' | 'Custo Loja'>('Custo Loja');
+    const [tempCostType, setTempCostType] = useState<'Custo Fábrica' | 'Custo Loja' | 'Custo Cliente'>('Custo Loja');
+    const [tempWorkType, setTempWorkType] = useState<'Ferragens/Acessórios Local' | 'Peça Fábrica' | 'Trabalho Equipe'>('Trabalho Equipe');
     const [tempSupplier, setTempSupplier] = useState('');
     const [tempDeadline, setTempDeadline] = useState('');
     const [tempObs, setTempObs] = useState('');
@@ -57,7 +60,8 @@ const PostAssembly: React.FC = () => {
     // Inspection Modal Temp Fields
     const [inspectEnv, setInspectEnv] = useState('');
     const [inspectProb, setInspectProb] = useState('');
-    const [inspectCostType, setInspectCostType] = useState<'Custo Fábrica' | 'Custo Loja'>('Custo Loja');
+    const [inspectCostType, setInspectCostType] = useState<'Custo Fábrica' | 'Custo Loja' | 'Custo Cliente'>('Custo Loja');
+    const [inspectWorkType, setInspectWorkType] = useState<'Ferragens/Acessórios Local' | 'Peça Fábrica' | 'Trabalho Equipe'>('Trabalho Equipe');
     const [inspectSupplier, setInspectSupplier] = useState('');
     const [inspectDeadline, setInspectDeadline] = useState('');
     const [inspectObs, setInspectObs] = useState('');
@@ -85,6 +89,7 @@ const PostAssembly: React.FC = () => {
             environmentName: tempEnv,
             problemDescription: tempProb,
             costType: tempCostType,
+            workType: tempWorkType,
             supplier: tempSupplier,
             supplierDeadline: tempDeadline,
             observations: tempObs
@@ -93,6 +98,7 @@ const PostAssembly: React.FC = () => {
         setTempEnv('');
         setTempProb('');
         setTempCostType('Custo Loja');
+        setTempWorkType('Trabalho Equipe');
         setTempSupplier('');
         setTempDeadline('');
         setTempObs('');
@@ -123,7 +129,8 @@ const PostAssembly: React.FC = () => {
                 updateProjectPostAssemblyItems(project.id, {
                     items: newItems as AssistanceItem[],
                     priority: initialPriority,
-                    events: [initialEvent]
+                    events: [initialEvent],
+                    startedAt: new Date().toISOString()
                 });
             }
         }
@@ -149,6 +156,7 @@ const PostAssembly: React.FC = () => {
             environmentName: inspectEnv,
             problemDescription: inspectProb,
             costType: inspectCostType,
+            workType: inspectWorkType,
             supplier: inspectSupplier,
             supplierDeadline: inspectDeadline,
             observations: inspectObs
@@ -174,6 +182,7 @@ const PostAssembly: React.FC = () => {
         setInspectEnv('');
         setInspectProb('');
         setInspectCostType('Custo Loja');
+        setInspectWorkType('Trabalho Equipe');
         setInspectSupplier('');
         setInspectDeadline('');
         setInspectObs('');
@@ -285,6 +294,28 @@ const PostAssembly: React.FC = () => {
         });
 
         setHistoryNote('');
+    };
+
+    const handleDeletePostAssembly = () => {
+        if (!selectedProject) return;
+        if (!confirm(`Tem certeza que deseja excluir o Pós-Montagem de "${selectedProject.client.name}"? Esta ação não pode ser desfeita.`)) return;
+        const batch = getProjectBatch(selectedProject.id);
+        if (batch) {
+            moveBatchToStep(batch.id, '7.2');
+        }
+        updateProjectPostAssemblyItems(selectedProject.id, { items: [], events: [] });
+        setIsInspectionOpen(false);
+        setSelectedProject(null);
+    };
+
+    const workTypeBadge = (wt?: string) => {
+        if (!wt) return '';
+        const map: Record<string, string> = {
+            'Ferragens/Acessórios Local': 'bg-amber-50 text-amber-700 border-amber-200',
+            'Peça Fábrica': 'bg-blue-50 text-blue-700 border-blue-200',
+            'Trabalho Equipe': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        };
+        return map[wt] || 'bg-slate-50 text-slate-600 border-slate-200';
     };
 
     const printServiceOrder = () => {
@@ -520,7 +551,9 @@ const PostAssembly: React.FC = () => {
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <span className="text-[10px] text-slate-400 font-medium">{new Date(batch?.lastUpdated || project.created_at).toLocaleDateString()}</span>
+                                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${(() => { const d = getBusinessDaysDifference(project.postAssemblyStartedAt || batch?.lastUpdated || project.created_at, new Date(), companySettings?.holidays); return d > 15 ? 'text-slate-400' : d >= 0 ? 'text-amber-600 bg-amber-50' : 'text-rose-600 bg-rose-50'; })()}`}>
+                                                        {getBusinessDaysDifference(project.postAssemblyStartedAt || batch?.lastUpdated || project.created_at, new Date(), companySettings?.holidays)} d.ú.
+                                                    </span>
                                                 </div>
                                                 <h4 className="font-bold text-slate-800 dark:text-white mb-1 truncate">{project.client.name}</h4>
 
@@ -599,10 +632,22 @@ const PostAssembly: React.FC = () => {
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tipo de Custo</label>
-                                        <select value={tempCostType} onChange={e => setTempCostType(e.target.value as 'Custo Loja' | 'Custo Fábrica')} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm">
+                                        <select value={tempCostType} onChange={e => setTempCostType(e.target.value as typeof tempCostType)} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm">
                                             <option>Custo Loja</option>
                                             <option>Custo Fábrica</option>
+                                            <option>Custo Cliente</option>
                                         </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tipo de Trabalho</label>
+                                        <div className="flex flex-col gap-1 mt-1">
+                                            {(['Ferragens/Acessórios Local', 'Peça Fábrica', 'Trabalho Equipe'] as const).map(opt => (
+                                                <label key={opt} className="flex items-center gap-2 cursor-pointer text-xs text-slate-600 dark:text-slate-300">
+                                                    <input type="radio" name="tempWorkTypePA" value={opt} checked={tempWorkType === opt} onChange={() => setTempWorkType(opt)} className="text-emerald-600 focus:ring-emerald-600" />
+                                                    {opt}
+                                                </label>
+                                            ))}
+                                        </div>
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Fornecedor</label>
@@ -694,7 +739,16 @@ const PostAssembly: React.FC = () => {
                                 </div>
                                 <h2 className="text-xl font-bold text-slate-900 dark:text-white">{selectedProject.client.name}</h2>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 items-center">
+                                {isOwnerOrAdmin && (
+                                    <button
+                                        onClick={handleDeletePostAssembly}
+                                        className="p-2 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-full text-rose-500 hover:text-rose-600 transition-colors"
+                                        title="Excluir pós-montagem"
+                                    >
+                                        <span className="material-symbols-outlined">delete</span>
+                                    </button>
+                                )}
                                 <button
                                     onClick={printServiceOrder}
                                     className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-600 dark:text-slate-300"
@@ -770,9 +824,10 @@ const PostAssembly: React.FC = () => {
                                                     // VIEW MODE
                                                     <div className="flex-1">
                                                         <div className="flex items-center justify-between mb-2">
-                                                            <div className="flex items-center gap-2">
+                                                            <div className="flex items-center gap-2 flex-wrap">
                                                                 <span className="font-bold text-sm text-slate-800 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">{item.environmentName}</span>
                                                                 {item.costType && <span className="text-[10px] font-bold px-2 py-0.5 rounded border border-slate-200 text-slate-500">{item.costType}</span>}
+                                                                {item.workType && <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${workTypeBadge(item.workType)}`}>{item.workType}</span>}
                                                             </div>
                                                             {canEdit && (
                                                                 <div className="flex gap-1">
@@ -807,46 +862,71 @@ const PostAssembly: React.FC = () => {
                                         )}
                                     </div>
 
-                                    {/* Add New Item Form */}
-                                    <div className="mt-8 bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/30 p-4 rounded-xl">
-                                        <h3 className="font-bold text-emerald-800 dark:text-emerald-400 mb-4 flex items-center gap-2">
-                                            <span className="material-symbols-outlined">add_circle</span>
-                                            Adicionar Item (Extra)
-                                        </h3>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                            <div>
-                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Ambiente</label>
-                                                <input type="text" value={inspectEnv} onChange={e => setInspectEnv(e.target.value)} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm" />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Problema</label>
-                                                <input type="text" value={inspectProb} onChange={e => setInspectProb(e.target.value)} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm" />
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo de Custo</label>
-                                                <select value={inspectCostType} onChange={e => setInspectCostType(e.target.value as 'Custo Loja' | 'Custo Fábrica')} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm">
-                                                    <option>Custo Loja</option>
-                                                    <option>Custo Fábrica</option>
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Fornecedor</label>
-                                                <input type="text" value={inspectSupplier} onChange={e => setInspectSupplier(e.target.value)} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm" />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Prazo Forn.</label>
-                                                <input type="date" value={inspectDeadline} onChange={e => setInspectDeadline(e.target.value)} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm" />
-                                            </div>
-                                            <div className="md:col-span-2">
-                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Observações</label>
-                                                <div className="flex gap-2">
-                                                    <input type="text" value={inspectObs} onChange={e => setInspectObs(e.target.value)} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm" />
-                                                    <button onClick={handleAddInspectionItem} className="bg-emerald-600 text-white font-bold py-1 px-4 rounded text-sm hover:bg-emerald-700">Add</button>
+                                    {/* Add New Item Form — locked after 8.1 */}
+                                    {(() => {
+                                        const batch = getProjectBatch(selectedProject.id);
+                                        const isFirstStep = batch?.phase === '8.1';
+                                        if (!isFirstStep) {
+                                            return (
+                                                <div className="mt-6 flex items-center gap-2 text-xs text-slate-400 bg-slate-100 dark:bg-slate-800 px-4 py-3 rounded-lg">
+                                                    <span className="material-symbols-outlined text-sm">lock</span>
+                                                    Adição de itens bloqueada — o pós-montagem já avançou da etapa inicial. Para novos itens, abra um novo pós-montagem.
+                                                </div>
+                                            );
+                                        }
+                                        return (
+                                            <div className="mt-8 bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/30 p-4 rounded-xl">
+                                                <h3 className="font-bold text-emerald-800 dark:text-emerald-400 mb-4 flex items-center gap-2">
+                                                    <span className="material-symbols-outlined">add_circle</span>
+                                                    Adicionar Item (Extra)
+                                                </h3>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Ambiente</label>
+                                                        <input type="text" value={inspectEnv} onChange={e => setInspectEnv(e.target.value)} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Problema</label>
+                                                        <input type="text" value={inspectProb} onChange={e => setInspectProb(e.target.value)} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo de Custo</label>
+                                                        <select value={inspectCostType} onChange={e => setInspectCostType(e.target.value as typeof inspectCostType)} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm">
+                                                            <option>Custo Loja</option>
+                                                            <option>Custo Fábrica</option>
+                                                            <option>Custo Cliente</option>
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo de Trabalho</label>
+                                                        <div className="flex flex-col gap-1 mt-1">
+                                                            {(['Ferragens/Acessórios Local', 'Peça Fábrica', 'Trabalho Equipe'] as const).map(opt => (
+                                                                <label key={opt} className="flex items-center gap-2 cursor-pointer text-xs text-slate-600 dark:text-slate-300">
+                                                                    <input type="radio" name="inspectWorkTypePA" value={opt} checked={inspectWorkType === opt} onChange={() => setInspectWorkType(opt)} className="text-emerald-600 focus:ring-emerald-600" />
+                                                                    {opt}
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Fornecedor</label>
+                                                        <input type="text" value={inspectSupplier} onChange={e => setInspectSupplier(e.target.value)} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Prazo Forn.</label>
+                                                        <input type="date" value={inspectDeadline} onChange={e => setInspectDeadline(e.target.value)} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm" />
+                                                    </div>
+                                                    <div className="md:col-span-2">
+                                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Observações</label>
+                                                        <div className="flex gap-2">
+                                                            <input type="text" value={inspectObs} onChange={e => setInspectObs(e.target.value)} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm" />
+                                                            <button onClick={handleAddInspectionItem} className="bg-emerald-600 text-white font-bold py-1 px-4 rounded text-sm hover:bg-emerald-700">Add</button>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </div>
+                                        );
+                                    })()}
                                 </>
                             )}
 

@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { useProjects } from '../context/ProjectContext';
 import { AssistanceTicket, AssistanceStatus, AssistanceItem, AssistanceEvent, AssistanceWorkflowStep, AssemblyTeam } from '../types';
+import { getBusinessDaysDifference } from '../utils/dateUtils';
 
 
 
 const TechnicalAssistance: React.FC = () => {
-    const { assistanceTickets, updateAssistanceTicket, addAssistanceTicket, projects, assistanceWorkflow, canUserEditAssistance, currentUser, companySettings, assemblyTeams } = useProjects();
+    const { assistanceTickets, updateAssistanceTicket, addAssistanceTicket, deleteAssistanceTicket, projects, assistanceWorkflow, canUserEditAssistance, currentUser, companySettings, assemblyTeams } = useProjects();
+
+    const isOwnerOrAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'Proprietario';
 
     // Filters
     const [hideCompleted, setHideCompleted] = useState(false);
@@ -59,7 +62,8 @@ const TechnicalAssistance: React.FC = () => {
     // Temp Item Fields
     const [tempEnv, setTempEnv] = useState('');
     const [tempProb, setTempProb] = useState('');
-    const [tempCostType, setTempCostType] = useState<'Custo Fábrica' | 'Custo Loja'>('Custo Loja');
+    const [tempCostType, setTempCostType] = useState<'Custo Fábrica' | 'Custo Loja' | 'Custo Cliente'>('Custo Loja');
+    const [tempWorkType, setTempWorkType] = useState<'Ferragens/Acessórios Local' | 'Peça Fábrica' | 'Trabalho Equipe'>('Trabalho Equipe');
     const [tempSupplier, setTempSupplier] = useState('');
     const [tempDeadline, setTempDeadline] = useState('');
     const [tempObs, setTempObs] = useState('');
@@ -78,6 +82,7 @@ const TechnicalAssistance: React.FC = () => {
             environmentName: tempEnv,
             problemDescription: tempProb,
             costType: tempCostType,
+            workType: tempWorkType,
             supplier: tempSupplier,
             supplierDeadline: tempDeadline,
             observations: tempObs
@@ -86,6 +91,7 @@ const TechnicalAssistance: React.FC = () => {
         setTempEnv('');
         setTempProb('');
         setTempCostType('Custo Loja');
+        setTempWorkType('Trabalho Equipe');
         setTempSupplier('');
         setTempDeadline('');
         setTempObs('');
@@ -137,7 +143,8 @@ const TechnicalAssistance: React.FC = () => {
     // Inspection Modal State (Adding new items)
     const [inspectEnv, setInspectEnv] = useState('');
     const [inspectProb, setInspectProb] = useState('');
-    const [inspectCostType, setInspectCostType] = useState<'Custo Fábrica' | 'Custo Loja'>('Custo Loja');
+    const [inspectCostType, setInspectCostType] = useState<'Custo Fábrica' | 'Custo Loja' | 'Custo Cliente'>('Custo Loja');
+    const [inspectWorkType, setInspectWorkType] = useState<'Ferragens/Acessórios Local' | 'Peça Fábrica' | 'Trabalho Equipe'>('Trabalho Equipe');
     const [inspectSupplier, setInspectSupplier] = useState('');
     const [inspectDeadline, setInspectDeadline] = useState('');
     const [inspectObs, setInspectObs] = useState('');
@@ -149,6 +156,7 @@ const TechnicalAssistance: React.FC = () => {
             environmentName: inspectEnv,
             problemDescription: inspectProb,
             costType: inspectCostType,
+            workType: inspectWorkType,
             supplier: inspectSupplier,
             supplierDeadline: inspectDeadline,
             observations: inspectObs
@@ -174,6 +182,7 @@ const TechnicalAssistance: React.FC = () => {
         setInspectEnv('');
         setInspectProb('');
         setInspectCostType('Custo Loja');
+        setInspectWorkType('Trabalho Equipe');
         setInspectSupplier('');
         setInspectDeadline('');
         setInspectObs('');
@@ -341,6 +350,24 @@ const TechnicalAssistance: React.FC = () => {
         }
     };
 
+    const handleDeleteTicket = () => {
+        if (!activeTicket) return;
+        if (!confirm(`Tem certeza que deseja excluir o chamado "${activeTicket.title}"? Esta ação não pode ser desfeita.`)) return;
+        deleteAssistanceTicket(activeTicket.id);
+        setIsInspectionOpen(false);
+        setActiveTicket(null);
+    };
+
+    const workTypeBadge = (wt?: string) => {
+        if (!wt) return '';
+        const map: Record<string, string> = {
+            'Ferragens/Acessórios Local': 'bg-amber-50 text-amber-700 border-amber-200',
+            'Peça Fábrica': 'bg-blue-50 text-blue-700 border-blue-200',
+            'Trabalho Equipe': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        };
+        return map[wt] || 'bg-slate-50 text-slate-600 border-slate-200';
+    };
+
     const canEdit = canUserEditAssistance();
 
     return (
@@ -487,9 +514,7 @@ const TechnicalAssistance: React.FC = () => {
 
                                 <div className="flex-1 bg-slate-100/30 dark:bg-[#15202b]/50 rounded-xl p-2 border border-slate-200/50 dark:border-slate-800 overflow-y-auto custom-scrollbar flex flex-col gap-3">
                                     {columnTickets.map((ticket: AssistanceTicket) => {
-                                        const createdDate = new Date(ticket.createdAt);
-                                        const now = new Date();
-                                        const slaDays = Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 3600 * 24));
+                                        const slaDays = getBusinessDaysDifference(ticket.createdAt, new Date(), companySettings?.holidays);
 
                                         return (
                                             <div
@@ -508,7 +533,9 @@ const TechnicalAssistance: React.FC = () => {
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <span className="text-[10px] text-slate-400 font-medium">Dias: {slaDays}</span>
+                                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${slaDays > 15 ? 'text-slate-400' : slaDays >= 0 ? 'text-amber-600 bg-amber-50' : 'text-rose-600 bg-rose-50'}`}>
+                                                        {slaDays} d.ú.
+                                                    </span>
                                                 </div>
                                                 <h4 className="font-bold text-slate-800 dark:text-white mb-1 truncate">{ticket.clientName}</h4>
                                                 <p className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-2 truncate">{ticket.title}</p>
@@ -608,10 +635,22 @@ const TechnicalAssistance: React.FC = () => {
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tipo de Custo</label>
-                                        <select value={tempCostType} onChange={e => setTempCostType(e.target.value as 'Custo Loja' | 'Custo Fábrica')} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm">
+                                        <select value={tempCostType} onChange={e => setTempCostType(e.target.value as typeof tempCostType)} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm">
                                             <option>Custo Loja</option>
                                             <option>Custo Fábrica</option>
+                                            <option>Custo Cliente</option>
                                         </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tipo de Trabalho</label>
+                                        <div className="flex flex-col gap-1 mt-1">
+                                            {(['Ferragens/Acessórios Local', 'Peça Fábrica', 'Trabalho Equipe'] as const).map(opt => (
+                                                <label key={opt} className="flex items-center gap-2 cursor-pointer text-xs text-slate-600 dark:text-slate-300">
+                                                    <input type="radio" name="tempWorkType" value={opt} checked={tempWorkType === opt} onChange={() => setTempWorkType(opt)} className="text-orange-600 focus:ring-orange-600" />
+                                                    {opt}
+                                                </label>
+                                            ))}
+                                        </div>
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Fornecedor</label>
@@ -698,7 +737,16 @@ const TechnicalAssistance: React.FC = () => {
                                 </div>
                                 <h2 className="text-xl font-bold text-slate-900 dark:text-white">{activeTicket.clientName} - {activeTicket.title}</h2>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 items-center">
+                                {isOwnerOrAdmin && (
+                                    <button
+                                        onClick={handleDeleteTicket}
+                                        className="p-2 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-full text-rose-500 hover:text-rose-600 transition-colors"
+                                        title="Excluir chamado"
+                                    >
+                                        <span className="material-symbols-outlined">delete</span>
+                                    </button>
+                                )}
                                 <button
                                     onClick={printServiceOrder}
                                     className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-600 dark:text-slate-300"
@@ -774,9 +822,10 @@ const TechnicalAssistance: React.FC = () => {
                                                     // VIEW MODE
                                                     <div className="flex-1">
                                                         <div className="flex items-center justify-between mb-2">
-                                                            <div className="flex items-center gap-2">
+                                                            <div className="flex items-center gap-2 flex-wrap">
                                                                 <span className="font-bold text-sm text-slate-800 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">{item.environmentName}</span>
                                                                 {item.costType && <span className="text-[10px] font-bold px-2 py-0.5 rounded border border-slate-200 text-slate-500">{item.costType}</span>}
+                                                                {item.workType && <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${workTypeBadge(item.workType)}`}>{item.workType}</span>}
                                                             </div>
                                                             {canEdit && (
                                                                 <button onClick={() => handleStartEditingItem(item)} className="p-1 text-slate-400 hover:text-blue-500 rounded hover:bg-blue-50">
@@ -797,7 +846,7 @@ const TechnicalAssistance: React.FC = () => {
                                         ))}
                                     </div>
 
-                                    {/* Add New Item Form (Only visible in VISITA or by Admin) - AND if user can edit */}
+                                    {/* Add New Item Form — only in Levantamento (10.1) */}
                                     {activeTicket.status === '10.1' && canEdit && (
                                         <div className="mt-8 bg-orange-50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-900/30 p-4 rounded-xl">
                                             <h3 className="font-bold text-orange-800 dark:text-orange-400 mb-4 flex items-center gap-2">
@@ -816,10 +865,22 @@ const TechnicalAssistance: React.FC = () => {
 
                                                 <div>
                                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo de Custo</label>
-                                                    <select value={inspectCostType} onChange={e => setInspectCostType(e.target.value as 'Custo Loja' | 'Custo Fábrica')} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm">
+                                                    <select value={inspectCostType} onChange={e => setInspectCostType(e.target.value as typeof inspectCostType)} className="w-full rounded border-slate-200 dark:bg-slate-800 text-sm">
                                                         <option>Custo Loja</option>
                                                         <option>Custo Fábrica</option>
+                                                        <option>Custo Cliente</option>
                                                     </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo de Trabalho</label>
+                                                    <div className="flex flex-col gap-1 mt-1">
+                                                        {(['Ferragens/Acessórios Local', 'Peça Fábrica', 'Trabalho Equipe'] as const).map(opt => (
+                                                            <label key={opt} className="flex items-center gap-2 cursor-pointer text-xs text-slate-600 dark:text-slate-300">
+                                                                <input type="radio" name="inspectWorkType" value={opt} checked={inspectWorkType === opt} onChange={() => setInspectWorkType(opt)} className="text-orange-600 focus:ring-orange-600" />
+                                                                {opt}
+                                                            </label>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Fornecedor</label>
@@ -837,6 +898,14 @@ const TechnicalAssistance: React.FC = () => {
                                                     </div>
                                                 </div>
                                             </div>
+                                        </div>
+                                    )}
+
+                                    {/* Notice when items are locked */}
+                                    {activeTicket.status !== '10.1' && (
+                                        <div className="mt-6 flex items-center gap-2 text-xs text-slate-400 bg-slate-100 dark:bg-slate-800 px-4 py-3 rounded-lg">
+                                            <span className="material-symbols-outlined text-sm">lock</span>
+                                            Adição de itens bloqueada — o chamado já avançou da etapa de Levantamento. Para novos itens, abra um novo chamado.
                                         </div>
                                     )}
                                 </>
