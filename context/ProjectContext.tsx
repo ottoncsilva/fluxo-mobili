@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, ReactNode, useEffect, useMe
 import { Project, Batch, WorkflowStep, Environment, Client, User, Role, Note, FactoryOrder, PermissionConfig, AssistanceTicket, CompanySettings, AssistanceWorkflowStep, Store, StoreConfig, PostAssemblyEvaluation, AssistanceItem, AssistanceEvent, AssemblyTeam, AssemblySchedule } from '../types';
 import { addBusinessDays } from '../utils/dateUtils';
 import { db } from '../firebase'; // Import Firebase DB
-import { collection, onSnapshot, addDoc, setDoc, doc, updateDoc, deleteDoc, query, where, getDoc, Firestore } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, setDoc, doc, updateDoc, deleteDoc, query, where, getDoc, Firestore, deleteField } from "firebase/firestore";
 import { useAuth } from './AuthContext';
 import {
     INITIAL_WORKFLOW_CONFIG,
@@ -1223,11 +1223,23 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     // Assembly Scheduling Functions
     const updateBatchAssemblySchedule = (batchId: string, schedule: AssemblySchedule | null) => {
-        const payload = { assemblySchedule: schedule ?? undefined, lastUpdated: new Date().toISOString() };
-        if (useCloud) {
-            persist("batches", batchId, payload);
+        const lastUpdated = new Date().toISOString();
+        if (useCloud && db) {
+            if (schedule === null) {
+                // deleteField() is required — setDoc with merge ignores undefined values
+                updateDoc(doc(db, "batches", batchId), { assemblySchedule: deleteField(), lastUpdated });
+            } else {
+                persist("batches", batchId, { assemblySchedule: schedule, lastUpdated });
+            }
         } else {
-            setAllBatches(prev => prev.map(b => b.id === batchId ? { ...b, ...payload } : b));
+            setAllBatches(prev => prev.map(b => {
+                if (b.id !== batchId) return b;
+                if (schedule === null) {
+                    const { assemblySchedule: _, ...rest } = b;
+                    return { ...rest, lastUpdated };
+                }
+                return { ...b, assemblySchedule: schedule, lastUpdated };
+            }));
         }
     };
 
