@@ -37,7 +37,9 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
         permissions,
         updateProjectSeller,
         deleteProject,
-        getBranchingOptions
+        getBranchingOptions,
+        canUserEditClient,
+        canUserDeleteClient
     } = useProjects();
     const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'ENVIRONMENTS' | 'BRIEFING' | 'TIMELINE'>('OVERVIEW'); // Changed 'ITPP' to 'BRIEFING'
     const [noteContent, setNoteContent] = useState('');
@@ -306,11 +308,11 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
         }
     };
 
-    // Helper to check if current user can edit client data (Sales/Admin only usually)
+    // Helper to check if current user can edit client data
     const isContractLocked = project.contractSigned || project.client.status === 'Concluido';
-    const canEditClient = !isContractLocked && (currentUser?.role === 'Admin' || currentUser?.role === 'Vendedor' || currentUser?.role === 'Proprietario' || currentUser?.role === 'Gerente');
+    const canEditClientData = !isContractLocked && canUserEditClient();
     const canChangeSeller = permissions.find((p: { role: Role }) => p.role === currentUser?.role)?.canChangeSeller || false;
-    const canDeleteProject = currentUser?.role === 'Admin' || currentUser?.role === 'Proprietario';
+    const canDeleteProject = canUserDeleteClient();
 
     const handleDeleteProject = async () => {
         if (confirm('TEM CERTEZA ABSOLUTA? Esta ação irá excluir o projeto inteiro e todo seu histórico. Não poderá ser desfeita.')) {
@@ -341,7 +343,7 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                     </div>
                 </div>
                 <div className="flex gap-2">
-                    {project.client.status === 'Perdido' && canEditClient && (
+                    {project.client.status === 'Perdido' && canEditClientData && (
                         <button
                             onClick={handleReactivate}
                             className="px-3 py-2 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors flex items-center gap-1 shadow-lg"
@@ -363,7 +365,7 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                         </button>
                     )}
 
-                    {project.client.status !== 'Perdido' && project.client.status !== 'Concluido' && canEditClient && (
+                    {project.client.status !== 'Perdido' && project.client.status !== 'Concluido' && canEditClientData && (
                         <button
                             onClick={() => setIsLostModalOpen(true)}
                             className="px-3 py-2 text-xs font-bold text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors flex items-center gap-1"
@@ -373,7 +375,7 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                             Projeto Perdido
                         </button>
                     )}
-                    {canEditClient && (
+                    {canEditClientData && (
                         <button
                             onClick={() => setIsEditClientOpen(true)}
                             className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-2"
@@ -622,7 +624,7 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                                 type="number"
                                                 value={env.estimated_value || ''}
                                                 onChange={(e) => updateEnvironmentDetails(project.id, env.id, { estimated_value: Number(e.target.value) })}
-                                                disabled={!canEditClient}
+                                                disabled={!canEditClientData}
                                                 className="bg-transparent border border-slate-200 dark:border-slate-700 rounded px-2 py-1 text-sm font-mono text-slate-700 dark:text-slate-300 w-32 focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-50"
                                                 placeholder="0.00"
                                             />
@@ -669,7 +671,7 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                 {/* BRIEFING TAB */}
                 {activeTab === 'BRIEFING' && (
                     <div className="relative">
-                        {canEditClient ? (
+                        {canEditClientData ? (
                             <div className="flex justify-end mb-4">
                                 {isEditingBriefing ? (
                                     <div className="flex gap-2">

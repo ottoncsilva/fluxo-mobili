@@ -91,10 +91,15 @@ interface ProjectContextType {
     canUserAdvanceStep: (stepId: string) => boolean;
     canUserViewStage: (stageId: number) => boolean;
     canUserEditAssistance: () => boolean;
+    canUserDeleteAssistance: () => boolean;
     canUserViewAssembly: () => boolean;
     canUserEditAssembly: () => boolean;
     canUserViewPostAssembly: () => boolean;
     canUserEditPostAssembly: () => boolean;
+    canUserDeletePostAssembly: () => boolean;
+    canUserEditClient: () => boolean;
+    canUserDeleteClient: () => boolean;
+    canUserManageUsers: () => boolean;
     resetStoreDefaults: (type: 'origins' | 'assistance' | 'all') => Promise<boolean>;
     getBranchingOptions: (stepId: string) => any[];
 
@@ -752,6 +757,12 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         return userPerms?.canEditAssistance ?? false;
     };
 
+    const canUserDeleteAssistance = (): boolean => {
+        if (!currentUser) return false;
+        const userPerms = permissions.find(p => p.role === currentUser.role);
+        return userPerms?.canDeleteAssistance ?? false;
+    };
+
     const canUserViewAssembly = (): boolean => {
         if (!currentUser) return false;
         const userPerms = permissions.find(p => p.role === currentUser.role);
@@ -774,6 +785,30 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         if (!currentUser) return false;
         const userPerms = permissions.find(p => p.role === currentUser.role);
         return userPerms?.canEditPostAssembly ?? false;
+    };
+
+    const canUserDeletePostAssembly = (): boolean => {
+        if (!currentUser) return false;
+        const userPerms = permissions.find(p => p.role === currentUser.role);
+        return userPerms?.canDeletePostAssembly ?? false;
+    };
+
+    const canUserEditClient = (): boolean => {
+        if (!currentUser) return false;
+        const userPerms = permissions.find(p => p.role === currentUser.role);
+        return userPerms?.canEditClient ?? false;
+    };
+
+    const canUserDeleteClient = (): boolean => {
+        if (!currentUser) return false;
+        const userPerms = permissions.find(p => p.role === currentUser.role);
+        return userPerms?.canDeleteClient ?? false;
+    };
+
+    const canUserManageUsers = (): boolean => {
+        if (!currentUser) return false;
+        const userPerms = permissions.find(p => p.role === currentUser.role);
+        return userPerms?.canManageUsers ?? false;
     };
 
     const moveBatchToStep = (batchId: string, targetStepId: string) => {
@@ -1526,8 +1561,10 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             addProject, deleteProject, advanceBatch, moveBatchToStep, markProjectAsLost, reactivateProject, isLastStep, splitBatch, getProjectById, addNote, updateWorkflowSla, setCurrentProjectId, updateEnvironmentStatus, requestFactoryPart,
             updateEnvironmentDetails, updateClientData, updateProjectBriefing, formalizeContract, updateProjectSeller, updateProjectPostAssembly, updateProjectPostAssemblyItems,
             addAssistanceTicket, updateAssistanceTicket, deleteAssistanceTicket,
-            canUserAdvanceStep, canUserViewStage, canUserEditAssistance,
-            canUserViewAssembly, canUserEditAssembly, canUserViewPostAssembly, canUserEditPostAssembly,
+            canUserAdvanceStep, canUserViewStage, canUserEditAssistance, canUserDeleteAssistance,
+            canUserViewAssembly, canUserEditAssembly,
+            canUserViewPostAssembly, canUserEditPostAssembly, canUserDeletePostAssembly,
+            canUserEditClient, canUserDeleteClient, canUserManageUsers,
             saveStoreConfig, resetStoreDefaults,
             getBranchingOptions,
             // Assembly Scheduling
