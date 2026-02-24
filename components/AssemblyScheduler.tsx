@@ -9,7 +9,7 @@ import {
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useProjects } from '../context/ProjectContext';
-import { AssemblyTeam, AssemblySchedule, AssemblyStatus, AssistanceStatus, AssistanceTicket, Batch, WorkflowStep, Project, CompanySettings } from '../types';
+import { AssemblyTeam, AssemblySchedule, AssemblyStatus, AssistanceStatus, AssistanceTicket, Batch, WorkflowStep, Project } from '../types';
 import { getBusinessDaysDifference, isHoliday, addBusinessDays } from '../utils/dateUtils';
 
 // ─── Color map (static for Tailwind purge safety) ────────────────────────────
@@ -59,7 +59,7 @@ const NON_WORKING_GRID_STYLE: React.CSSProperties = {
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
 // ─── Pure helper functions (outside component for stability) ─────────────────
-const getDeadlineChipPure = (assemblyDeadline: string | undefined, holidays?: string[]) => {
+const getDeadlineChipPure = (assemblyDeadline: string | undefined, holidays?: Array<{ date: string; name: string; type: 'fixed' | 'movable'; year?: number }>) => {
     if (!assemblyDeadline) return null;
     const days = getBusinessDaysDifference(new Date(), new Date(assemblyDeadline), holidays);
     const dateStr = format(new Date(assemblyDeadline), 'dd/MM/yyyy');
@@ -88,7 +88,7 @@ interface QueueBatchCardProps {
     project: Project;
     assemblyTeams: AssemblyTeam[];
     workflowConfig: Record<string, WorkflowStep>;
-    holidays?: string[];
+    holidays?: Array<{ date: string; name: string; type: 'fixed' | 'movable'; year?: number }>;
     canEdit: boolean;
     onOpenScheduleModal: (batch: Batch) => void;
 }
