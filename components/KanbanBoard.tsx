@@ -444,35 +444,43 @@ const KanbanBoard: React.FC = () => {
                                         }
                 `}>
                                         {(() => {
-                                            // Group cards by owner/role
-                                            const cardsByOwner = new Map<string, KanbanCard[]>();
+                                            // Group cards by step/phase
+                                            const cardsByPhase = new Map<string, KanbanCard[]>();
                                             column.cards.forEach(card => {
-                                                const owner = card.owner || 'Sem Responsável';
-                                                if (!cardsByOwner.has(owner)) {
-                                                    cardsByOwner.set(owner, []);
+                                                const phaseKey = card.stepLabel || 'Sem Etapa';
+                                                if (!cardsByPhase.has(phaseKey)) {
+                                                    cardsByPhase.set(phaseKey, []);
                                                 }
-                                                cardsByOwner.get(owner)!.push(card);
+                                                cardsByPhase.get(phaseKey)!.push(card);
                                             });
 
-                                            const ownerGroups = Array.from(cardsByOwner.entries());
+                                            // Sort groups by numeric phase order
+                                            const phaseGroups = Array.from(cardsByPhase.entries()).sort((a, b) => {
+                                                const phaseA = a[1][0]?.phase || '';
+                                                const phaseB = b[1][0]?.phase || '';
+                                                // Extract numeric parts (e.g., "4.1" → 4.1, "2.3" → 2.3)
+                                                const numA = parseFloat(phaseA);
+                                                const numB = parseFloat(phaseB);
+                                                return numA - numB;
+                                            });
 
-                                            return ownerGroups.map(([owner, ownerCards], groupIdx) => (
-                                                <div key={owner} className="flex flex-col gap-2">
-                                                    {/* Team Separator */}
+                                            return phaseGroups.map(([phaseLabel, phaseCards], groupIdx) => (
+                                                <div key={phaseLabel} className="flex flex-col gap-2">
+                                                    {/* Phase Separator */}
                                                     {groupIdx > 0 && <div className="h-px bg-slate-300 dark:bg-slate-600 my-1" />}
 
-                                                    {/* Team Header */}
+                                                    {/* Phase Header */}
                                                     <div className="px-2 py-1.5 bg-slate-200/50 dark:bg-slate-700/50 rounded-lg flex items-center justify-between">
                                                         <span className="text-[9px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
-                                                            {owner}
+                                                            {phaseLabel}
                                                         </span>
                                                         <span className="text-[8px] px-2 py-0.5 rounded-full bg-slate-300/70 dark:bg-slate-600/70 text-slate-700 dark:text-slate-200 font-semibold">
-                                                            {ownerCards.length}
+                                                            {phaseCards.length}
                                                         </span>
                                                     </div>
 
-                                                    {/* Cards for this team */}
-                                                    {ownerCards.map((card: KanbanCard) => (
+                                                    {/* Cards for this phase */}
+                                                    {phaseCards.map((card: KanbanCard) => (
                                                         <div
                                                             key={card.id}
                                                             onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleCardClick(card.id, card.phase, card.projectId); }}
