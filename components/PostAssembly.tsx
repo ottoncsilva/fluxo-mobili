@@ -184,6 +184,29 @@ const PostAssembly: React.FC = () => {
         setEditItemForm({ ...item });
     };
 
+    const handleDeleteItem = (itemId: string) => {
+        if (!selectedProject || !confirm('Tem certeza que deseja excluir este item?')) return;
+
+        const updatedItems = (selectedProject.postAssemblyItems || []).filter(item => item.id !== itemId);
+        updateProjectDetails(selectedProject.id, { postAssemblyItems: updatedItems });
+    };
+
+    const handleMoveItem = (itemId: string, direction: 'up' | 'down') => {
+        if (!selectedProject) return;
+
+        const items = [...(selectedProject.postAssemblyItems || [])];
+        const currentIndex = items.findIndex(item => item.id === itemId);
+
+        if ((direction === 'up' && currentIndex === 0) || (direction === 'down' && currentIndex === items.length - 1)) {
+            return; // Already at start or end
+        }
+
+        const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+        [items[currentIndex], items[newIndex]] = [items[newIndex], items[currentIndex]];
+
+        updateProjectDetails(selectedProject.id, { postAssemblyItems: items });
+    };
+
     const handleSaveItemEdit = () => {
         if (!selectedProject || !editingItemId) return;
 
@@ -752,9 +775,20 @@ const PostAssembly: React.FC = () => {
                                                                 {item.costType && <span className="text-[10px] font-bold px-2 py-0.5 rounded border border-slate-200 text-slate-500">{item.costType}</span>}
                                                             </div>
                                                             {canEdit && (
-                                                                <button onClick={() => handleStartEditingItem(item)} className="p-1 text-slate-400 hover:text-blue-500 rounded hover:bg-blue-50">
-                                                                    <span className="material-symbols-outlined text-sm">edit</span>
-                                                                </button>
+                                                                <div className="flex gap-1">
+                                                                    <button onClick={() => handleStartEditingItem(item)} className="p-1 text-slate-400 hover:text-blue-500 rounded hover:bg-blue-50 transition-colors">
+                                                                        <span className="material-symbols-outlined text-sm">edit</span>
+                                                                    </button>
+                                                                    <button onClick={() => handleDeleteItem(item.id)} className="p-1 text-slate-400 hover:text-rose-500 rounded hover:bg-rose-50 transition-colors" title="Excluir item">
+                                                                        <span className="material-symbols-outlined text-sm">delete</span>
+                                                                    </button>
+                                                                    <button onClick={() => handleMoveItem(item.id, 'up')} className="p-1 text-slate-400 hover:text-emerald-500 rounded hover:bg-emerald-50 transition-colors" title="Mover para cima">
+                                                                        <span className="material-symbols-outlined text-sm">arrow_upward</span>
+                                                                    </button>
+                                                                    <button onClick={() => handleMoveItem(item.id, 'down')} className="p-1 text-slate-400 hover:text-emerald-500 rounded hover:bg-emerald-50 transition-colors" title="Mover para baixo">
+                                                                        <span className="material-symbols-outlined text-sm">arrow_downward</span>
+                                                                    </button>
+                                                                </div>
                                                             )}
                                                         </div>
                                                         <p className="text-slate-600 dark:text-slate-300 font-medium mb-3">{item.problemDescription}</p>

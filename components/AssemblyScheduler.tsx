@@ -39,6 +39,7 @@ const STATUS_STYLES: Record<AssemblyStatus, string> = {
 
 // ─── Gantt config ─────────────────────────────────────────────────────────────
 const GANTT_WEEKS = 6; // visible window width
+const VISIBILITY_MULTIPLIER = 1.2; // 20% more days = 20% narrower columns per day
 
 // ─── Non-working day helpers ──────────────────────────────────────────────────
 // Note: Will be defined inside component to access companySettings
@@ -91,7 +92,8 @@ const AssemblyScheduler: React.FC = () => {
     // ── Gantt state ────────────────────────────────────────────────────────────
     const [ganttAnchor, setGanttAnchor] = useState(new Date()); // start of visible range
     const ganttStartDate = startOfWeek(ganttAnchor, { weekStartsOn: 1 });
-    const totalDays = ganttWeeks * 7;
+    const baseTotalDays = ganttWeeks * 7;
+    const totalDays = Math.floor(baseTotalDays * VISIBILITY_MULTIPLIER); // Apply 20% visibility multiplier
     const ganttEndDate = addDays(ganttStartDate, totalDays - 1);
     const ganttDays = eachDayOfInterval({ start: ganttStartDate, end: ganttEndDate });
 
@@ -276,8 +278,7 @@ const AssemblyScheduler: React.FC = () => {
             ...assemblyTeams.map(team => ({
                 team,
                 events: ganttEvents.filter(e => e.teamId === team.id)
-            })),
-            { team: null, events: ganttEvents.filter(e => !e.teamId) }
+            }))
         ];
         return rows;
     }, [assemblyTeams, ganttEvents]);
@@ -406,6 +407,19 @@ const AssemblyScheduler: React.FC = () => {
         }
 
         updateBatchAssemblySchedule(selectedBatch.id, schedule);
+        setTimeout(() => {
+            setIsSavingSchedule(false);
+            setIsScheduleModalOpen(false);
+            setSelectedBatch(null);
+        }, 400);
+    };
+
+    const handleCancelSchedule = () => {
+        if (!selectedBatch) return;
+        setIsSavingSchedule(true);
+
+        // Remove schedule by passing null
+        updateBatchAssemblySchedule(selectedBatch.id, null);
         setTimeout(() => {
             setIsSavingSchedule(false);
             setIsScheduleModalOpen(false);
@@ -1238,22 +1252,36 @@ const AssemblyScheduler: React.FC = () => {
                             </div>
 
                             {/* Footer */}
-                            <div className="p-5 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 shrink-0">
-                                <button onClick={() => setIsScheduleModalOpen(false)} className="px-4 py-2 rounded-lg text-sm font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={handleSaveSchedule}
-                                    disabled={isSavingSchedule}
-                                    className="px-5 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50"
-                                >
-                                    {isSavingSchedule ? (
-                                        <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
-                                    ) : (
-                                        <span className="material-symbols-outlined text-sm">save</span>
+                            <div className="p-5 border-t border-slate-100 dark:border-slate-700 flex justify-between gap-3 shrink-0">
+                                <div className="flex gap-2">
+                                    {canEdit && (selectedBatch?.assemblySchedule?.status === 'Previsto' || selectedBatch?.assemblySchedule?.status === 'Agendado') && (
+                                        <button
+                                            onClick={handleCancelSchedule}
+                                            disabled={isSavingSchedule}
+                                            className="px-5 py-2 bg-rose-600 text-white rounded-lg text-sm font-bold hover:bg-rose-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                                        >
+                                            <span className="material-symbols-outlined text-sm">cancel</span>
+                                            Cancelar Agendamento
+                                        </button>
                                     )}
-                                    Salvar
-                                </button>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setIsScheduleModalOpen(false)} className="px-4 py-2 rounded-lg text-sm font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                                        Fechar
+                                    </button>
+                                    <button
+                                        onClick={handleSaveSchedule}
+                                        disabled={isSavingSchedule}
+                                        className="px-5 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50"
+                                    >
+                                        {isSavingSchedule ? (
+                                            <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                                        ) : (
+                                            <span className="material-symbols-outlined text-sm">save</span>
+                                        )}
+                                        Salvar
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
