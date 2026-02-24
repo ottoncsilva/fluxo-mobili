@@ -730,6 +730,12 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         } else {
             setAllProjects(prev => prev.map(p => p.id === projectId ? { ...p, notes: updatedNotes } : p));
         }
+
+        // Notify involved if manual note
+        if (authorId !== 'sys') {
+            const message = `📝 *Nova observação* no projeto de *${project.client.name}*\n\n"${content}"\n\n_Enviado por: ${author?.name || 'Vendedor'}_`;
+            notifyProjectInvolved(project, message, 'newObservation');
+        }
     };
 
     const isLastStep = (stepId: string) => {
@@ -1185,6 +1191,12 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         } else {
             setAllProjects(prev => prev.map(p => p.id === projectId ? { ...p, ...updates } : p));
         }
+
+        // Notification for Post-Assembly
+        if (data.startedAt || updates.postAssemblyCode) {
+            const message = `📋 *Pós-Montagem Iniciada*\n\nCliente: *${project.client.name}*\nCódigo: *${updates.postAssemblyCode || project.postAssemblyCode}*\nPrioridade: *${data.priority || project.postAssemblyPriority || 'Normal'}*`;
+            notifyProjectInvolved(project, message, 'postAssemblyUpdate');
+        }
     };
 
     // Assistance
@@ -1213,6 +1225,17 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         } else {
             setAssistanceTickets(prev => [...prev, newTicket]);
         }
+
+        // Notification for new Assistance Ticket
+        const message = `🛠️ *Novo Chamado de Assistência*\n\nCliente: *${ticketData.clientName}*\nCódigo: *${code}*\nPrioridade: *${ticketData.priority}*\n\nStatus Inicial: ${assistanceWorkflow.find(s => s.id === ticketData.status)?.label || ticketData.status}`;
+
+        // Find project to get phone/involved
+        const project = allProjects.find(p => p.client.id === ticketData.clientId);
+        if (project) {
+            notifyProjectInvolved(project, message, 'assistanceUpdate');
+        } else if (companySettings.phone) {
+            sendWhatsApp(companySettings.phone, message);
+        }
     };
 
     const updateAssistanceTicket = async (ticket: AssistanceTicket) => {
@@ -1221,6 +1244,18 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             await setDoc(doc(db, "assistance_tickets", ticket.id), updatedTicket);
         } else {
             setAssistanceTickets(prev => prev.map(t => t.id === ticket.id ? updatedTicket : t));
+        }
+
+        // Notification for Assistance Status Change
+        const originalTicket = assistanceTickets.find(t => t.id === ticket.id);
+        if (originalTicket && originalTicket.status !== ticket.status) {
+            const statusLabel = assistanceWorkflow.find(s => s.id === ticket.status)?.label || ticket.status;
+            const message = `🛠️ *Atualização Assistência - ${ticket.code}*\n\nO status do seu chamado foi alterado para: *${statusLabel}*`;
+
+            const project = allProjects.find(p => p.client.id === ticket.clientId);
+            if (project) {
+                notifyProjectInvolved(project, message, 'assistanceUpdate');
+            }
         }
     };
 
@@ -1402,20 +1437,47 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
 
     // Helper to send notifications
-    const notifyClientStatusChange = async (project: Project, newStepLabel: string) => {
-        if (!companySettings.evolutionApi?.notifyStatus || !companySettings.evolutionApi?.instanceUrl) return;
+    const sendWhatsApp = async (phone: string | undefined, message: string) => {
+        if (!phone || !companySettings.evolutionApi?.instanceUrl || !companySettings.evolutionApi?.token || !companySettings.evolutionApi.globalEnabled) return;
 
-        const message = `Olá ${project.client.name}, seu projeto *${project.environments.map(e => e.name).join(', ')}* mudou de status para: *${newStepLabel}*. \n\nAcompanhe o progresso com a gente! 🚀\n*${companySettings.name}*`;
-
-        await import('../services/evolutionApi').then(({ EvolutionApi }) => {
-            EvolutionApi.sendText({
-                instanceUrl: companySettings.evolutionApi!.instanceUrl,
-                token: companySettings.evolutionApi!.token,
-                phone: project.client.phone,
-                message
-            });
+        const { EvolutionApi } = await import('../services/evolutionApi');
+        await EvolutionApi.sendText({
+            instanceUrl: companySettings.evolutionApi.instanceUrl,
+            token: companySettings.evolutionApi.token,
+            phone,
+            message
         });
-    }
+    };
+
+    const notifyProjectInvolved = async (project: Project, message: string, type: keyof CompanySettings['evolutionApi']['settings']) => {
+        const evo = companySettings.evolutionApi;
+        if (!evo?.globalEnabled || !evo.settings[type]?.enabled) return;
+
+        const config = evo.settings[type];
+
+        // 1. Notify Client
+        if ('notifyClient' in config && config.notifyClient) {
+            await sendWhatsApp(project.client.phone, message);
+        }
+
+        // 2. Notify Seller
+        if (config.notifySeller && project.sellerId) {
+            const seller = allUsers.find((u: User) => u.id === project.sellerId);
+            if (seller?.phone) {
+                await sendWhatsApp(seller.phone, `[NOTIFICAÇÃO VENDEDOR]\n${message}`);
+            }
+        }
+
+        // 3. Notify Admins/Managers
+        if (config.notifyManager && companySettings.phone) {
+            await sendWhatsApp(companySettings.phone, `[GESTÃO]\n${message}`);
+        }
+    };
+
+    const notifyClientStatusChange = async (project: Project, newStepLabel: string) => {
+        const message = `Olá ${project.client.name}, seu projeto *${project.environments.map(e => e.name).join(', ')}* mudou de status para: *${newStepLabel}*. \n\nAcompanhe o progresso com a gente! 🚀\n*${companySettings.name}*`;
+        await notifyProjectInvolved(project, message, 'stageChange');
+    };
 
 
     const notifySalesNewLead = async (client: Client) => {
@@ -1456,78 +1518,71 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
                 if (!step || !step.sla) continue; // No SLA for this step
 
                 const lastUpdate = new Date(batch.lastUpdated);
-                const deadline = new Date(lastUpdate.getTime() + (step.sla * 24 * 60 * 60 * 1000));
+                const slaMs = step.sla * 24 * 60 * 60 * 1000;
+                const deadline = new Date(lastUpdate.getTime() + slaMs);
+                const timeLeftMs = deadline.getTime() - now.getTime();
 
-                if (now > deadline) {
-                    // SLA BREACHED!
+                // 1. SLA BREACHED (Corrective)
+                if (now > deadline && !batch.slaNotificationSent) {
                     console.log(`SLA Breach detected for Batch ${batch.name} (Project ${batch.projectId}) in step ${step.label}`);
-
-                    // 1. Find Responsible Users (by Role)
-                    // We define "Responsible" as users in the current store with the 'ownerRole' of the step.
-                    // If ownerRole is 'Vendedor', we specifically look for the project's seller if possible, otherwise all sellers.
 
                     const project = allProjects.find(p => p.id === batch.projectId);
                     if (!project) continue;
 
-                    let targetUsers: User[] = [];
+                    const message = `⚠️ *Alerta de Atraso (SLA)*\n\nO projeto *${project.client.name}* - *${batch.name}* está atrasado na etapa: *${step.label}*.\n\nPrazo era: ${deadline.toLocaleDateString()}\nStatus: ATRASADO`;
 
-                    if (step.ownerRole === 'Vendedor' && project.sellerId) {
-                        const seller = allUsers.find(u => u.id === project.sellerId);
-                        if (seller) targetUsers.push(seller);
-                    }
+                    await notifyInvolvedSLA(batch, project, step, message);
 
-                    if (targetUsers.length === 0) {
-                        // Fallback: Notify all users with the role
-                        targetUsers = allUsers.filter(u => u.storeId === batch.storeId && u.role === step.ownerRole);
-                    }
-
-                    // 2. Send Notification(s)
-                    if (targetUsers.length > 0) {
-                        let notificationSent = false;
-                        const { EvolutionApi } = await import('../services/evolutionApi');
-
-                        for (const user of targetUsers) {
-                            if (!user.phone) continue; // Needs phone to notify via WhatsApp
-
-                            // Format phone for API (assuming it needs just numbers)
-                            const cleanPhone = user.phone.replace(/\D/g, '');
-                            // Basic validation for BR number (10 or 11 digits)
-                            // if (cleanPhone.length < 10) continue; 
-                            // EvolutionAPI usually handles '55' prefix check, but assuming stored phones might need '55' if not present?
-                            // Let's assume user.phone is stored mostly correctly or mask handles it.
-                            // Ideally we prepend 55 if missing.
-                            const finalPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
-
-                            const message = `⚠️ *Alerta de Atraso (SLA)*\n\nO projeto *${project.client.name}* - *${batch.name}* está atrasado na etapa: *${step.label}*.\n\nPrazo era: ${deadline.toLocaleDateString()}\nDias de atraso: ${Math.floor((now.getTime() - deadline.getTime()) / (1000 * 3600 * 24))}\n\nPor favor, verifique!`;
-
-                            try {
-                                await EvolutionApi.sendText({
-                                    instanceUrl: companySettings.evolutionApi!.instanceUrl,
-                                    token: companySettings.evolutionApi!.token,
-                                    phone: finalPhone,
-                                    message
-                                });
-                                notificationSent = true;
-                                console.log(`SLA Notification sent to ${user.name} (${finalPhone})`);
-                            } catch (err) {
-                                console.error(`Failed to send SLA notification to ${user.name}`, err);
-                            }
-                        }
-
-                        // 3. Mark as notified to prevent spam
-                        if (notificationSent) {
-                            const updateData = { slaNotificationSent: true };
-                            if (useCloud && db) {
-                                // We use persist helper or updateDoc directly
-                                // using the existing internal helper if accessible or direct firebase
-                                // persist is defined in scope
-                                persist("batches", batch.id, updateData);
-                            } else {
-                                setAllBatches(prev => prev.map(b => b.id === batch.id ? { ...b, ...updateData } : b));
-                            }
-                        }
-                    }
+                    const updateData = { slaNotificationSent: true };
+                    if (useCloud && db) persist("batches", batch.id, updateData);
+                    else setAllBatches((prev: Batch[]) => prev.map((b: Batch) => b.id === batch.id ? { ...b, ...updateData } : b));
                 }
+                // 2. SLA PREVENTIVE (24h before)
+                else if (timeLeftMs > 0 && timeLeftMs < 24 * 60 * 60 * 1000 && !batch.slaPreventiveSent) {
+                    const project = allProjects.find((p: Project) => p.id === batch.projectId);
+                    if (!project) continue;
+
+                    const message = `⏳ *Alerta Preventivo (SLA)*\n\nO projeto *${project.client.name}* vencerá em menos de 24h na etapa: *${step.label}*.\n\nPrazo: ${deadline.toLocaleString()}`;
+
+                    await notifyInvolvedSLA(batch, project, step, message);
+
+                    const updateData = { slaPreventiveSent: true };
+                    if (useCloud && db) persist("batches", batch.id, updateData);
+                    else setAllBatches((prev: Batch[]) => prev.map((b: Batch) => b.id === batch.id ? { ...b, ...updateData } : b));
+                }
+            }
+        };
+
+        const notifyInvolvedSLA = async (batch: Batch, project: Project, step: WorkflowStep, message: string) => {
+            const evo = companySettings.evolutionApi;
+            if (!evo?.globalEnabled || !evo.settings.slaAlert.enabled) return;
+
+            let targetUsers: User[] = [];
+
+            // Seller
+            if (step.ownerRole === 'Vendedor' && project.sellerId && evo.settings.slaAlert.notifySeller) {
+                const seller = allUsers.find((u: User) => u.id === project.sellerId);
+                if (seller) targetUsers.push(seller);
+            }
+
+            // Admins/Managers
+            if (evo.settings.slaAlert.notifyManager) {
+                const admins = allUsers.filter((u: User) => u.storeId === batch.storeId && ['Admin', 'Proprietario', 'Gerente'].includes(u.role));
+                targetUsers = [...targetUsers, ...admins];
+            }
+
+            // Remove duplicates
+            const uniqueTargetUsers = targetUsers.filter((u: User, index: number, self: User[]) => index === self.findIndex((t: User) => t.id === u.id));
+
+            for (const user of uniqueTargetUsers) {
+                if (user.phone) {
+                    await sendWhatsApp(user.phone, message);
+                }
+            }
+
+            // Also notify company phone if configured
+            if (companySettings.phone && evo.settings.slaAlert.notifyManager) {
+                await sendWhatsApp(companySettings.phone, `[GESTÃO-SLA]\n${message}`);
             }
         };
 

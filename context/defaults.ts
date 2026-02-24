@@ -98,7 +98,19 @@ export const DEFAULT_COMPANY_SETTINGS: CompanySettings = {
     corporateName: 'Fluxo Modelo Ltda',
     address: 'Av. Moveleira, 1000',
     phone: '(11) 99999-9999',
-    socialMedia: '@fluxomodelo'
+    socialMedia: '@fluxomodelo',
+    evolutionApi: {
+        instanceUrl: 'https://evolutionapi.digicasa.com.br/',
+        token: '',
+        globalEnabled: false,
+        settings: {
+            stageChange: { enabled: true, notifyClient: true, notifySeller: true, notifyManager: true },
+            newObservation: { enabled: true, notifySeller: true, notifyManager: true },
+            assistanceUpdate: { enabled: true, notifyClient: true, notifySeller: true, notifyManager: true },
+            postAssemblyUpdate: { enabled: true, notifyClient: true, notifySeller: true, notifyManager: true },
+            slaAlert: { enabled: true, notifySeller: true, notifyManager: true, preventive: true }
+        }
+    }
 };
 
 export const DEFAULT_ORIGINS: string[] = [

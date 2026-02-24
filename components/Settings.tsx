@@ -3,6 +3,69 @@ import { useProjects } from '../context/ProjectContext';
 import { useAgenda } from '../context/AgendaContext';
 import { Role, User, PermissionConfig, AssistanceStatus, WorkflowStep, AssistanceWorkflowStep } from '../types';
 
+interface RuleSettings {
+    enabled: boolean;
+    notifyClient?: boolean;
+    notifySeller: boolean;
+    notifyManager: boolean;
+    preventive?: boolean;
+}
+
+function CommunicationRule({ label, description, settings, onChange, allowClient, isSla }: {
+    label: string;
+    description: string;
+    settings: RuleSettings;
+    onChange: (settings: RuleSettings) => void;
+    allowClient?: boolean;
+    isSla?: boolean;
+}) {
+    if (!settings) return null;
+
+    const toggle = (field: keyof RuleSettings) => {
+        onChange({ ...settings, [field]: !settings[field] });
+    };
+
+    return (
+        <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h4 className="font-bold text-slate-800 dark:text-white text-sm">{label}</h4>
+                    <p className="text-xs text-slate-500">{description}</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" checked={settings.enabled} onChange={() => toggle('enabled')} className="sr-only peer" />
+                    <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                </label>
+            </div>
+
+            {settings.enabled && (
+                <div className="flex flex-wrap gap-4 pt-2 border-t border-slate-200 dark:border-slate-800">
+                    {allowClient && (
+                        <label className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-400 cursor-pointer">
+                            <input type="checkbox" checked={settings.notifyClient} onChange={() => toggle('notifyClient')} className="rounded text-primary focus:ring-primary h-4 w-4" />
+                            Cliente
+                        </label>
+                    )}
+                    <label className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-400 cursor-pointer">
+                        <input type="checkbox" checked={settings.notifySeller} onChange={() => toggle('notifySeller')} className="rounded text-primary focus:ring-primary h-4 w-4" />
+                        Vendedor
+                    </label>
+                    <label className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-400 cursor-pointer">
+                        <input type="checkbox" checked={settings.notifyManager} onChange={() => toggle('notifyManager')} className="rounded text-primary focus:ring-primary h-4 w-4" />
+                        Gerente/Adm
+                    </label>
+                    {isSla && (
+                        <label className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-400 cursor-pointer">
+                            <input type="checkbox" checked={settings.preventive} onChange={() => toggle('preventive')} className="rounded text-primary focus:ring-primary h-4 w-4" />
+                            Aviso Antecipado (24h)
+                        </label>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
 const Settings: React.FC = () => {
     const {
         users, addUser, updateUser, deleteUser,
@@ -17,7 +80,7 @@ const Settings: React.FC = () => {
 
     const { appointmentTypes, addAppointmentType, updateAppointmentType, deleteAppointmentType, agendaUsers, toggleAgendaUser } = useAgenda();
 
-    const [activeTab, setActiveTab] = useState<'COMPANY' | 'USERS' | 'PERMISSIONS' | 'ORIGINS' | 'AGENDA' | 'APPEARANCE' | 'ASSISTANCE' | 'WORKFLOW' | 'POST_ASSEMBLY' | 'INTEGRATIONS' | 'HOLIDAYS'>('COMPANY');
+    const [activeTab, setActiveTab] = useState<'COMPANY' | 'USERS' | 'PERMISSIONS' | 'ORIGINS' | 'AGENDA' | 'APPEARANCE' | 'ASSISTANCE' | 'WORKFLOW' | 'POST_ASSEMBLY' | 'INTEGRATIONS' | 'HOLIDAYS' | 'COMUNICACOES'>('COMPANY');
 
     // Dark Mode State
     const [theme, setTheme] = useState<'light' | 'dark' | 'auto'>(() => {
@@ -97,15 +160,18 @@ const Settings: React.FC = () => {
     const handleSaveConfig = async () => {
         setSaving(true);
         setSaveMessage(null);
+
+        const updatedEvo = {
+            ...companySettings.evolutionApi,
+            instanceUrl: evoInstanceUrl,
+            token: evoToken,
+            globalEnabled: evoGlobalEnabled,
+            settings: evoSettings
+        };
+
         await updateCompanySettings({
             ...companySettings,
-            evolutionApi: {
-                instanceUrl: evoInstanceUrl,
-                token: evoToken,
-                notifyLead: evoNotifyLead,
-                notifyStatus: evoNotifyStatus,
-                notifySla: evoNotifySla
-            }
+            evolutionApi: updatedEvo as any
         });
         const success = await saveStoreConfig();
         setSaving(false);
@@ -128,9 +194,14 @@ const Settings: React.FC = () => {
     // Evolution API State
     const [evoInstanceUrl, setEvoInstanceUrl] = useState(companySettings.evolutionApi?.instanceUrl || '');
     const [evoToken, setEvoToken] = useState(companySettings.evolutionApi?.token || '');
-    const [evoNotifyLead, setEvoNotifyLead] = useState(companySettings.evolutionApi?.notifyLead || false);
-    const [evoNotifyStatus, setEvoNotifyStatus] = useState(companySettings.evolutionApi?.notifyStatus || false);
-    const [evoNotifySla, setEvoNotifySla] = useState(companySettings.evolutionApi?.notifySla || false);
+    const [evoGlobalEnabled, setEvoGlobalEnabled] = useState(companySettings.evolutionApi?.globalEnabled ?? false);
+    const [evoSettings, setEvoSettings] = useState<any>(companySettings.evolutionApi?.settings || {
+        stageChange: { enabled: true, notifyClient: true, notifySeller: true, notifyManager: true },
+        newObservation: { enabled: true, notifySeller: true, notifyManager: true },
+        assistanceUpdate: { enabled: true, notifyClient: true, notifySeller: true, notifyManager: true },
+        postAssemblyUpdate: { enabled: true, notifyClient: true, notifySeller: true, notifyManager: true },
+        slaAlert: { enabled: true, notifySeller: true, notifyManager: true, preventive: true }
+    });
     const [testConnectionStatus, setTestConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
 
     const handleTestConnection = async () => {
@@ -451,6 +522,12 @@ const Settings: React.FC = () => {
                     >
                         Feriados
                     </button>
+                    <button
+                        onClick={() => setActiveTab('COMUNICACOES')}
+                        className={`pb-4 px-2 font-bold text-sm transition-colors border-b-2 whitespace-nowrap ${activeTab === 'COMUNICACOES' ? 'border-primary text-primary' : 'border-transparent text-slate-500'}`}
+                    >
+                        Comunicações
+                    </button>
                 </div>
 
 
@@ -521,6 +598,109 @@ const Settings: React.FC = () => {
 
                         <div className="flex justify-end pt-4 border-t border-slate-100 dark:border-slate-800">
                             <button onClick={handleSaveCompany} className="bg-primary text-white font-bold py-2.5 px-6 rounded-lg text-sm hover:bg-primary-600">Salvar Alterações</button>
+                        </div>
+                    </div>
+                )}
+
+                {/* COMMUNICATIONS TAB */}
+                {activeTab === 'COMUNICACOES' && (
+                    <div className="space-y-6 animate-fade-in pb-20">
+                        <div className="bg-white dark:bg-[#1a2632] p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+                            <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Instância Evolution API</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">URL da Instância</label>
+                                    <input
+                                        type="text"
+                                        value={evoInstanceUrl}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEvoInstanceUrl(e.target.value)}
+                                        className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm"
+                                        placeholder="https://..."
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Token da API</label>
+                                    <input
+                                        type="password"
+                                        value={evoToken}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEvoToken(e.target.value)}
+                                        className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm"
+                                        placeholder="..."
+                                    />
+                                </div>
+                                <div className="md:col-span-2 flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-800">
+                                    <div>
+                                        <p className="font-bold text-slate-800 dark:text-white text-sm">Status Global das Automações</p>
+                                        <p className="text-xs text-slate-500">Ative ou desative todos os envios de WhatsApp de uma vez.</p>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" checked={evoGlobalEnabled} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEvoGlobalEnabled(e.target.checked)} className="sr-only peer" />
+                                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                                    </label>
+                                </div>
+                                <div className="md:col-span-2 flex justify-end gap-3">
+                                    <button
+                                        onClick={handleTestConnection}
+                                        disabled={testConnectionStatus === 'testing'}
+                                        className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors ${testConnectionStatus === 'success' ? 'bg-emerald-100 text-emerald-700' : testConnectionStatus === 'error' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                                    >
+                                        <span className="material-symbols-outlined text-sm">{testConnectionStatus === 'testing' ? 'sync' : testConnectionStatus === 'success' ? 'check' : testConnectionStatus === 'error' ? 'close' : 'api'}</span>
+                                        {testConnectionStatus === 'testing' ? 'Testando...' : testConnectionStatus === 'success' ? 'Conectado!' : testConnectionStatus === 'error' ? 'Erro na Conexão' : 'Testar Conexão'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white dark:bg-[#1a2632] p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+                            <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Regras de Comunicação</h3>
+                            <div className="space-y-4">
+                                <CommunicationRule
+                                    label="Mudança de Etapa (Kanban)"
+                                    description="Enviado quando o projeto avança para uma nova fase."
+                                    settings={evoSettings.stageChange}
+                                    onChange={(newVal: RuleSettings) => setEvoSettings((prev: any) => ({ ...prev, stageChange: newVal }))}
+                                    allowClient
+                                />
+                                <CommunicationRule
+                                    label="Novas Observações"
+                                    description="Enviado quando um colaborador adiciona uma nota manual ao projeto."
+                                    settings={evoSettings.newObservation}
+                                    onChange={(newVal: RuleSettings) => setEvoSettings((prev: any) => ({ ...prev, newObservation: newVal }))}
+                                />
+                                <CommunicationRule
+                                    label="Assistência Técnica"
+                                    description="Avisos sobre abertura e atualização de chamados de assistência."
+                                    settings={evoSettings.assistanceUpdate}
+                                    onChange={(newVal: RuleSettings) => setEvoSettings((prev: any) => ({ ...prev, assistanceUpdate: newVal }))}
+                                    allowClient
+                                />
+                                <CommunicationRule
+                                    label="Pós-Montagem"
+                                    description="Atualizações sobre o processo de finalização e vistoria."
+                                    settings={evoSettings.postAssemblyUpdate}
+                                    onChange={(newVal: RuleSettings) => setEvoSettings((prev: any) => ({ ...prev, postAssemblyUpdate: newVal }))}
+                                    allowClient
+                                />
+                                <CommunicationRule
+                                    label="Alertas de SLA (Prazos)"
+                                    description="Alertas sobre tarefas próximas do vencimento ou atrasadas."
+                                    settings={evoSettings.slaAlert}
+                                    onChange={(newVal: RuleSettings) => setEvoSettings((prev: any) => ({ ...prev, slaAlert: newVal }))}
+                                    isSla
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-3 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-dashed border-slate-300 dark:border-slate-700">
+                            {saveMessage && <span className="text-sm font-bold flex items-center mr-4">{saveMessage}</span>}
+                            <button
+                                onClick={handleSaveConfig}
+                                disabled={saving}
+                                className="bg-primary text-white font-bold py-2.5 px-8 rounded-lg text-sm hover:bg-primary-600 disabled:opacity-50 flex items-center gap-2"
+                            >
+                                {saving ? <span className="material-symbols-outlined animate-spin text-sm">sync</span> : null}
+                                Salvar Configurações de Comunicação
+                            </button>
                         </div>
                     </div>
                 )}
@@ -1028,97 +1208,16 @@ const Settings: React.FC = () => {
                 {
                     activeTab === 'INTEGRATIONS' && (
                         <div className="space-y-6 animate-fade-in">
-                            <div className="bg-white dark:bg-[#1a2632] p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
-                                <div className="flex items-center gap-4 mb-6">
-                                    <span className="material-symbols-outlined text-4xl text-green-500">chat</span>
-                                    <div>
-                                        <h3 className="font-bold text-slate-800 dark:text-white text-lg">Evolution API (WhatsApp)</h3>
-                                        <p className="text-sm text-slate-500">Configure a conexão com a Evolution API para envio de mensagens automáticas.</p>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="md:col-span-2">
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">URL da Instância</label>
-                                        <div className="relative">
-                                            <span className="absolute left-3 top-3 text-slate-400 material-symbols-outlined text-sm">link</span>
-                                            <input
-                                                type="text"
-                                                value={evoInstanceUrl}
-                                                onChange={e => setEvoInstanceUrl(e.target.value)}
-                                                className="w-full pl-9 rounded-lg border-slate-200 dark:bg-slate-800 text-sm"
-                                                placeholder="https://api.evolution.com/instance/minha-empresa"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="md:col-span-2">
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">API Token (API Key)</label>
-                                        <div className="relative">
-                                            <span className="absolute left-3 top-3 text-slate-400 material-symbols-outlined text-sm">key</span>
-                                            <input
-                                                type="password"
-                                                value={evoToken}
-                                                onChange={e => setEvoToken(e.target.value)}
-                                                className="w-full pl-9 rounded-lg border-slate-200 dark:bg-slate-800 text-sm"
-                                                placeholder="Ex: 4E8Q..."
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="md:col-span-2">
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-4">Automações Ativas</label>
-                                        <div className="space-y-3">
-                                            <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer">
-                                                <input type="checkbox" checked={evoNotifyStatus} onChange={e => setEvoNotifyStatus(e.target.checked)} className="rounded text-primary focus:ring-primary" />
-                                                <div>
-                                                    <p className="font-bold text-sm text-slate-700 dark:text-slate-200">Notificar Cliente sobre Mudança de Status</p>
-                                                    <p className="text-xs text-slate-400">Envia mensagem quando o projeto avança de etapa.</p>
-                                                </div>
-                                            </label>
-                                            <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer">
-                                                <input type="checkbox" checked={evoNotifyLead} onChange={e => setEvoNotifyLead(e.target.checked)} className="rounded text-primary focus:ring-primary" />
-                                                <div>
-                                                    <p className="font-bold text-sm text-slate-700 dark:text-slate-200">Notificar Vendedor sobre Novo Lead [Em Breve]</p>
-                                                    <p className="text-xs text-slate-400">Envia mensagem quando um novo projeto entra no funil.</p>
-                                                </div>
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                                    <button
-                                        onClick={handleTestConnection}
-                                        disabled={testConnectionStatus === 'testing' || !evoInstanceUrl || !evoToken}
-                                        className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors ${testConnectionStatus === 'success' ? 'bg-green-100 text-green-700' : testConnectionStatus === 'error' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                                    >
-                                        {testConnectionStatus === 'testing' ? (
-                                            <>
-                                                <span className="material-symbols-outlined animate-spin text-sm">refresh</span>
-                                                Testando...
-                                            </>
-                                        ) : testConnectionStatus === 'success' ? (
-                                            <>
-                                                <span className="material-symbols-outlined text-sm">check_circle</span>
-                                                Conectado!
-                                            </>
-                                        ) : testConnectionStatus === 'error' ? (
-                                            <>
-                                                <span className="material-symbols-outlined text-sm">error</span>
-                                                Falha na Conexão
-                                            </>
-                                        ) : (
-                                            <>
-                                                <span className="material-symbols-outlined text-sm">wifi_tethering</span>
-                                                Testar Conexão
-                                            </>
-                                        )}
-                                    </button>
-                                    <button onClick={handleSaveConfig} className="bg-primary text-white font-bold py-2.5 px-6 rounded-lg text-sm hover:bg-primary-600 shadow-lg shadow-primary/20">
-                                        Salvar Integrações
-                                    </button>
-                                </div>
+                            <div className="bg-white dark:bg-[#1a2632] p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 text-center">
+                                <span className="material-symbols-outlined text-6xl text-slate-300 mb-4">alternate_email</span>
+                                <h3 className="font-bold text-slate-800 dark:text-white text-lg">Configurações de Comunicação</h3>
+                                <p className="text-sm text-slate-500 mb-6">As configurações da Evolution API e regras de WhatsApp agora possuem uma aba dedicada.</p>
+                                <button
+                                    onClick={() => setActiveTab('COMUNICACOES')}
+                                    className="bg-primary/10 text-primary hover:bg-primary/20 font-bold py-2.5 px-6 rounded-lg text-sm transition-colors"
+                                >
+                                    Ir para Comunicações
+                                </button>
                             </div>
                         </div>
                     )
@@ -1266,11 +1365,10 @@ const Settings: React.FC = () => {
                                                     <td className="px-4 py-3 text-slate-600 dark:text-slate-400 font-mono">{holiday.date}</td>
                                                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{holiday.name}</td>
                                                     <td className="px-4 py-3">
-                                                        <span className={`text-xs font-bold px-2 py-1 rounded ${
-                                                            holiday.type === 'fixed'
-                                                                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                                                                : 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300'
-                                                        }`}>
+                                                        <span className={`text-xs font-bold px-2 py-1 rounded ${holiday.type === 'fixed'
+                                                            ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                                                            : 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300'
+                                                            }`}>
                                                             {holiday.type === 'fixed' ? 'Fixo' : `Móvel (${holiday.year})`}
                                                         </span>
                                                     </td>
