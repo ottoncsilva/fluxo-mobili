@@ -66,6 +66,9 @@ export interface CompanySettings {
       slaAlert: { enabled: boolean; notifySeller: boolean; notifyManager: boolean; preventive: boolean; };
     };
   };
+  whatsappClientTemplates?: ClientWhatsAppTemplate[];
+  whatsappTeamTemplates?: TeamSlaTemplate[];
+  whatsappLogs?: WhatsAppLog[];
   holidays?: Array<{
     date: string;        // Formato: "YYYY-MM-DD" para móveis ou "MM-DD" para fixos
     name: string;        // Ex: "Carnaval", "Corpus Christi"
@@ -355,6 +358,30 @@ export interface TechnicalAssistanceSchedule {
   notes?: string;
 }
 
+// WhatsApp Communication Types
+export interface ClientWhatsAppTemplate {
+    stepId: string;
+    label: string;
+    message: string;
+    enabled: boolean;
+}
+
+export interface TeamSlaTemplate {
+    type: 'sla_d1' | 'sla_d0';
+    label: string;
+    message: string;
+    enabled: boolean;
+}
+
+export interface WhatsAppLog {
+    sentAt: string;
+    audience: 'client' | 'team';
+    stepId: string;
+    recipientName: string;
+    phone: string;
+    success: boolean;
+}
+
 // UI Types
 export interface KanbanCard {
   id: string;
@@ -377,4 +404,3 @@ export interface KanbanColumn {
   id: number;
   title: string;
   cards: KanbanCard[];
-}

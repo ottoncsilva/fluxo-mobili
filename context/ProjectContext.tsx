@@ -860,6 +860,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             const project = allProjects.find(p => p.id === batch.projectId);
             if (project) {
                 notifyClientStatusChange(project, nextStep.label);
+                sendStepClientNotification(project, targetStepId);
             }
         }
     };
@@ -925,6 +926,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             const project = allProjects.find(p => p.id === batch.projectId);
             if (project) {
                 notifyClientStatusChange(project, nextStep.label);
+                sendStepClientNotification(project, finalNextStepId);
             }
         }
     };
@@ -1255,6 +1257,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             const project = allProjects.find(p => p.client.id === ticket.clientId);
             if (project) {
                 notifyProjectInvolved(project, message, 'assistanceUpdate');
+                sendStepClientNotification(project, ticket.status, { codigoAss: ticket.code || '' });
             }
         }
     };
@@ -1474,6 +1477,29 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         }
     };
 
+
+    // Template-based per-step client notification (used alongside category-based system)
+    const sendStepClientNotification = async (project: Project, stepId: string, extraVars?: Record<string, string>) => {
+        const templates = companySettings.whatsappClientTemplates;
+        if (!templates || !companySettings.evolutionApi?.instanceUrl) return;
+
+        const { sendClientNotification, addWhatsAppLog } = await import('../services/communicationService');
+
+        const vars: Record<string, string> = {
+            nomeCliente: project.client.name,
+            vendedor: project.sellerName || '',
+            etapa: stepId,
+            prazo: '30',
+            ...(extraVars || {}),
+        };
+
+        const { log } = await sendClientNotification(stepId, project.client.phone, project.client.name, vars, companySettings);
+        if (log.phone) {
+            const updatedLogs = addWhatsAppLog(companySettings.whatsappLogs || [], log);
+            updateCompanySettings({ ...companySettings, whatsappLogs: updatedLogs });
+        }
+    };
+
     const notifyClientStatusChange = async (project: Project, newStepLabel: string) => {
         const message = `Olá ${project.client.name}, seu projeto *${project.environments.map(e => e.name).join(', ')}* mudou de status para: *${newStepLabel}*. \n\nAcompanhe o progresso com a gente! 🚀\n*${companySettings.name}*`;
         await notifyProjectInvolved(project, message, 'stageChange');
@@ -1634,4 +1660,3 @@ export const useProjects = () => {
     const context = useContext(ProjectContext);
     if (!context) throw new Error('useProjects must be used within a ProjectProvider');
     return context;
-};

@@ -179,7 +179,7 @@ const AssemblyScheduler: React.FC = () => {
     const {
         batches, projects, workflowConfig,
         assemblyTeams, updateBatchAssemblySchedule, saveAssemblyTeams,
-        canUserEditAssembly, companySettings, assistanceTickets, assistanceWorkflow,
+        canUserEditAssembly, companySettings, updateCompanySettings, assistanceTickets, assistanceWorkflow,
         updateAssistanceTicket
     } = useProjects();
 
@@ -501,6 +501,28 @@ const AssemblyScheduler: React.FC = () => {
         }
 
         updateBatchAssemblySchedule(selectedBatch.id, schedule);
+
+        // Send WhatsApp notification when assembly is scheduled
+        if (schedule.scheduledDate && schedule.status === 'Agendado') {
+            const project = projects.find(p => p.id === selectedBatch.projectId);
+            if (project && project.client.phone && companySettings.whatsappClientTemplates) {
+                import('../services/communicationService').then(({ sendClientNotification, addWhatsAppLog }) => {
+                    const vars: Record<string, string> = {
+                        nomeCliente: project.client.name,
+                        data: format(new Date(schedule.scheduledDate!), "dd/MM/yyyy", { locale: ptBR }),
+                        vendedor: project.sellerName || '',
+                        etapa: 'Montagem Agendada',
+                    };
+                    sendClientNotification('assembly_scheduled', project.client.phone, project.client.name, vars, companySettings).then(({ log }) => {
+                        if (log.phone) {
+                            const updatedLogs = addWhatsAppLog(companySettings.whatsappLogs || [], log);
+                            updateCompanySettings({ ...companySettings, whatsappLogs: updatedLogs });
+                        }
+                    });
+                });
+            }
+        }
+
         setTimeout(() => {
             setIsSavingSchedule(false);
             setIsScheduleModalOpen(false);
