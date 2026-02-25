@@ -1,7 +1,7 @@
 // context/defaults.ts
 // Constantes e dados iniciais extraídos do ProjectContext para facilitar manutenção.
 
-import { WorkflowStep, AssistanceWorkflowStep, CompanySettings, Store, User, Client, Project, Batch, PermissionConfig } from '../types';
+import { WorkflowStep, AssistanceWorkflowStep, CompanySettings, Store, User, Client, Project, Batch, PermissionConfig, ClientWhatsAppTemplate, TeamSlaTemplate } from '../types';
 
 // ─── Workflow Principal ────────────────────────────────────────────────────────
 
@@ -152,6 +152,9 @@ export const DEFAULT_COMPANY_SETTINGS: CompanySettings = {
     ],
     whatsappLogs: [],
 };
+
+export const DEFAULT_CLIENT_TEMPLATES: ClientWhatsAppTemplate[] = DEFAULT_COMPANY_SETTINGS.whatsappClientTemplates!;
+export const DEFAULT_TEAM_TEMPLATES: TeamSlaTemplate[] = DEFAULT_COMPANY_SETTINGS.whatsappTeamTemplates!;
 
 export const DEFAULT_ORIGINS: string[] = [
     'Captação (Vendedor)',
