@@ -1052,9 +1052,10 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         const newEnv: Environment = {
             id: `env-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             name,
-            status: 'Projetando',
+            status: 'Pending',
             version: 1,
-            valueHistory: []
+            valueHistory: [],
+            observations: ''
         };
         const newEnvs = [...project.environments, newEnv];
 
@@ -1063,7 +1064,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         } else {
             setAllProjects(prev => prev.map(p => p.id !== projectId ? p : { ...p, environments: newEnvs }));
         }
-        
+
         const projectBatches = allBatches.filter(b => b.projectId === projectId);
         if (projectBatches.length > 0) {
             const mainBatch = projectBatches.find(b => b.name === 'Projeto Completo' || b.name === 'Lote Restante') || projectBatches[0];

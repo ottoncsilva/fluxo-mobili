@@ -168,7 +168,7 @@ const ClientList: React.FC = () => {
                   maxStage = 1;
                 }
 
-                let displayStatus = project.client.status;
+                let displayStatus: string = project.client.status;
                 let statusColor = 'bg-slate-100 text-slate-600';
 
                 if (project.client.status === 'Perdido') {
