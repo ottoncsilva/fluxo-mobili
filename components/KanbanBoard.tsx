@@ -170,7 +170,7 @@ const KanbanBoard: React.FC = () => {
                 filteredBatches = filteredBatches.filter((b: Batch) => {
                     const project = projects.find((p: Project) => p.id === b.projectId);
                     return project?.client.name.toLowerCase().includes(q) ||
-                           b.name?.toLowerCase().includes(q);
+                        b.name?.toLowerCase().includes(q);
                 });
             }
             if (filterSeller) {
@@ -485,84 +485,84 @@ const KanbanBoard: React.FC = () => {
                                                             key={card.id}
                                                             onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleCardClick(card.id, card.phase, card.projectId); }}
                                                             className={`
-                        bg-white dark:bg-[#1e2936] p-4 rounded-lg shadow-sm hover:shadow-md transition-all cursor-pointer group border border-slate-300 dark:border-slate-700 relative overflow-hidden
+                        bg-white dark:bg-[#1e2936] p-3 rounded-lg shadow-sm hover:shadow-md transition-all cursor-pointer group border border-slate-300 dark:border-slate-700 relative overflow-hidden
                         ${card.slaStatus === 'Atrasado' ? 'border-l-4 border-l-rose-500' : ''}
                         ${card.slaStatus === 'Perdido' ? 'opacity-70 grayscale' : ''}
                         ${card.slaStatus === 'Concluido' ? 'border-l-4 border-l-emerald-500' : ''}
                         `}
-                                                            >
-                                                                {/* 1. Top: Step Info */}
-                                                                <div className="flex justify-between items-center mb-2">
-                                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{card.subtitle}</span>
-                                                                    {card.slaStatus === 'Perdido' ? (
-                                                                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">PERDIDO</span>
-                                                                    ) : card.slaStatus === 'Concluido' ? (
-                                                                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">OK</span>
-                                                                    ) : (
-                                                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${card.daysDiff < 0 ? 'bg-rose-100 text-rose-700' :
-                                                                            card.daysDiff < 2 ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'
-                                                                            }`}>
-                                                                            {card.daysDiff > 0 ? `+${card.daysDiff} dias` : `${card.daysDiff} dias`}
-                                                                        </span>
+                                                        >
+                                                            {/* 1. Top: Step Info */}
+                                                            <div className="flex justify-between items-center mb-1.5">
+                                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{card.subtitle}</span>
+                                                                {card.slaStatus === 'Perdido' ? (
+                                                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">PERDIDO</span>
+                                                                ) : card.slaStatus === 'Concluido' ? (
+                                                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">OK</span>
+                                                                ) : (
+                                                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${card.daysDiff < 0 ? 'bg-rose-100 text-rose-700' :
+                                                                        card.daysDiff < 2 ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'
+                                                                        }`}>
+                                                                        {card.daysDiff > 0 ? `+${card.daysDiff} dias` : `${card.daysDiff} dias`}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+
+                                                            {/* 2. Main: Client Name (Evident) */}
+                                                            <div className="flex items-center gap-2 mb-0.5">
+                                                                <span className="material-symbols-outlined text-slate-400 text-[15px]">person</span>
+                                                                <h4 className={`text-[14.4px] font-extrabold leading-tight ${card.slaStatus === 'Perdido' ? 'text-slate-500 line-through decoration-2 decoration-rose-500/50' : 'text-slate-900 dark:text-white'}`}>
+                                                                    {card.clientName}
+                                                                </h4>
+                                                            </div>
+
+                                                            {/* 3. Sub: Project/Batch Name */}
+                                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mb-2 pl-[23px]">
+                                                                {card.title}
+                                                            </p>
+
+                                                            {/* 4. Footer: Seller & Status */}
+                                                            <div className="flex items-center justify-between pt-2 border-t border-slate-300 dark:border-slate-700">
+                                                                <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-700/50 px-2 py-1 rounded">
+                                                                    <span className="material-symbols-outlined text-[12px] text-slate-400">sell</span>
+                                                                    <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                                                                        {card.sellerName}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="flex gap-1.5">
+                                                                    {workflowConfig[card.phase]?.stage >= 4 && card.phase !== '9.0' && card.phase !== '9.1' ? (
+                                                                        <button
+                                                                            onClick={(e: React.MouseEvent) => {
+                                                                                e.stopPropagation();
+                                                                                const batch = batches.find((b: Batch) => b.id === card.id);
+                                                                                if (batch) {
+                                                                                    setSelectedBatchId(batch.id);
+                                                                                    setIsLotModalOpen(true);
+                                                                                }
+                                                                            }}
+                                                                            className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 border border-blue-100 dark:border-blue-800 rounded transition-colors"
+                                                                        >
+                                                                            <span className="material-symbols-outlined text-[14px]">call_split</span>
+                                                                            Dividir
+                                                                        </button>
+                                                                    ) : <div />}
+
+                                                                    {/* Main Advance Button (if actionable) */}
+                                                                    {canUserAdvanceStep(card.phase) && (
+                                                                        <button
+                                                                            onClick={(e: React.MouseEvent) => {
+                                                                                const batch = batches.find((b: Batch) => b.id === card.id);
+                                                                                if (batch) handleAdvanceClick(e, batch);
+                                                                            }}
+                                                                            className="flex items-center gap-1 px-3 py-1 text-[10px] font-bold text-white bg-primary hover:bg-primary-600 rounded shadow-sm transition-all active:scale-95"
+                                                                        >
+                                                                            <span className="material-symbols-outlined text-[14px]">done_all</span>
+                                                                            Concluir
+                                                                        </button>
                                                                     )}
                                                                 </div>
-
-                                                                {/* 2. Main: Client Name (Evident) */}
-                                                                <div className="flex items-center gap-2 mb-1">
-                                                                    <span className="material-symbols-outlined text-slate-400 text-base">person</span>
-                                                                    <h4 className={`text-lg font-extrabold leading-tight ${card.slaStatus === 'Perdido' ? 'text-slate-500 line-through decoration-2 decoration-rose-500/50' : 'text-slate-900 dark:text-white'}`}>
-                                                                        {card.clientName}
-                                                                    </h4>
-                                                                </div>
-
-                                                                {/* 3. Sub: Project/Batch Name */}
-                                                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-3 pl-6">
-                                                                    {card.title}
-                                                                </p>
-
-                                                                {/* 4. Footer: Seller & Status */}
-                                                                <div className="flex items-center justify-between pt-3 border-t border-slate-300 dark:border-slate-700">
-                                                                    <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-700/50 px-2 py-1 rounded">
-                                                                        <span className="material-symbols-outlined text-[12px] text-slate-400">sell</span>
-                                                                        <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">
-                                                                            {card.sellerName}
-                                                                        </span>
-                                                                    </div>
-                                                                    <div className="flex gap-1.5">
-                                                                        {workflowConfig[card.phase]?.stage >= 4 && card.phase !== '9.0' && card.phase !== '9.1' ? (
-                                                                            <button
-                                                                                onClick={(e: React.MouseEvent) => {
-                                                                                    e.stopPropagation();
-                                                                                    const batch = batches.find((b: Batch) => b.id === card.id);
-                                                                                    if (batch) {
-                                                                                        setSelectedBatchId(batch.id);
-                                                                                        setIsLotModalOpen(true);
-                                                                                    }
-                                                                                }}
-                                                                                className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 border border-blue-100 dark:border-blue-800 rounded transition-colors"
-                                                                            >
-                                                                                <span className="material-symbols-outlined text-[14px]">call_split</span>
-                                                                                Dividir
-                                                                            </button>
-                                                                        ) : <div />}
-
-                                                                        {/* Main Advance Button (if actionable) */}
-                                                                        {canUserAdvanceStep(card.phase) && (
-                                                                            <button
-                                                                                onClick={(e: React.MouseEvent) => {
-                                                                                    const batch = batches.find((b: Batch) => b.id === card.id);
-                                                                                    if (batch) handleAdvanceClick(e, batch);
-                                                                                }}
-                                                                                className="flex items-center gap-1 px-3 py-1 text-[10px] font-bold text-white bg-primary hover:bg-primary-600 rounded shadow-sm transition-all active:scale-95"
-                                                                            >
-                                                                                <span className="material-symbols-outlined text-[14px]">done_all</span>
-                                                                                Concluir
-                                                                            </button>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
                                                             </div>
-                                                        ))}
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             ));
                                         })()}

@@ -14,17 +14,17 @@ import { getBusinessDaysDifference, isHoliday, addBusinessDays } from '../utils/
 
 // ─── Color map (static for Tailwind purge safety) ────────────────────────────
 const TEAM_COLOR_MAP: Record<string, { bg: string; border: string; text: string; light: string }> = {
-    blue:    { bg: 'bg-blue-500',    border: 'border-blue-600',    text: 'text-white', light: 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' },
+    blue: { bg: 'bg-blue-500', border: 'border-blue-600', text: 'text-white', light: 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' },
     emerald: { bg: 'bg-emerald-500', border: 'border-emerald-600', text: 'text-white', light: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300' },
-    violet:  { bg: 'bg-violet-500',  border: 'border-violet-600',  text: 'text-white', light: 'bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300' },
-    orange:  { bg: 'bg-orange-500',  border: 'border-orange-600',  text: 'text-white', light: 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300' },
-    rose:    { bg: 'bg-rose-500',    border: 'border-rose-600',    text: 'text-white', light: 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300' },
-    amber:   { bg: 'bg-amber-500',   border: 'border-amber-600',   text: 'text-white', light: 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300' },
-    cyan:    { bg: 'bg-cyan-500',    border: 'border-cyan-600',    text: 'text-white', light: 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300' },
-    indigo:  { bg: 'bg-indigo-500',  border: 'border-indigo-600',  text: 'text-white', light: 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300' },
-    teal:    { bg: 'bg-teal-500',    border: 'border-teal-600',    text: 'text-white', light: 'bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-300' },
-    pink:    { bg: 'bg-pink-500',    border: 'border-pink-600',    text: 'text-white', light: 'bg-pink-50 dark:bg-pink-900/20 text-pink-700 dark:text-pink-300' },
-    slate:   { bg: 'bg-slate-400',   border: 'border-slate-500',   text: 'text-white', light: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
+    violet: { bg: 'bg-violet-500', border: 'border-violet-600', text: 'text-white', light: 'bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300' },
+    orange: { bg: 'bg-orange-500', border: 'border-orange-600', text: 'text-white', light: 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300' },
+    rose: { bg: 'bg-rose-500', border: 'border-rose-600', text: 'text-white', light: 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300' },
+    amber: { bg: 'bg-amber-500', border: 'border-amber-600', text: 'text-white', light: 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300' },
+    cyan: { bg: 'bg-cyan-500', border: 'border-cyan-600', text: 'text-white', light: 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300' },
+    indigo: { bg: 'bg-indigo-500', border: 'border-indigo-600', text: 'text-white', light: 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300' },
+    teal: { bg: 'bg-teal-500', border: 'border-teal-600', text: 'text-white', light: 'bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-300' },
+    pink: { bg: 'bg-pink-500', border: 'border-pink-600', text: 'text-white', light: 'bg-pink-50 dark:bg-pink-900/20 text-pink-700 dark:text-pink-300' },
+    slate: { bg: 'bg-slate-400', border: 'border-slate-500', text: 'text-white', light: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
 };
 
 const COLOR_OPTIONS = ['blue', 'emerald', 'violet', 'orange', 'rose', 'amber', 'cyan', 'indigo', 'teal', 'pink'];
@@ -32,9 +32,9 @@ const COLOR_OPTIONS = ['blue', 'emerald', 'violet', 'orange', 'rose', 'amber', '
 // ─── Status badge styles ──────────────────────────────────────────────────────
 const STATUS_STYLES: Record<AssemblyStatus, string> = {
     'Sem Previsão': 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400',
-    'Previsto':     'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700',
-    'Agendado':     'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700',
-    'Concluído':    'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300',
+    'Previsto': 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700',
+    'Agendado': 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700',
+    'Concluído': 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300',
 };
 
 // ─── Gantt config ─────────────────────────────────────────────────────────────
@@ -234,6 +234,7 @@ const AssemblyScheduler: React.FC = () => {
 
     // ── Queue state ────────────────────────────────────────────────────────────
     const [queueFilter, setQueueFilter] = useState<AssemblyStatus | 'Todos'>('Todos');
+    const [postAssemblyFilter, setPostAssemblyFilter] = useState<AssemblyStatus | 'Todos'>('Todos');
     const [assistanceFilter, setAssistanceFilter] = useState<string>('Todos');
 
     // ── Schedule modal state ───────────────────────────────────────────────────
@@ -363,8 +364,32 @@ const AssemblyScheduler: React.FC = () => {
         [enrichedBatches, queueFilter]
     );
 
-    const ganttEvents = useMemo(() =>
-        enrichedBatches.flatMap(({ batch, project }) => {
+    const relevantPostAssemblies = useMemo(() =>
+        batches.filter(b =>
+            b.status === 'Active' &&
+            workflowConfig[b.phase] &&
+            workflowConfig[b.phase].stage === 8
+        ),
+        [batches, workflowConfig]
+    );
+
+    const enrichedPostAssemblies = useMemo(() =>
+        relevantPostAssemblies
+            .map(b => ({ batch: b, project: projects.find(p => p.id === b.projectId) }))
+            .filter((x): x is { batch: Batch; project: NonNullable<typeof x.project> } => !!x.project),
+        [relevantPostAssemblies, projects]
+    );
+
+    const filteredPostAssemblies = useMemo(() =>
+        enrichedPostAssemblies.filter(({ batch }) => {
+            const status = batch.assemblySchedule?.status || 'Sem Previsão';
+            return postAssemblyFilter === 'Todos' || status === postAssemblyFilter;
+        }),
+        [enrichedPostAssemblies, postAssemblyFilter]
+    );
+
+    const ganttEvents = useMemo(() => {
+        const events = enrichedBatches.flatMap(({ batch, project }) => {
             const s = batch.assemblySchedule;
             const date = s?.scheduledDate || s?.forecastDate;
             if (!date) return [];
@@ -384,10 +409,36 @@ const AssemblyScheduler: React.FC = () => {
                 estimatedDays: bizDays,
                 calendarDays,
                 assemblyDeadline: batch.assemblyDeadline,
+                isPostAssembly: false,
             }];
-        }),
-        [enrichedBatches, assemblyTeams]
-    );
+        });
+
+        const postEvents = enrichedPostAssemblies.flatMap(({ batch, project }) => {
+            const s = batch.assemblySchedule;
+            const date = s?.scheduledDate || s?.forecastDate;
+            if (!date) return [];
+            const team = assemblyTeams.find(t => t.id === s?.teamId);
+            const bizDays = s?.estimatedDays || 1;
+            const startDateObj = new Date(date);
+            const endDateObj = addBusinessDays(startDateObj, bizDays, companySettings?.holidays);
+            const calendarDays = Math.max(1, differenceInDays(endDateObj, startDateObj));
+            return [{
+                batchId: batch.id,
+                date,
+                clientName: project.client.name,
+                batchName: 'Pós-Mont: ' + (batch.name || 'Lote'),
+                teamId: s?.teamId || null,
+                teamColor: team?.color || 'slate',
+                status: (s?.status || 'Sem Previsão') as AssemblyStatus,
+                estimatedDays: bizDays,
+                calendarDays,
+                assemblyDeadline: batch.assemblyDeadline,
+                isPostAssembly: true,
+            }];
+        });
+
+        return [...events, ...postEvents];
+    }, [enrichedBatches, enrichedPostAssemblies, assemblyTeams, companySettings?.holidays]);
 
     const ganttRows = useMemo(() => {
         const rows: Array<{ team: AssemblyTeam | null; events: typeof ganttEvents }> = [
@@ -726,160 +777,159 @@ const AssemblyScheduler: React.FC = () => {
                         onTouchMove={handleGanttTouchMove}
                         onTouchEnd={handleGanttTouchEnd}
                     >
-                    {/* Sticky header: month row + day row */}
-                    <div className="sticky top-0 z-20 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1a2632]">
-                        {/* Month/year header row */}
-                        <div className="flex border-b border-slate-100 dark:border-slate-800">
-                            <div className="w-32 shrink-0 border-r border-slate-200 dark:border-slate-700" />
-                            <div className="flex-1 flex overflow-hidden">
-                                {monthGroups.map((mg, i) => (
-                                    <div
-                                        key={i}
-                                        style={{ flex: mg.count }}
-                                        className="px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide border-r last:border-r-0 border-slate-200 dark:border-slate-700 truncate"
-                                    >
-                                        {mg.label}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        {/* Day header row — absolute positioning matches body grid exactly */}
-                        <div className="flex">
-                            {/* Row label column */}
-                            <div className="w-32 shrink-0 px-3 py-2 border-r border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                Equipe
-                            </div>
-                            {/* Date columns: use absolute positioning same as body grid */}
-                            <div className="flex-1 relative overflow-hidden" style={{ height: 38 }}>
-                                {ganttDays.map((day, i) => {
-                                    const nonWorking = isNonWorkingDay(day);
-                                    const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
-                                    return (
+                        {/* Sticky header: month row + day row */}
+                        <div className="sticky top-0 z-20 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1a2632]">
+                            {/* Month/year header row */}
+                            <div className="flex border-b border-slate-100 dark:border-slate-800">
+                                <div className="w-32 shrink-0 border-r border-slate-200 dark:border-slate-700" />
+                                <div className="flex-1 flex overflow-hidden">
+                                    {monthGroups.map((mg, i) => (
                                         <div
                                             key={i}
-                                            className={`absolute top-0 bottom-0 flex flex-col items-center justify-center border-r border-slate-200 dark:border-slate-700 ${nonWorking ? 'bg-slate-50 dark:bg-slate-800/60' : ''}`}
-                                            style={{
-                                                left: `${(i / totalDays) * 100}%`,
-                                                width: `${(1 / totalDays) * 100}%`,
-                                                ...(nonWorking ? NON_WORKING_HEADER_STYLE : {})
-                                            }}
+                                            style={{ flex: mg.count }}
+                                            className="px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide border-r last:border-r-0 border-slate-200 dark:border-slate-700 truncate"
                                         >
-                                            <div className={nonWorking
-                                                ? 'text-[10px] font-bold uppercase text-slate-300 dark:text-slate-600 leading-tight'
-                                                : 'text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 leading-tight'
-                                            }>
-                                                {WEEKDAY_ABBR[day.getDay()]}
-                                            </div>
-                                            <div className={`font-bold leading-tight ${
-                                                isToday
+                                            {mg.label}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            {/* Day header row — absolute positioning matches body grid exactly */}
+                            <div className="flex">
+                                {/* Row label column */}
+                                <div className="w-32 shrink-0 px-3 py-2 border-r border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                    Equipe
+                                </div>
+                                {/* Date columns: use absolute positioning same as body grid */}
+                                <div className="flex-1 relative overflow-hidden" style={{ height: 38 }}>
+                                    {ganttDays.map((day, i) => {
+                                        const nonWorking = isNonWorkingDay(day);
+                                        const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+                                        return (
+                                            <div
+                                                key={i}
+                                                className={`absolute top-0 bottom-0 flex flex-col items-center justify-center border-r border-slate-200 dark:border-slate-700 ${nonWorking ? 'bg-slate-50 dark:bg-slate-800/60' : ''}`}
+                                                style={{
+                                                    left: `${(i / totalDays) * 100}%`,
+                                                    width: `${(1 / totalDays) * 100}%`,
+                                                    ...(nonWorking ? NON_WORKING_HEADER_STYLE : {})
+                                                }}
+                                            >
+                                                <div className={nonWorking
+                                                    ? 'text-[10px] font-bold uppercase text-slate-300 dark:text-slate-600 leading-tight'
+                                                    : 'text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 leading-tight'
+                                                }>
+                                                    {WEEKDAY_ABBR[day.getDay()]}
+                                                </div>
+                                                <div className={`font-bold leading-tight ${isToday
                                                     ? 'text-[11px] text-rose-600 dark:text-rose-400'
                                                     : nonWorking
                                                         ? 'text-[9px] text-slate-300 dark:text-slate-600'
                                                         : 'text-[11px] text-slate-600 dark:text-slate-400'
-                                            }`}>
-                                                {format(day, 'd')}
+                                                    }`}>
+                                                    {format(day, 'd')}
+                                                </div>
                                             </div>
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    })}
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Gantt body rows */}
+                        {/* Gantt body rows */}
                         {ganttRows.map(({ team, events }, idx) => (
                             <React.Fragment key={team?.id || 'no-team'}>
                                 <div className="flex border-b border-slate-100 dark:border-slate-800 last:border-b-0">
                                     {/* Row label */}
                                     <div className="w-32 shrink-0 px-3 py-2 border-r border-slate-200 dark:border-slate-700 flex items-start gap-2">
-                                    {team ? (
-                                        <>
-                                            <div className={`w-2.5 h-2.5 rounded-full shrink-0 mt-0.5 ${TEAM_COLOR_MAP[team.color]?.bg || 'bg-slate-400'}`} />
-                                            <div>
-                                                <div className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{team.name}</div>
-                                                {team.members.length > 0 && (
-                                                    <div className="text-[10px] text-slate-400 truncate">{team.members.slice(0, 2).join(', ')}{team.members.length > 2 ? '...' : ''}</div>
-                                                )}
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <span className="text-[10px] text-slate-400 italic">Sem equipe</span>
-                                    )}
-                                </div>
+                                        {team ? (
+                                            <>
+                                                <div className={`w-2.5 h-2.5 rounded-full shrink-0 mt-0.5 ${TEAM_COLOR_MAP[team.color]?.bg || 'bg-slate-400'}`} />
+                                                <div>
+                                                    <div className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{team.name}</div>
+                                                    {team.members.length > 0 && (
+                                                        <div className="text-[10px] text-slate-400 truncate">{team.members.slice(0, 2).join(', ')}{team.members.length > 2 ? '...' : ''}</div>
+                                                    )}
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <span className="text-[10px] text-slate-400 italic">Sem equipe</span>
+                                        )}
+                                    </div>
 
-                                {/* Gantt bar area — minHeight reduced 30% (68→48) */}
-                                <div className="flex-1 relative" style={{ minHeight: 48 }}>
-                                    {/* Background grid */}
-                                    {ganttDays.map((day, i) => {
-                                        const nonWorking = isNonWorkingDay(day);
-                                        return (
+                                    {/* Gantt bar area — minHeight reduced 30% (68→48) */}
+                                    <div className="flex-1 relative" style={{ minHeight: 48 }}>
+                                        {/* Background grid */}
+                                        {ganttDays.map((day, i) => {
+                                            const nonWorking = isNonWorkingDay(day);
+                                            return (
+                                                <div
+                                                    key={i}
+                                                    className={`absolute top-0 bottom-0 border-r border-slate-200 dark:border-slate-700 ${nonWorking ? 'bg-slate-50/90 dark:bg-slate-800/50' : ''}`}
+                                                    style={{
+                                                        left: `${(i / totalDays) * 100}%`,
+                                                        width: `${(1 / totalDays) * 100}%`,
+                                                        ...(nonWorking ? NON_WORKING_GRID_STYLE : {})
+                                                    }}
+                                                />
+                                            );
+                                        })}
+
+                                        {/* Today column - full width with orange overlay */}
+                                        {isInGanttRange(new Date().toISOString()) && (
                                             <div
-                                                key={i}
-                                                className={`absolute top-0 bottom-0 border-r border-slate-200 dark:border-slate-700 ${nonWorking ? 'bg-slate-50/90 dark:bg-slate-800/50' : ''}`}
+                                                className="absolute top-0 bottom-0 bg-orange-200/50 dark:bg-orange-900/30 z-10 pointer-events-none"
                                                 style={{
-                                                    left: `${(i / totalDays) * 100}%`,
-                                                    width: `${(1 / totalDays) * 100}%`,
-                                                    ...(nonWorking ? NON_WORKING_GRID_STYLE : {})
+                                                    left: `${dateToPercent(new Date())}%`,
+                                                    width: `${(1 / totalDays) * 100}%`
                                                 }}
                                             />
-                                        );
-                                    })}
+                                        )}
 
-                                    {/* Today column - full width with orange overlay */}
-                                    {isInGanttRange(new Date().toISOString()) && (
-                                        <div
-                                            className="absolute top-0 bottom-0 bg-orange-200/50 dark:bg-orange-900/30 z-10 pointer-events-none"
-                                            style={{
-                                                left: `${dateToPercent(new Date())}%`,
-                                                width: `${(1 / totalDays) * 100}%`
-                                            }}
-                                        />
-                                    )}
+                                        {/* Assembly bars */}
+                                        {events.map(evt => {
+                                            const left = dateToPercent(evt.date);
+                                            const width = durationToPercent(evt.date, evt.calendarDays);
+                                            const colorMap = TEAM_COLOR_MAP[evt.teamColor] || TEAM_COLOR_MAP.slate;
+                                            const isDashed = evt.status === 'Previsto';
 
-                                    {/* Assembly bars */}
-                                    {events.map(evt => {
-                                        const left = dateToPercent(evt.date);
-                                        const width = durationToPercent(evt.date, evt.calendarDays);
-                                        const colorMap = TEAM_COLOR_MAP[evt.teamColor] || TEAM_COLOR_MAP.slate;
-                                        const isDashed = evt.status === 'Previsto';
-
-                                        return (
-                                            <div
-                                                key={evt.batchId}
-                                                className={`absolute top-1.5 bottom-1.5 rounded-md px-2 flex items-center z-10 overflow-hidden transition-transform hover:scale-y-105 ${colorMap.bg} ${isDashed ? 'border-2 border-dashed border-white/60 opacity-80' : 'shadow-md'} ${canEdit ? 'cursor-pointer' : 'cursor-default'}`}
-                                                style={{ left: `${left}%`, width: `${Math.max(width, 1.5)}%`, minWidth: '44px' }}
-                                                onClick={() => {
-                                                    if (hasDraggedRef.current) return;
-                                                    if (!canEdit) return;
-                                                    const b = batches.find(x => x.id === evt.batchId);
-                                                    if (b) handleOpenScheduleModal(b);
-                                                }}
-                                                title={`${evt.clientName} — ${evt.batchName} (${evt.estimatedDays} d.ú.)`}
-                                            >
-                                                <span className="text-white text-[10px] font-bold truncate select-none">{evt.clientName}</span>
-                                                {/* Assembly deadline marker */}
-                                                {evt.assemblyDeadline && isInGanttRange(evt.assemblyDeadline) && (() => {
-                                                    const deadlineStr = evt.assemblyDeadline as string;
-                                                    const deadlineLeft = dateToPercent(deadlineStr);
-                                                    const relPct = width > 0 ? ((deadlineLeft - left) / width) * 100 : 0;
-                                                    return (
-                                                        <div
-                                                            className="absolute -top-1 w-2 h-2 bg-rose-600 rotate-45 z-30 pointer-events-none"
-                                                            style={{ left: `${clamp(relPct, 0, 92)}%` }}
-                                                            title={`Prazo: ${format(new Date(deadlineStr), 'dd/MM/yyyy')}`}
-                                                        />
-                                                    );
-                                                })()}
-                                            </div>
-                                        );
-                                    })}
+                                            return (
+                                                <div
+                                                    key={evt.batchId}
+                                                    className={`absolute top-1.5 bottom-1.5 rounded-md px-2 flex items-center z-10 overflow-hidden transition-transform hover:scale-y-105 ${colorMap.bg} ${isDashed ? 'border-2 border-dashed border-white/60 opacity-80' : 'shadow-md'} ${canEdit ? 'cursor-pointer' : 'cursor-default'}`}
+                                                    style={{ left: `${left}%`, width: `${Math.max(width, 1.5)}%`, minWidth: '44px' }}
+                                                    onClick={() => {
+                                                        if (hasDraggedRef.current) return;
+                                                        if (!canEdit) return;
+                                                        const b = batches.find(x => x.id === evt.batchId);
+                                                        if (b) handleOpenScheduleModal(b);
+                                                    }}
+                                                    title={`${evt.clientName} — ${evt.batchName} (${evt.estimatedDays} d.ú.)`}
+                                                >
+                                                    <span className="text-white text-[10px] font-bold truncate select-none">{evt.clientName}</span>
+                                                    {/* Assembly deadline marker */}
+                                                    {evt.assemblyDeadline && isInGanttRange(evt.assemblyDeadline) && (() => {
+                                                        const deadlineStr = evt.assemblyDeadline as string;
+                                                        const deadlineLeft = dateToPercent(deadlineStr);
+                                                        const relPct = width > 0 ? ((deadlineLeft - left) / width) * 100 : 0;
+                                                        return (
+                                                            <div
+                                                                className="absolute -top-1 w-2 h-2 bg-rose-600 rotate-45 z-30 pointer-events-none"
+                                                                style={{ left: `${clamp(relPct, 0, 92)}%` }}
+                                                                title={`Prazo: ${format(new Date(deadlineStr), 'dd/MM/yyyy')}`}
+                                                            />
+                                                        );
+                                                    })()}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
-                            </div>
-                            {/* Team separator */}
-                            {idx < ganttRows.length - 1 && (
-                                <div className="w-full h-px bg-slate-200 dark:bg-slate-700" />
-                            )}
-                        </React.Fragment>
+                                {/* Team separator */}
+                                {idx < ganttRows.length - 1 && (
+                                    <div className="w-full h-px bg-slate-200 dark:bg-slate-700" />
+                                )}
+                            </React.Fragment>
                         ))}
 
                         {/* Separator between Assembly and Assistance sections */}
@@ -957,11 +1007,11 @@ const AssemblyScheduler: React.FC = () => {
                                         })}
                                     </div>
                                 </div>
-                            {/* Team separator */}
-                            {idx < assistanceRows.length - 1 && (
-                                <div className="w-full h-px bg-slate-200 dark:bg-slate-700" />
-                            )}
-                        </React.Fragment>
+                                {/* Team separator */}
+                                {idx < assistanceRows.length - 1 && (
+                                    <div className="w-full h-px bg-slate-200 dark:bg-slate-700" />
+                                )}
+                            </React.Fragment>
                         ))}
 
                         {ganttRows.every(r => r.events.length === 0) && assistanceRows.every(r => r.events.length === 0) && (
@@ -1016,6 +1066,53 @@ const AssemblyScheduler: React.FC = () => {
                                 </div>
                             ) : (
                                 queueBatches.map(({ batch, project }) => (
+                                    <QueueBatchCard
+                                        key={batch.id}
+                                        batch={batch}
+                                        project={project}
+                                        assemblyTeams={assemblyTeams}
+                                        workflowConfig={workflowConfig}
+                                        holidays={companySettings?.holidays}
+                                        canEdit={canEdit}
+                                        onOpenScheduleModal={handleOpenScheduleModal}
+                                    />
+                                ))
+                            )}
+                        </div>
+
+                        {/* ── Separator ────────────────────────────────────────────── */}
+                        <div className="mx-2 my-1 h-px bg-slate-200 dark:bg-slate-700" />
+
+                        {/* ── PÓS-MONTAGENS section ────────────────────────────────── */}
+                        <div className="sticky top-0 z-10 px-3 py-2 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1e2936]">
+                            <div className="flex items-center justify-between mb-1.5">
+                                <div className="flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-orange-600 text-sm">build_circle</span>
+                                    <h3 className="text-xs font-bold text-slate-700 dark:text-slate-200">Fila de Pós-Montagens</h3>
+                                </div>
+                                <span className="text-[10px] text-slate-400 font-medium">{relevantPostAssemblies.length} lotes</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                                {(['Todos', 'Sem Previsão', 'Previsto', 'Agendado', 'Concluído'] as const).map(f => (
+                                    <button
+                                        key={f}
+                                        onClick={() => setPostAssemblyFilter(f)}
+                                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors ${postAssemblyFilter === f ? 'bg-orange-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+                                    >
+                                        {f}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="p-2 space-y-2">
+                            {filteredPostAssemblies.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-8 text-center">
+                                    <span className="material-symbols-outlined text-slate-300 dark:text-slate-600 text-4xl mb-2">build_circle</span>
+                                    <p className="text-xs text-slate-400">Nenhuma pós-montagem neste filtro</p>
+                                </div>
+                            ) : (
+                                filteredPostAssemblies.map(({ batch, project }) => (
                                     <QueueBatchCard
                                         key={batch.id}
                                         batch={batch}

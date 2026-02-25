@@ -139,6 +139,7 @@ const ClientList: React.FC = () => {
               <tr>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Cliente</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Contato</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Vendedor</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Etapa Atual</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Ambientes</th>
@@ -154,6 +155,35 @@ const ClientList: React.FC = () => {
                 const projectBatches = batches.filter(b => b.projectId === project.id);
                 const phase = projectBatches.length > 0 ? projectBatches[0].phase : '1.1';
                 const currentStep = workflowConfig[phase];
+
+                let maxStage = 0;
+                if (projectBatches.length > 0) {
+                  maxStage = Math.max(...projectBatches.map(b => {
+                    const configStage = workflowConfig[b.phase]?.stage;
+                    if (configStage !== undefined) return configStage;
+                    const fallbackStage = Math.floor(parseFloat(b.phase));
+                    return isNaN(fallbackStage) ? 1 : fallbackStage;
+                  }));
+                } else {
+                  maxStage = 1;
+                }
+
+                let displayStatus = project.client.status;
+                let statusColor = 'bg-slate-100 text-slate-600';
+
+                if (project.client.status === 'Perdido') {
+                  displayStatus = 'Perdido';
+                  statusColor = 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400';
+                } else if (project.client.status === 'Concluido') {
+                  displayStatus = 'Concluído';
+                  statusColor = 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400';
+                } else if (maxStage > 2) {
+                  displayStatus = 'Em Andamento';
+                  statusColor = 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400';
+                } else {
+                  displayStatus = 'Ativo';
+                  statusColor = 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400';
+                }
 
                 return (
                   <tr key={project.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
@@ -173,8 +203,13 @@ const ClientList: React.FC = () => {
                       <p className="text-xs text-slate-400">{project.client.phone}</p>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${project.client.status === 'Ativo' ? 'bg-green-100 text-green-700' : project.client.status === 'Perdido' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'}`}>
-                        {project.client.status}
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded">
+                        {project.sellerName || 'N/A'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${statusColor}`}>
+                        {displayStatus}
                       </span>
                     </td>
                     <td className="px-6 py-4">

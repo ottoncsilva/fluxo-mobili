@@ -39,7 +39,9 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
         deleteProject,
         getBranchingOptions,
         canUserEditClient,
-        canUserDeleteClient
+        canUserDeleteClient,
+        addEnvironment,
+        removeEnvironment
     } = useProjects();
     const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'ENVIRONMENTS' | 'BRIEFING' | 'TIMELINE'>('OVERVIEW'); // Changed 'ITPP' to 'BRIEFING'
     const [noteContent, setNoteContent] = useState('');
@@ -49,6 +51,7 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
 
     // Edit Client Modal
     const [isEditClientOpen, setIsEditClientOpen] = useState(false);
+    const [isEditingSeller, setIsEditingSeller] = useState(false);
     const [editClientForm, setEditClientForm] = useState<{ name: string, email: string, phone: string, address: string, condominium: string, cpf: string, rg: string, cod_efinance?: string, origin: string, consultant_name: string, sellerId: string }>({
         name: '', email: '', phone: '', address: '', condominium: '', cpf: '', rg: '', cod_efinance: '', origin: '', consultant_name: '', sellerId: ''
     });
@@ -311,6 +314,8 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
     // Helper to check if current user can edit client data
     const isContractLocked = project.contractSigned || project.client.status === 'Concluido';
     const canEditClientData = !isContractLocked && canUserEditClient();
+    const isAdminOrOwner = currentUser?.role === 'Admin' || currentUser?.role === 'Proprietario';
+    const canEditEnvironments = !isContractLocked || isAdminOrOwner;
     const canChangeSeller = permissions.find((p: { role: Role }) => p.role === currentUser?.role)?.canChangeSeller || false;
     const canDeleteProject = canUserDeleteClient();
 
@@ -336,8 +341,36 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                         <p className="text-sm text-slate-500 flex flex-wrap items-center gap-4 mt-1">
                             <span className="flex items-center gap-1"><span className="material-symbols-outlined text-sm">mail</span> {project.client.email}</span>
                             <span className="flex items-center gap-1"><span className="material-symbols-outlined text-sm">phone</span> {project.client.phone}</span>
-                            {project.sellerName && (
-                                <span className="flex items-center gap-1"><span className="material-symbols-outlined text-sm">person</span> {project.sellerName}</span>
+                            {isEditingSeller ? (
+                                <select
+                                    autoFocus
+                                    className="text-xs border-slate-300 dark:border-slate-700 dark:bg-slate-800 rounded px-2 py-1 focus:ring-primary focus:border-primary ml-2"
+                                    value={project.sellerId || ''}
+                                    onChange={(e) => {
+                                        const newSellerId = e.target.value;
+                                        if (newSellerId && newSellerId !== project.sellerId) {
+                                            const newSellerName = allUsers.find((u: User) => u.id === newSellerId)?.name || 'Vendedor';
+                                            updateProjectSeller(project.id, newSellerId, newSellerName);
+                                        }
+                                        setIsEditingSeller(false);
+                                    }}
+                                    onBlur={() => setIsEditingSeller(false)}
+                                    title="Pressione Esc para cancelar"
+                                >
+                                    <option value="" disabled>Selecione o vendedor...</option>
+                                    {allUsers.filter((u: User) => u.role !== 'Montador' && u.role !== 'Projetista').map((u: User) => (
+                                        <option key={u.id} value={u.id}>{u.name}</option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <span className="flex items-center gap-1 group">
+                                    <span className="material-symbols-outlined text-sm">person</span> {project.sellerName || 'N/A'}
+                                    {canChangeSeller && (
+                                        <button onClick={() => setIsEditingSeller(true)} className="opacity-0 group-hover:opacity-100 transition-opacity text-primary hover:text-primary-dark ml-1 flex items-center" title="Alterar Vendedor">
+                                            <span className="material-symbols-outlined text-[14px]">edit</span>
+                                        </button>
+                                    )}
+                                </span>
                             )}
                         </p>
                     </div>
@@ -612,6 +645,9 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                     <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Valor Atual (R$)</th>
                                     <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Versão</th>
                                     <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Histórico</th>
+                                    {canEditEnvironments && (
+                                        <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase text-right">Ações</th>
+                                    )}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -624,7 +660,7 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                                 type="number"
                                                 value={env.estimated_value || ''}
                                                 onChange={(e) => updateEnvironmentDetails(project.id, env.id, { estimated_value: Number(e.target.value) })}
-                                                disabled={!canEditClientData}
+                                                disabled={!canEditEnvironments}
                                                 className="bg-transparent border border-slate-200 dark:border-slate-700 rounded px-2 py-1 text-sm font-mono text-slate-700 dark:text-slate-300 w-32 focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-50"
                                                 placeholder="0.00"
                                             />
@@ -651,6 +687,21 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                                 <span className="text-xs text-slate-400 italic">—</span>
                                             )}
                                         </td>
+                                        {canEditEnvironments && (
+                                            <td className="px-6 py-4 text-right">
+                                                <button
+                                                    onClick={() => {
+                                                        if (confirm(`Tem certeza que deseja excluir o ambiente "${env.name}"?`)) {
+                                                            removeEnvironment(project.id, env.id);
+                                                        }
+                                                    }}
+                                                    className="p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded transition-colors"
+                                                    title="Excluir Ambiente"
+                                                >
+                                                    <span className="material-symbols-outlined text-sm">delete</span>
+                                                </button>
+                                            </td>
+                                        )}
                                     </tr>
                                 ))}
                             </tbody>
@@ -665,6 +716,22 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                 </tr>
                             </tfoot>
                         </table>
+                        {canEditEnvironments && (
+                            <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#1a2632] flex justify-end">
+                                <button
+                                    onClick={() => {
+                                        const name = prompt('Nome do novo ambiente:');
+                                        if (name && name.trim()) {
+                                            addEnvironment(project.id, name.trim());
+                                        }
+                                    }}
+                                    className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold shadow-lg hover:bg-primary/90 transition-colors flex items-center gap-2"
+                                >
+                                    <span className="material-symbols-outlined text-sm">add</span>
+                                    Novo Ambiente
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
 

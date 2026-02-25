@@ -408,7 +408,7 @@ const AppContent: React.FC = () => {
         </header>
 
         {/* Content - add bottom padding on mobile for the bottom nav + safe area */}
-        <div className="flex-1 overflow-hidden relative content-bottom-nav md:pb-0">
+        <div className="flex-1 overflow-hidden relative content-bottom-nav md:pb-0 flex flex-col min-h-0">
           {renderContent()}
         </div>
       </div>

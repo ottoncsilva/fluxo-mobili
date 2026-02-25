@@ -76,6 +76,8 @@ interface ProjectContextType {
     setCurrentProjectId: (id: string | null) => void;
     updateEnvironmentStatus: (projectId: string, envId: string, status: Environment['status']) => void;
     updateEnvironmentDetails: (projectId: string, envId: string, updates: Partial<Environment>) => void;
+    addEnvironment: (projectId: string, name: string) => void;
+    removeEnvironment: (projectId: string, envId: string) => void;
     updateClientData: (projectId: string, updates: Partial<Client>, noteMessage?: string | null) => void;
     updateProjectBriefing: (projectId: string, updates: Partial<Client>) => void;
     formalizeContract: (projectId: string, finalEnvironments: Environment[], contractValue: number, contractDate: string) => void;
@@ -976,12 +978,11 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
         const projectBatchesCount = batches.filter(b => b.projectId === originalBatch.projectId).length;
 
-        let newName = `Lote ${projectBatchesCount + 1}`;
-        let originalNameUpdate = originalBatch.name;
+        let newName = `Lote ${projectBatchesCount}`;
+        let originalNameUpdate = 'Lote Restante';
 
-        if (originalBatch.name === 'Projeto Completo' || originalBatch.name === 'Projeto Geral') {
-            originalNameUpdate = 'Lote 1';
-            newName = 'Lote 2';
+        if (projectBatchesCount === 1) {
+            newName = 'Lote 1';
         }
 
         const newBatch: Batch = {
@@ -1042,6 +1043,63 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         } else {
             setAllProjects(prev => prev.map(p => p.id !== projectId ? p : { ...p, environments: newEnvs }));
         }
+    };
+
+    const addEnvironment = (projectId: string, name: string) => {
+        const project = allProjects.find(p => p.id === projectId);
+        if (!project) return;
+
+        const newEnv: Environment = {
+            id: `env-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            name,
+            status: 'Projetando',
+            version: 1,
+            valueHistory: []
+        };
+        const newEnvs = [...project.environments, newEnv];
+
+        if (useCloud) {
+            persist("projects", projectId, { environments: newEnvs });
+        } else {
+            setAllProjects(prev => prev.map(p => p.id !== projectId ? p : { ...p, environments: newEnvs }));
+        }
+        
+        const projectBatches = allBatches.filter(b => b.projectId === projectId);
+        if (projectBatches.length > 0) {
+            const mainBatch = projectBatches.find(b => b.name === 'Projeto Completo' || b.name === 'Lote Restante') || projectBatches[0];
+            const updatedBatch = {
+                ...mainBatch,
+                environmentIds: [...(mainBatch.environmentIds || []), newEnv.id]
+            };
+            if (useCloud && db) {
+                updateDoc(doc(db, "batches", mainBatch.id), { environmentIds: updatedBatch.environmentIds });
+            } else {
+                setAllBatches(prev => prev.map(b => b.id !== mainBatch.id ? b : updatedBatch));
+            }
+        }
+    };
+
+    const removeEnvironment = (projectId: string, envId: string) => {
+        const project = allProjects.find(p => p.id === projectId);
+        if (!project) return;
+
+        const newEnvs = project.environments.filter(e => e.id !== envId);
+
+        if (useCloud) {
+            persist("projects", projectId, { environments: newEnvs });
+        } else {
+            setAllProjects(prev => prev.map(p => p.id !== projectId ? p : { ...p, environments: newEnvs }));
+        }
+
+        const projectBatches = allBatches.filter(b => b.projectId === projectId && (b.environmentIds || []).includes(envId));
+        projectBatches.forEach(b => {
+            const newEnvIds = (b.environmentIds || []).filter(id => id !== envId);
+            if (useCloud && db) {
+                updateDoc(doc(db, "batches", b.id), { environmentIds: newEnvIds });
+            } else {
+                setAllBatches(prev => prev.map(pb => pb.id !== b.id ? pb : { ...pb, environmentIds: newEnvIds }));
+            }
+        });
     };
 
     const updateClientData = (projectId: string, updates: Partial<Client>, noteMessage?: string | null) => {
@@ -1642,7 +1700,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             addAssistanceStep, updateAssistanceStep, deleteAssistanceStep, reorderAssistanceSteps,
 
             addProject, deleteProject, advanceBatch, moveBatchToStep, markProjectAsLost, reactivateProject, isLastStep, splitBatch, getProjectById, addNote, updateWorkflowSla, setCurrentProjectId, updateEnvironmentStatus, requestFactoryPart,
-            updateEnvironmentDetails, updateClientData, updateProjectBriefing, formalizeContract, updateProjectSeller, updateProjectPostAssembly, updateProjectPostAssemblyItems,
+            updateEnvironmentDetails, addEnvironment, removeEnvironment, updateClientData, updateProjectBriefing, formalizeContract, updateProjectSeller, updateProjectPostAssembly, updateProjectPostAssemblyItems,
             addAssistanceTicket, updateAssistanceTicket, deleteAssistanceTicket,
             canUserAdvanceStep, canUserViewStage, canUserEditAssistance, canUserDeleteAssistance,
             canUserViewAssembly, canUserEditAssembly,
