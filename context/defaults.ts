@@ -1,7 +1,7 @@
 // context/defaults.ts
 // Constantes e dados iniciais extraídos do ProjectContext para facilitar manutenção.
 
-import { WorkflowStep, AssistanceWorkflowStep, CompanySettings, Store, User, Client, Project, Batch, PermissionConfig, ClientWhatsAppTemplate, TeamSlaTemplate } from '../types';
+import { WorkflowStep, AssistanceWorkflowStep, CompanySettings, Store, User, Client, Project, Batch, PermissionConfig } from '../types';
 
 // ─── Workflow Principal ────────────────────────────────────────────────────────
 
@@ -98,51 +98,60 @@ export const DEFAULT_COMPANY_SETTINGS: CompanySettings = {
     corporateName: 'Fluxo Modelo Ltda',
     address: 'Av. Moveleira, 1000',
     phone: '(11) 99999-9999',
-    socialMedia: '@fluxomodelo'
+    socialMedia: '@fluxomodelo',
+    evolutionApi: {
+        instanceUrl: 'https://evolutionapi.digicasa.com.br/',
+        token: '',
+        globalEnabled: false,
+        settings: {
+            stageChange: { enabled: true, notifyClient: true, notifySeller: true, notifyManager: true },
+            newObservation: { enabled: true, notifySeller: true, notifyManager: true },
+            assistanceUpdate: { enabled: true, notifyClient: true, notifySeller: true, notifyManager: true },
+            postAssemblyUpdate: { enabled: true, notifyClient: true, notifySeller: true, notifyManager: true },
+            slaAlert: { enabled: true, notifySeller: true, notifyManager: true, preventive: true }
+        }
+    },
+    whatsappClientTemplates: [
+        { stepId: '3.1', label: 'Avaliação para Medição', message: 'Olá {nomeCliente}! Recebemos seu projeto para avaliação de medição. Em breve agendaremos a visita técnica.', enabled: false },
+        { stepId: '3.2', label: 'Medição', message: 'Olá {nomeCliente}! A medição do seu ambiente foi realizada com sucesso! Agora seu projeto segue para a fase de engenharia.', enabled: true },
+        { stepId: '4.1', label: 'Construção de Mobiliário', message: 'Olá {nomeCliente}! Seu projeto está na fase de construção do mobiliário em nosso sistema.', enabled: false },
+        { stepId: '4.2', label: 'Conferência Técnica', message: 'Olá {nomeCliente}! Seu projeto está em conferência técnica pela nossa equipe de engenharia.', enabled: false },
+        { stepId: '4.3', label: 'Aprovação Financeira', message: 'Olá {nomeCliente}! Seu projeto está em fase de aprovação financeira.', enabled: false },
+        { stepId: '4.4', label: 'Detalhamento Executivo', message: 'Olá {nomeCliente}! Seu projeto está em detalhamento executivo. Estamos finalizando os últimos ajustes!', enabled: false },
+        { stepId: '4.5', label: 'Aprovação do Executivo', message: 'Olá {nomeCliente}! O detalhamento executivo do seu projeto foi aprovado!', enabled: false },
+        { stepId: '4.6', label: 'Solicitação de Correção', message: 'Olá {nomeCliente}! Identificamos um ajuste necessário no seu projeto. Estamos corrigindo.', enabled: false },
+        { stepId: '5.1', label: 'Pedido à Fábrica', message: 'Olá {nomeCliente}! Seu pedido foi enviado para a fábrica e está em produção! Prazo estimado: {prazo} dias úteis.', enabled: true },
+        { stepId: '5.2', label: 'Pagamento à Fábrica', message: 'Olá {nomeCliente}! O pagamento à fábrica foi confirmado. Seu pedido está garantido na produção.', enabled: false },
+        { stepId: '6.1', label: 'Conferir Pedido', message: 'Olá {nomeCliente}! Seu pedido chegou da fábrica e está sendo conferido pela nossa equipe.', enabled: true },
+        { stepId: '6.2', label: 'Agendar Carreto', message: 'Olá {nomeCliente}! Estamos agendando o transporte do seu mobiliário.', enabled: false },
+        { stepId: '6.3', label: 'Entrega', message: 'Olá {nomeCliente}! Seu mobiliário foi entregue! Agora vamos agendar a montagem.', enabled: true },
+        { stepId: 'assembly_scheduled', label: 'Montagem Agendada', message: 'Olá {nomeCliente}! Sua montagem foi agendada para {data}. Nossa equipe estará no local. Qualquer dúvida estamos à disposição!', enabled: true },
+        { stepId: '7.1', label: 'Montagem', message: 'Olá {nomeCliente}! A montagem do seu mobiliário está em andamento! Nossa equipe está trabalhando no local.', enabled: true },
+        { stepId: '7.2', label: 'Vistoria Montagem', message: 'Olá {nomeCliente}! A vistoria da montagem foi realizada com sucesso.', enabled: true },
+        { stepId: '8.1', label: 'Levantamento (Pós)', message: 'Olá {nomeCliente}! Registramos uma necessidade de pós-montagem no seu projeto. Estamos trabalhando nisso.', enabled: false },
+        { stepId: '8.2', label: 'Solicitação Pós Montagem', message: 'Olá {nomeCliente}! Sua solicitação de pós-montagem está sendo processada.', enabled: false },
+        { stepId: '8.3', label: 'Aprovação Financeira Pós', message: 'Olá {nomeCliente}! A parte financeira da sua pós-montagem foi aprovada.', enabled: false },
+        { stepId: '8.4', label: 'Fabricação Pós Montagem', message: 'Olá {nomeCliente}! As peças da pós-montagem estão em fabricação.', enabled: false },
+        { stepId: '8.5', label: 'Transporte Pós Montagem', message: 'Olá {nomeCliente}! As peças da pós-montagem estão em transporte.', enabled: false },
+        { stepId: '8.6', label: 'Pós Montagem', message: 'Olá {nomeCliente}! A equipe está realizando a pós-montagem no seu ambiente.', enabled: true },
+        { stepId: '8.7', label: 'Vistoria Pós Montagem', message: 'Olá {nomeCliente}! A vistoria da pós-montagem foi concluída!', enabled: false },
+        { stepId: '8.8', label: 'Concluído (Pós)', message: 'Olá {nomeCliente}! Sua pós-montagem foi finalizada com sucesso!', enabled: true },
+        { stepId: '9.0', label: 'Projeto Entregue', message: 'Olá {nomeCliente}! Seu projeto foi concluído com sucesso! Foi um prazer atendê-lo. Agradecemos a confiança!', enabled: true },
+        { stepId: '10.1', label: 'Assistência - Levantamento', message: 'Olá {nomeCliente}! Sua assistência técnica {codigoAss} foi registrada. Nossa equipe está analisando.', enabled: true },
+        { stepId: '10.2', label: 'Solicitação de Assistência', message: 'Olá {nomeCliente}! Sua assistência técnica {codigoAss} está sendo processada.', enabled: false },
+        { stepId: '10.3', label: 'Aprovação Financeira Assist.', message: 'Olá {nomeCliente}! A parte financeira da assistência técnica {codigoAss} foi aprovada.', enabled: false },
+        { stepId: '10.4', label: 'Fabricação Assistência', message: 'Olá {nomeCliente}! As peças da assistência técnica {codigoAss} estão em fabricação.', enabled: false },
+        { stepId: '10.5', label: 'Transporte Assistência', message: 'Olá {nomeCliente}! As peças da assistência técnica {codigoAss} estão em transporte.', enabled: false },
+        { stepId: '10.6', label: 'Assistência Técnica', message: 'Olá {nomeCliente}! A equipe de assistência está realizando o serviço no seu ambiente.', enabled: false },
+        { stepId: '10.7', label: 'Vistoria Assistência', message: 'Olá {nomeCliente}! A vistoria da assistência técnica {codigoAss} foi concluída!', enabled: false },
+        { stepId: '10.8', label: 'Assistência Concluída', message: 'Olá {nomeCliente}! Sua assistência técnica {codigoAss} foi finalizada com sucesso!', enabled: true },
+    ],
+    whatsappTeamTemplates: [
+        { type: 'sla_d1', label: 'SLA vence amanhã (D-1)', message: '{nomeResponsavel}, o projeto {nomeProjeto} ({nomeCliente}) vence o SLA amanhã na etapa {etapa}. Acesse o sistema!', enabled: true },
+        { type: 'sla_d0', label: 'SLA vence hoje (D-0)', message: 'URGENTE {nomeResponsavel}! Projeto {nomeProjeto} ({nomeCliente}) vence SLA HOJE na etapa {etapa}. Ação imediata!', enabled: true },
+    ],
+    whatsappLogs: [],
 };
-
-// ─── Templates de WhatsApp Padrão ────────────────────────────────────────────
-
-export const DEFAULT_CLIENT_TEMPLATES: ClientWhatsAppTemplate[] = [
-    { stepId: '3.1', label: 'Avaliação para Medição', message: 'Olá {nomeCliente}! Recebemos seu projeto para avaliação de medição. Em breve agendaremos a visita técnica.', enabled: false },
-    { stepId: '3.2', label: 'Medição', message: 'Olá {nomeCliente}! A medição do seu ambiente foi realizada com sucesso! Agora seu projeto segue para a fase de engenharia.', enabled: true },
-    { stepId: '4.1', label: 'Construção de Mobiliário', message: 'Olá {nomeCliente}! Seu projeto está na fase de construção do mobiliário em nosso sistema.', enabled: false },
-    { stepId: '4.2', label: 'Conferência Técnica', message: 'Olá {nomeCliente}! Seu projeto está em conferência técnica pela nossa equipe de engenharia.', enabled: false },
-    { stepId: '4.3', label: 'Aprovação Financeira', message: 'Olá {nomeCliente}! Seu projeto está em fase de aprovação financeira.', enabled: false },
-    { stepId: '4.4', label: 'Detalhamento Executivo', message: 'Olá {nomeCliente}! Seu projeto está em detalhamento executivo. Estamos finalizando os últimos ajustes!', enabled: false },
-    { stepId: '4.5', label: 'Aprovação do Executivo', message: 'Olá {nomeCliente}! O detalhamento executivo do seu projeto foi aprovado!', enabled: false },
-    { stepId: '4.6', label: 'Solicitação de Correção', message: 'Olá {nomeCliente}! Identificamos um ajuste necessário no seu projeto. Estamos corrigindo.', enabled: false },
-    { stepId: '5.1', label: 'Pedido à Fábrica', message: 'Olá {nomeCliente}! Seu pedido foi enviado para a fábrica e está em produção! Prazo estimado: {prazo} dias úteis.', enabled: true },
-    { stepId: '5.2', label: 'Pagamento à Fábrica', message: 'Olá {nomeCliente}! O pagamento à fábrica foi confirmado. Seu pedido está garantido na produção.', enabled: false },
-    { stepId: '6.1', label: 'Conferir Pedido', message: 'Olá {nomeCliente}! Seu pedido chegou da fábrica e está sendo conferido pela nossa equipe.', enabled: true },
-    { stepId: '6.2', label: 'Agendar Carreto', message: 'Olá {nomeCliente}! Estamos agendando o transporte do seu mobiliário.', enabled: false },
-    { stepId: '6.3', label: 'Entrega', message: 'Olá {nomeCliente}! Seu mobiliário foi entregue! Agora vamos agendar a montagem.', enabled: true },
-    { stepId: 'assembly_scheduled', label: 'Montagem Agendada', message: 'Olá {nomeCliente}! Sua montagem foi agendada para {data}. Nossa equipe estará no local. Qualquer dúvida estamos à disposição!', enabled: true },
-    { stepId: '7.1', label: 'Montagem', message: 'Olá {nomeCliente}! A montagem do seu mobiliário está em andamento! Nossa equipe está trabalhando no local.', enabled: true },
-    { stepId: '7.2', label: 'Vistoria Montagem', message: 'Olá {nomeCliente}! A vistoria da montagem foi realizada com sucesso.', enabled: true },
-    { stepId: '8.1', label: 'Levantamento (Pós)', message: 'Olá {nomeCliente}! Registramos uma necessidade de pós-montagem no seu projeto. Estamos trabalhando nisso.', enabled: false },
-    { stepId: '8.2', label: 'Solicitação Pós Montagem', message: 'Olá {nomeCliente}! Sua solicitação de pós-montagem está sendo processada.', enabled: false },
-    { stepId: '8.3', label: 'Aprovação Financeira Pós', message: 'Olá {nomeCliente}! A parte financeira da sua pós-montagem foi aprovada.', enabled: false },
-    { stepId: '8.4', label: 'Fabricação Pós Montagem', message: 'Olá {nomeCliente}! As peças da pós-montagem estão em fabricação.', enabled: false },
-    { stepId: '8.5', label: 'Transporte Pós Montagem', message: 'Olá {nomeCliente}! As peças da pós-montagem estão em transporte.', enabled: false },
-    { stepId: '8.6', label: 'Pós Montagem', message: 'Olá {nomeCliente}! A equipe está realizando a pós-montagem no seu ambiente.', enabled: true },
-    { stepId: '8.7', label: 'Vistoria Pós Montagem', message: 'Olá {nomeCliente}! A vistoria da pós-montagem foi concluída!', enabled: false },
-    { stepId: '8.8', label: 'Concluído (Pós)', message: 'Olá {nomeCliente}! Sua pós-montagem foi finalizada com sucesso!', enabled: true },
-    { stepId: '9.0', label: 'Projeto Entregue', message: 'Olá {nomeCliente}! Seu projeto foi concluído com sucesso! Foi um prazer atendê-lo. Agradecemos a confiança!', enabled: true },
-    { stepId: '10.1', label: 'Assistência - Levantamento', message: 'Olá {nomeCliente}! Sua assistência técnica {codigoAss} foi registrada. Nossa equipe está analisando.', enabled: true },
-    { stepId: '10.2', label: 'Solicitação de Assistência', message: 'Olá {nomeCliente}! Sua assistência técnica {codigoAss} está sendo processada.', enabled: false },
-    { stepId: '10.3', label: 'Aprovação Financeira Assist.', message: 'Olá {nomeCliente}! A parte financeira da assistência técnica {codigoAss} foi aprovada.', enabled: false },
-    { stepId: '10.4', label: 'Fabricação Assistência', message: 'Olá {nomeCliente}! As peças da assistência técnica {codigoAss} estão em fabricação.', enabled: false },
-    { stepId: '10.5', label: 'Transporte Assistência', message: 'Olá {nomeCliente}! As peças da assistência técnica {codigoAss} estão em transporte.', enabled: false },
-    { stepId: '10.6', label: 'Assistência Técnica', message: 'Olá {nomeCliente}! A equipe de assistência está realizando o serviço no seu ambiente.', enabled: false },
-    { stepId: '10.7', label: 'Vistoria Assistência', message: 'Olá {nomeCliente}! A vistoria da assistência técnica {codigoAss} foi concluída!', enabled: false },
-    { stepId: '10.8', label: 'Assistência Concluída', message: 'Olá {nomeCliente}! Sua assistência técnica {codigoAss} foi finalizada com sucesso!', enabled: true },
-];
-
-export const DEFAULT_TEAM_TEMPLATES: TeamSlaTemplate[] = [
-    { type: 'sla_d1', label: 'SLA vence amanhã (D-1)', message: '{nomeResponsavel}, o projeto {nomeProjeto} ({nomeCliente}) vence o SLA amanhã na etapa {etapa}. Acesse o sistema!', enabled: true },
-    { type: 'sla_d0', label: 'SLA vence hoje (D-0)', message: 'URGENTE {nomeResponsavel}! Projeto {nomeProjeto} ({nomeCliente}) vence SLA HOJE na etapa {etapa}. Ação imediata!', enabled: true },
-];
 
 export const DEFAULT_ORIGINS: string[] = [
     'Captação (Vendedor)',

@@ -55,9 +55,16 @@ export interface CompanySettings {
   evolutionApi?: {
     instanceUrl: string;
     token: string;
-    notifyLead: boolean;
-    notifyStatus: boolean;
-    notifySla: boolean;
+    instanceName?: string;
+    globalEnabled: boolean;
+    // Message Types & Recipients
+    settings: {
+      stageChange: { enabled: boolean; notifyClient: boolean; notifySeller: boolean; notifyManager: boolean; };
+      newObservation: { enabled: boolean; notifySeller: boolean; notifyManager: boolean; };
+      assistanceUpdate: { enabled: boolean; notifyClient: boolean; notifySeller: boolean; notifyManager: boolean; };
+      postAssemblyUpdate: { enabled: boolean; notifyClient: boolean; notifySeller: boolean; notifyManager: boolean; };
+      slaAlert: { enabled: boolean; notifySeller: boolean; notifyManager: boolean; preventive: boolean; };
+    };
   };
   whatsappClientTemplates?: ClientWhatsAppTemplate[];
   whatsappTeamTemplates?: TeamSlaTemplate[];
@@ -248,7 +255,8 @@ export interface Batch {
   status: 'Active' | 'Completed' | 'Lost' | 'Archived';
   createdAt?: string; // Date
   lastUpdated: string; // Date
-  slaNotificationSent?: boolean; // New flag for SLA
+  slaNotificationSent?: boolean; // New flag for SLA (Corrective)
+  slaPreventiveSent?: boolean; // New flag for SLA (Preventive)
   // Assembly Scheduling
   assemblySchedule?: AssemblySchedule;
   phase45CompletedAt?: string; // ISO date: when step 4.5 was completed
@@ -396,4 +404,3 @@ export interface KanbanColumn {
   id: number;
   title: string;
   cards: KanbanCard[];
-}

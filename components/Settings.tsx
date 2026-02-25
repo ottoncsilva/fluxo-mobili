@@ -4,6 +4,69 @@ import { useAgenda } from '../context/AgendaContext';
 import { Role, User, PermissionConfig, AssistanceStatus, WorkflowStep, AssistanceWorkflowStep, ClientWhatsAppTemplate, TeamSlaTemplate, WhatsAppLog } from '../types';
 import { DEFAULT_CLIENT_TEMPLATES, DEFAULT_TEAM_TEMPLATES } from '../context/defaults';
 
+interface RuleSettings {
+    enabled: boolean;
+    notifyClient?: boolean;
+    notifySeller: boolean;
+    notifyManager: boolean;
+    preventive?: boolean;
+}
+
+function CommunicationRule({ label, description, settings, onChange, allowClient, isSla }: {
+    label: string;
+    description: string;
+    settings: RuleSettings;
+    onChange: (settings: RuleSettings) => void;
+    allowClient?: boolean;
+    isSla?: boolean;
+}) {
+    if (!settings) return null;
+
+    const toggle = (field: keyof RuleSettings) => {
+        onChange({ ...settings, [field]: !settings[field] });
+    };
+
+    return (
+        <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h4 className="font-bold text-slate-800 dark:text-white text-sm">{label}</h4>
+                    <p className="text-xs text-slate-500">{description}</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" checked={settings.enabled} onChange={() => toggle('enabled')} className="sr-only peer" />
+                    <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                </label>
+            </div>
+
+            {settings.enabled && (
+                <div className="flex flex-wrap gap-4 pt-2 border-t border-slate-200 dark:border-slate-800">
+                    {allowClient && (
+                        <label className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-400 cursor-pointer">
+                            <input type="checkbox" checked={settings.notifyClient} onChange={() => toggle('notifyClient')} className="rounded text-primary focus:ring-primary h-4 w-4" />
+                            Cliente
+                        </label>
+                    )}
+                    <label className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-400 cursor-pointer">
+                        <input type="checkbox" checked={settings.notifySeller} onChange={() => toggle('notifySeller')} className="rounded text-primary focus:ring-primary h-4 w-4" />
+                        Vendedor
+                    </label>
+                    <label className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-400 cursor-pointer">
+                        <input type="checkbox" checked={settings.notifyManager} onChange={() => toggle('notifyManager')} className="rounded text-primary focus:ring-primary h-4 w-4" />
+                        Gerente/Adm
+                    </label>
+                    {isSla && (
+                        <label className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-400 cursor-pointer">
+                            <input type="checkbox" checked={settings.preventive} onChange={() => toggle('preventive')} className="rounded text-primary focus:ring-primary h-4 w-4" />
+                            Aviso Antecipado (24h)
+                        </label>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
 const Settings: React.FC = () => {
     const {
         users, addUser, updateUser, deleteUser,
@@ -101,11 +164,11 @@ const Settings: React.FC = () => {
         await updateCompanySettings({
             ...companySettings,
             evolutionApi: {
+                ...companySettings.evolutionApi,
                 instanceUrl: evoInstanceUrl,
                 token: evoToken,
-                notifyLead: evoNotifyLead,
-                notifyStatus: evoNotifyStatus,
-                notifySla: evoNotifySla
+                globalEnabled: evoGlobalEnabled,
+                settings: evoSettings,
             }
         });
         const success = await saveStoreConfig();
@@ -129,9 +192,14 @@ const Settings: React.FC = () => {
     // Evolution API State
     const [evoInstanceUrl, setEvoInstanceUrl] = useState(companySettings.evolutionApi?.instanceUrl || '');
     const [evoToken, setEvoToken] = useState(companySettings.evolutionApi?.token || '');
-    const [evoNotifyLead, setEvoNotifyLead] = useState(companySettings.evolutionApi?.notifyLead || false);
-    const [evoNotifyStatus, setEvoNotifyStatus] = useState(companySettings.evolutionApi?.notifyStatus || false);
-    const [evoNotifySla, setEvoNotifySla] = useState(companySettings.evolutionApi?.notifySla || false);
+    const [evoGlobalEnabled, setEvoGlobalEnabled] = useState(companySettings.evolutionApi?.globalEnabled ?? false);
+    const [evoSettings, setEvoSettings] = useState<any>(companySettings.evolutionApi?.settings || {
+        stageChange: { enabled: true, notifyClient: true, notifySeller: true, notifyManager: true },
+        newObservation: { enabled: true, notifySeller: true, notifyManager: true },
+        assistanceUpdate: { enabled: true, notifyClient: true, notifySeller: true, notifyManager: true },
+        postAssemblyUpdate: { enabled: true, notifyClient: true, notifySeller: true, notifyManager: true },
+        slaAlert: { enabled: true, notifySeller: true, notifyManager: true, preventive: true }
+    });
     const [testConnectionStatus, setTestConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
 
     // Communications State
@@ -155,11 +223,11 @@ const Settings: React.FC = () => {
         await updateCompanySettings({
             ...companySettings,
             evolutionApi: {
+                ...companySettings.evolutionApi,
                 instanceUrl: evoInstanceUrl,
                 token: evoToken,
-                notifyLead: evoNotifyLead,
-                notifyStatus: evoNotifyStatus,
-                notifySla: evoNotifySla,
+                globalEnabled: evoGlobalEnabled,
+                settings: evoSettings,
             },
             whatsappClientTemplates: clientTemplates,
             whatsappTeamTemplates: teamTemplates,
@@ -1110,20 +1178,13 @@ const Settings: React.FC = () => {
                                     </div>
 
                                     <div className="md:col-span-2">
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-4">Automações Ativas</label>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-4">Ativação Global</label>
                                         <div className="space-y-3">
                                             <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer">
-                                                <input type="checkbox" checked={evoNotifyStatus} onChange={e => setEvoNotifyStatus(e.target.checked)} className="rounded text-primary focus:ring-primary" />
+                                                <input type="checkbox" checked={evoGlobalEnabled} onChange={e => setEvoGlobalEnabled(e.target.checked)} className="rounded text-primary focus:ring-primary" />
                                                 <div>
-                                                    <p className="font-bold text-sm text-slate-700 dark:text-slate-200">Notificar Cliente sobre Mudança de Status</p>
-                                                    <p className="text-xs text-slate-400">Envia mensagem quando o projeto avança de etapa.</p>
-                                                </div>
-                                            </label>
-                                            <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer">
-                                                <input type="checkbox" checked={evoNotifyLead} onChange={e => setEvoNotifyLead(e.target.checked)} className="rounded text-primary focus:ring-primary" />
-                                                <div>
-                                                    <p className="font-bold text-sm text-slate-700 dark:text-slate-200">Notificar Vendedor sobre Novo Lead [Em Breve]</p>
-                                                    <p className="text-xs text-slate-400">Envia mensagem quando um novo projeto entra no funil.</p>
+                                                    <p className="font-bold text-sm text-slate-700 dark:text-slate-200">Ativar Notificações Globais (sistema legado)</p>
+                                                    <p className="text-xs text-slate-400">Quando ativo, notificações genéricas de categoria são disparadas. Para notificações por etapa configure na aba Comunicações.</p>
                                                 </div>
                                             </label>
                                         </div>
@@ -1731,4 +1792,3 @@ const Settings: React.FC = () => {
     );
 };
 
-export default Settings;

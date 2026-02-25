@@ -730,6 +730,12 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         } else {
             setAllProjects(prev => prev.map(p => p.id === projectId ? { ...p, notes: updatedNotes } : p));
         }
+
+        // Notify involved if manual note
+        if (authorId !== 'sys') {
+            const message = `📝 *Nova observação* no projeto de *${project.client.name}*\n\n"${content}"\n\n_Enviado por: ${author?.name || 'Vendedor'}_`;
+            notifyProjectInvolved(project, message, 'newObservation');
+        }
     };
 
     const isLastStep = (stepId: string) => {
@@ -848,11 +854,12 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             setAllBatches((prev: Batch[]) => prev.map(b => b.id !== batchId ? b : { ...b, ...updateData }));
         }
 
-        // Trigger WhatsApp notification via template system
+        // Trigger Notification
         const nextStep = workflowConfig[targetStepId];
         if (nextStep) {
             const project = allProjects.find(p => p.id === batch.projectId);
             if (project) {
+                notifyClientStatusChange(project, nextStep.label);
                 sendStepClientNotification(project, targetStepId);
             }
         }
@@ -914,10 +921,11 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             setAllBatches(prev => prev.map(b => b.id !== batchId ? b : { ...b, ...updateData }));
         }
 
-        // Trigger WhatsApp notification via template system
+        // Trigger Notification
         if (nextStep) {
             const project = allProjects.find(p => p.id === batch.projectId);
             if (project) {
+                notifyClientStatusChange(project, nextStep.label);
                 sendStepClientNotification(project, finalNextStepId);
             }
         }
@@ -1185,6 +1193,12 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         } else {
             setAllProjects(prev => prev.map(p => p.id === projectId ? { ...p, ...updates } : p));
         }
+
+        // Notification for Post-Assembly
+        if (data.startedAt || updates.postAssemblyCode) {
+            const message = `📋 *Pós-Montagem Iniciada*\n\nCliente: *${project.client.name}*\nCódigo: *${updates.postAssemblyCode || project.postAssemblyCode}*\nPrioridade: *${data.priority || project.postAssemblyPriority || 'Normal'}*`;
+            notifyProjectInvolved(project, message, 'postAssemblyUpdate');
+        }
     };
 
     // Assistance
@@ -1213,10 +1227,20 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         } else {
             setAssistanceTickets(prev => [...prev, newTicket]);
         }
+
+        // Notification for new Assistance Ticket
+        const message = `🛠️ *Novo Chamado de Assistência*\n\nCliente: *${ticketData.clientName}*\nCódigo: *${code}*\nPrioridade: *${ticketData.priority}*\n\nStatus Inicial: ${assistanceWorkflow.find(s => s.id === ticketData.status)?.label || ticketData.status}`;
+
+        // Find project to get phone/involved
+        const project = allProjects.find(p => p.client.id === ticketData.clientId);
+        if (project) {
+            notifyProjectInvolved(project, message, 'assistanceUpdate');
+        } else if (companySettings.phone) {
+            sendWhatsApp(companySettings.phone, message);
+        }
     };
 
     const updateAssistanceTicket = async (ticket: AssistanceTicket) => {
-        const oldTicket = assistanceTickets.find(t => t.id === ticket.id);
         const updatedTicket = { ...ticket, updatedAt: new Date().toISOString() };
         if (useCloud && db) {
             await setDoc(doc(db, "assistance_tickets", ticket.id), updatedTicket);
@@ -1224,13 +1248,16 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             setAssistanceTickets(prev => prev.map(t => t.id === ticket.id ? updatedTicket : t));
         }
 
-        // Send WhatsApp notification if status changed (10.x steps)
-        if (oldTicket && oldTicket.status !== ticket.status) {
-            const client = allProjects.find(p => p.client.id === ticket.clientId)?.client
-                ?? { name: ticket.clientName, phone: '' } as Client;
-            if (client.phone) {
-                const fakeProject = { client, sellerName: '', environments: [] } as unknown as Project;
-                sendStepClientNotification(fakeProject, ticket.status, { codigoAss: ticket.code || '' });
+        // Notification for Assistance Status Change
+        const originalTicket = assistanceTickets.find(t => t.id === ticket.id);
+        if (originalTicket && originalTicket.status !== ticket.status) {
+            const statusLabel = assistanceWorkflow.find(s => s.id === ticket.status)?.label || ticket.status;
+            const message = `🛠️ *Atualização Assistência - ${ticket.code}*\n\nO status do seu chamado foi alterado para: *${statusLabel}*`;
+
+            const project = allProjects.find(p => p.client.id === ticket.clientId);
+            if (project) {
+                notifyProjectInvolved(project, message, 'assistanceUpdate');
+                sendStepClientNotification(project, ticket.status, { codigoAss: ticket.code || '' });
             }
         }
     };
@@ -1412,7 +1439,46 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         return [];
     };
 
-    // Helper to send WhatsApp notifications using template system
+    // Helper to send notifications
+    const sendWhatsApp = async (phone: string | undefined, message: string) => {
+        if (!phone || !companySettings.evolutionApi?.instanceUrl || !companySettings.evolutionApi?.token || !companySettings.evolutionApi.globalEnabled) return;
+
+        const { EvolutionApi } = await import('../services/evolutionApi');
+        await EvolutionApi.sendText({
+            instanceUrl: companySettings.evolutionApi.instanceUrl,
+            token: companySettings.evolutionApi.token,
+            phone,
+            message
+        });
+    };
+
+    const notifyProjectInvolved = async (project: Project, message: string, type: keyof CompanySettings['evolutionApi']['settings']) => {
+        const evo = companySettings.evolutionApi;
+        if (!evo?.globalEnabled || !evo.settings[type]?.enabled) return;
+
+        const config = evo.settings[type];
+
+        // 1. Notify Client
+        if ('notifyClient' in config && config.notifyClient) {
+            await sendWhatsApp(project.client.phone, message);
+        }
+
+        // 2. Notify Seller
+        if (config.notifySeller && project.sellerId) {
+            const seller = allUsers.find((u: User) => u.id === project.sellerId);
+            if (seller?.phone) {
+                await sendWhatsApp(seller.phone, `[NOTIFICAÇÃO VENDEDOR]\n${message}`);
+            }
+        }
+
+        // 3. Notify Admins/Managers
+        if (config.notifyManager && companySettings.phone) {
+            await sendWhatsApp(companySettings.phone, `[GESTÃO]\n${message}`);
+        }
+    };
+
+
+    // Template-based per-step client notification (used alongside category-based system)
     const sendStepClientNotification = async (project: Project, stepId: string, extraVars?: Record<string, string>) => {
         const templates = companySettings.whatsappClientTemplates;
         if (!templates || !companySettings.evolutionApi?.instanceUrl) return;
@@ -1428,16 +1494,15 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         };
 
         const { log } = await sendClientNotification(stepId, project.client.phone, project.client.name, vars, companySettings);
-        if (log.success || log.phone) {
+        if (log.phone) {
             const updatedLogs = addWhatsAppLog(companySettings.whatsappLogs || [], log);
             updateCompanySettings({ ...companySettings, whatsappLogs: updatedLogs });
         }
     };
 
-    // Legacy compatibility — calls template-based system
     const notifyClientStatusChange = async (project: Project, newStepLabel: string) => {
-        // Kept for backward compatibility with moveBatchToStep
-        // The new system uses sendStepClientNotification with stepId
+        const message = `Olá ${project.client.name}, seu projeto *${project.environments.map(e => e.name).join(', ')}* mudou de status para: *${newStepLabel}*. \n\nAcompanhe o progresso com a gente! 🚀\n*${companySettings.name}*`;
+        await notifyProjectInvolved(project, message, 'stageChange');
     };
 
 
@@ -1457,97 +1522,112 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         });
     };
 
-    // --- SLA Checker with Template-Based WhatsApp Alerts (D-1 and D-0) ---
+    // --- SLA Checker Logic ---
     useEffect(() => {
-        if (typeof window === 'undefined') return;
+        if (typeof window === 'undefined') return; // Client-side only check
 
-        const checkSlaAlerts = async () => {
-            const teamTemplates = companySettings.whatsappTeamTemplates;
-            if (!teamTemplates || teamTemplates.every(t => !t.enabled)) return;
-            if (!companySettings.evolutionApi?.instanceUrl || !companySettings.evolutionApi?.token) return;
+        const checkSlaBreaches = async () => {
+            if (!companySettings.evolutionApi?.instanceUrl || !companySettings.evolutionApi.token) return;
+
+            // Iterate over batches to check for SLA violations
+            // We use a functional update pattern or just local checks to avoid infinite loops
+            // But here we might need to update the batch in DB/State if a notification is sent.
 
             const now = new Date();
-            const todayKey = now.toISOString().split('T')[0];
-            const { sendTeamSlaAlert, addWhatsAppLog } = await import('../services/communicationService');
-            let logsToAdd: import('../types').WhatsAppLog[] = [];
 
             for (const batch of allBatches) {
+                // Skip if already notified or if completed/lost
+                if (batch.slaNotificationSent) continue;
                 if (['9.0', '9.1'].includes(batch.phase)) continue;
-                if (batch.status !== 'Active') continue;
 
                 const step = workflowConfig[batch.phase];
-                if (!step || !step.sla) continue;
+                if (!step || !step.sla) continue; // No SLA for this step
 
                 const lastUpdate = new Date(batch.lastUpdated);
-                const deadlineMs = lastUpdate.getTime() + (step.sla * 24 * 60 * 60 * 1000);
-                const daysRemaining = Math.ceil((deadlineMs - now.getTime()) / (1000 * 3600 * 24));
+                const slaMs = step.sla * 24 * 60 * 60 * 1000;
+                const deadline = new Date(lastUpdate.getTime() + slaMs);
+                const timeLeftMs = deadline.getTime() - now.getTime();
 
-                let alertType: 'sla_d1' | 'sla_d0' | null = null;
-                if (daysRemaining === 1) alertType = 'sla_d1';
-                else if (daysRemaining <= 0) alertType = 'sla_d0';
-                if (!alertType) continue;
+                // 1. SLA BREACHED (Corrective)
+                if (now > deadline && !batch.slaNotificationSent) {
+                    console.log(`SLA Breach detected for Batch ${batch.name} (Project ${batch.projectId}) in step ${step.label}`);
 
-                // Anti-spam: check localStorage
-                const spamKey = `sla_notified_${batch.id}_${todayKey}_${alertType}`;
-                if (localStorage.getItem(spamKey)) continue;
+                    const project = allProjects.find(p => p.id === batch.projectId);
+                    if (!project) continue;
 
-                const project = allProjects.find(p => p.id === batch.projectId);
-                if (!project) continue;
+                    const message = `⚠️ *Alerta de Atraso (SLA)*\n\nO projeto *${project.client.name}* - *${batch.name}* está atrasado na etapa: *${step.label}*.\n\nPrazo era: ${deadline.toLocaleDateString()}\nStatus: ATRASADO`;
 
-                // Collect recipients: 1) ownerRole users, 2) seller, 3) managers/admins
-                const recipientIds = new Set<string>();
-                const recipients: { name: string; phone: string }[] = [];
+                    await notifyInvolvedSLA(batch, project, step, message);
 
-                const addRecipient = (user: User) => {
-                    if (recipientIds.has(user.id) || !user.phone) return;
-                    recipientIds.add(user.id);
-                    recipients.push({ name: user.name, phone: user.phone });
-                };
-
-                // 1. Users with ownerRole
-                allUsers.filter(u => u.storeId === batch.storeId && u.role === step.ownerRole).forEach(addRecipient);
-                // 2. Seller
-                if (project.sellerId) {
-                    const seller = allUsers.find(u => u.id === project.sellerId);
-                    if (seller) addRecipient(seller);
+                    const updateData = { slaNotificationSent: true };
+                    if (useCloud && db) persist("batches", batch.id, updateData);
+                    else setAllBatches((prev: Batch[]) => prev.map((b: Batch) => b.id === batch.id ? { ...b, ...updateData } : b));
                 }
-                // 3. Gerente / Admin / Proprietario
-                allUsers.filter(u => u.storeId === batch.storeId && ['Gerente', 'Admin', 'Proprietario'].includes(u.role)).forEach(addRecipient);
+                // 2. SLA PREVENTIVE (24h before)
+                else if (timeLeftMs > 0 && timeLeftMs < 24 * 60 * 60 * 1000 && !batch.slaPreventiveSent) {
+                    const project = allProjects.find((p: Project) => p.id === batch.projectId);
+                    if (!project) continue;
 
-                const vars = {
-                    nomeProjeto: batch.name || project.client.name,
-                    nomeCliente: project.client.name,
-                    etapa: step.label,
-                    diasRestantes: String(Math.max(daysRemaining, 0)),
-                };
+                    const message = `⏳ *Alerta Preventivo (SLA)*\n\nO projeto *${project.client.name}* vencerá em menos de 24h na etapa: *${step.label}*.\n\nPrazo: ${deadline.toLocaleString()}`;
 
-                for (const r of recipients) {
-                    const { log } = await sendTeamSlaAlert(alertType, r.phone, r.name, vars, companySettings);
-                    logsToAdd.push(log);
+                    await notifyInvolvedSLA(batch, project, step, message);
+
+                    const updateData = { slaPreventiveSent: true };
+                    if (useCloud && db) persist("batches", batch.id, updateData);
+                    else setAllBatches((prev: Batch[]) => prev.map((b: Batch) => b.id === batch.id ? { ...b, ...updateData } : b));
                 }
-
-                localStorage.setItem(spamKey, '1');
-            }
-
-            // Persist logs
-            if (logsToAdd.length > 0) {
-                let currentLogs = companySettings.whatsappLogs || [];
-                for (const l of logsToAdd) {
-                    currentLogs = addWhatsAppLog(currentLogs, l);
-                }
-                updateCompanySettings({ ...companySettings, whatsappLogs: currentLogs });
             }
         };
 
-        // Run every 30 minutes + on mount (with 5s delay)
-        const intervalId = setInterval(checkSlaAlerts, 30 * 60 * 1000);
-        const timeoutId = setTimeout(checkSlaAlerts, 5000);
+        const notifyInvolvedSLA = async (batch: Batch, project: Project, step: WorkflowStep, message: string) => {
+            const evo = companySettings.evolutionApi;
+            if (!evo?.globalEnabled || !evo.settings.slaAlert.enabled) return;
+
+            let targetUsers: User[] = [];
+
+            // Seller
+            if (step.ownerRole === 'Vendedor' && project.sellerId && evo.settings.slaAlert.notifySeller) {
+                const seller = allUsers.find((u: User) => u.id === project.sellerId);
+                if (seller) targetUsers.push(seller);
+            }
+
+            // Admins/Managers
+            if (evo.settings.slaAlert.notifyManager) {
+                const admins = allUsers.filter((u: User) => u.storeId === batch.storeId && ['Admin', 'Proprietario', 'Gerente'].includes(u.role));
+                targetUsers = [...targetUsers, ...admins];
+            }
+
+            // Remove duplicates
+            const uniqueTargetUsers = targetUsers.filter((u: User, index: number, self: User[]) => index === self.findIndex((t: User) => t.id === u.id));
+
+            for (const user of uniqueTargetUsers) {
+                if (user.phone) {
+                    await sendWhatsApp(user.phone, message);
+                }
+            }
+
+            // Also notify company phone if configured
+            if (companySettings.phone && evo.settings.slaAlert.notifyManager) {
+                await sendWhatsApp(companySettings.phone, `[GESTÃO-SLA]\n${message}`);
+            }
+        };
+
+        // Run check every 1 hour (3600000 ms) or just on mount/updates?
+        // If we only run on mount/dependency change, it runs whenever 'allBatches' changes (which includes the update we just made).
+        // To avoid rapid loops if something goes wrong, maybe we stick to a simplified check or use a ref to track last check?
+        // For now, let's trust 'slaNotificationSent' prevents loops.
+        // We also want to check periodically even if no data changes (e.g. time passes).
+        const intervalId = setInterval(checkSlaBreaches, 60 * 60 * 1000); // Check every hour
+
+        // Also run immediately on data change (debounced slightly?)
+        const timeoutId = setTimeout(checkSlaBreaches, 5000); // Run 5s after data load/change to let things settle
 
         return () => {
             clearInterval(intervalId);
             clearTimeout(timeoutId);
         };
-    }, [allBatches, allProjects, allUsers, workflowConfig, companySettings, useCloud]);
+
+    }, [allBatches, allProjects, allUsers, workflowConfig, companySettings, useCloud]); // Dependencies: if any of these change, re-run checks
 
 
     return (
@@ -1580,4 +1660,3 @@ export const useProjects = () => {
     const context = useContext(ProjectContext);
     if (!context) throw new Error('useProjects must be used within a ProjectProvider');
     return context;
-};
