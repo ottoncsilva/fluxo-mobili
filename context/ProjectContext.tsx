@@ -1452,11 +1452,13 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         });
     };
 
-    const notifyProjectInvolved = async (project: Project, message: string, type: keyof CompanySettings['evolutionApi']['settings']) => {
+    const notifyProjectInvolved = async (project: Project, message: string, type: string) => {
         const evo = companySettings.evolutionApi;
-        if (!evo?.globalEnabled || !evo.settings[type]?.enabled) return;
+        if (!evo?.globalEnabled || !evo.settings) return;
+        const settings = evo.settings as Record<string, any>;
+        if (!settings[type]?.enabled) return;
 
-        const config = evo.settings[type];
+        const config = settings[type];
 
         // 1. Notify Client
         if ('notifyClient' in config && config.notifyClient) {
@@ -1508,7 +1510,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     const notifySalesNewLead = async (client: Client) => {
         // Notify Sales (Company Phone) when a new lead is created
-        if (!companySettings.evolutionApi?.notifyLead || !companySettings.evolutionApi?.instanceUrl || !companySettings.phone) return;
+        if (!companySettings.evolutionApi?.globalEnabled || !companySettings.evolutionApi?.instanceUrl || !companySettings.phone) return;
 
         const message = `🔔 *Novo Lead Cadastrado*\n\n👤 Nome: ${client.name}\n📱 Telefone: ${client.phone}\n📍 Origem: ${client.origin || 'Não informado'}\n\nAcesse o sistema para mais detalhes.`;
 
@@ -1660,3 +1662,4 @@ export const useProjects = () => {
     const context = useContext(ProjectContext);
     if (!context) throw new Error('useProjects must be used within a ProjectProvider');
     return context;
+};

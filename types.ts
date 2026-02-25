@@ -404,3 +404,4 @@ export interface KanbanColumn {
   id: number;
   title: string;
   cards: KanbanCard[];
+}
