@@ -42,12 +42,12 @@ const KanbanBoard: React.FC = () => {
     const [filterSeller, setFilterSeller] = useState('');
     const [showMyTasksOnly, setShowMyTasksOnly] = useState(false);
 
-    const { batches, projects, workflowConfig, workflowOrder, setCurrentProjectId, canUserViewStage, splitBatch, advanceBatch, moveBatchToStep, canUserAdvanceStep, getBranchingOptions, currentUser, updateEnvironmentDetails, companySettings } = useProjects();
+    const { batches, projects, workflowConfig, workflowOrder, setCurrentProjectId, setCurrentBatchId, canUserViewStage, splitBatch, advanceBatch, moveBatchToStep, canUserAdvanceStep, getBranchingOptions, currentUser, updateEnvironmentDetails, companySettings } = useProjects();
     const { showToast } = useToast();
 
     const handleCardClick = (batchId: string, phase: string, projectId: string) => {
+        setCurrentBatchId(batchId);
         setCurrentProjectId(projectId);
-        // setSelectedBatchId(batchId); // We might keep this if other things use it, but for card click, ProjectDetails handles it.
     };
 
 

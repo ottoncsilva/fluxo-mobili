@@ -83,6 +83,7 @@ export interface CompanySettings {
     type: 'fixed' | 'movable';  // fixed = todo ano, movable = específico de ano
     year?: number;       // Opcional, para feriados móveis de um ano específico
   }>;
+  monthlySalesGoal?: number; // Meta mensal de vendas em R$
 }
 
 export interface PermissionConfig {
