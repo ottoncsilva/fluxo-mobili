@@ -229,6 +229,7 @@ const Settings: React.FC = () => {
     const [commLogs] = useState<WhatsAppLog[]>(companySettings.whatsappLogs || []);
     const [commSaveMsg, setCommSaveMsg] = useState<string | null>(null);
     const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+    const [expandedSlaStep, setExpandedSlaStep] = useState<string | null>(null);
 
     const handleSaveCommunications = async () => {
         setSaving(true);
@@ -1425,18 +1426,23 @@ const Settings: React.FC = () => {
 
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Destinatários por Etapa</label>
-                                <p className="text-xs text-slate-400 mb-4">Selecione quais cargos recebem o alerta de SLA para cada etapa. <span className="font-semibold text-amber-600 dark:text-amber-400">Vendedor</span> = vendedor responsável pelo projeto (não todos). Padrão: cargo dono da etapa + Gerente.</p>
+                                <p className="text-xs text-slate-400 mb-4">
+                                    Clique em uma etapa para escolher quais cargos recebem o alerta de SLA.{' '}
+                                    <span className="font-semibold text-amber-600 dark:text-amber-400">Vendedor</span> = vendedor responsável pelo projeto específico.
+                                </p>
                                 {(() => {
-                                    const SLA_ROLES: Array<{ role: Role; label: string }> = [
-                                        { role: 'Vendedor', label: 'Vend.' },
-                                        { role: 'Projetista', label: 'Proj.' },
-                                        { role: 'Medidor', label: 'Med.' },
-                                        { role: 'Liberador', label: 'Lib.' },
-                                        { role: 'Financeiro', label: 'Fin.' },
-                                        { role: 'Logistica', label: 'Log.' },
-                                        { role: 'Montador', label: 'Mont.' },
-                                        { role: 'Coordenador de Montagem', label: 'C.Mt.' },
-                                        { role: 'Gerente', label: 'Ger.' },
+                                    const SLA_ROLES: Array<{ role: Role; color: string }> = [
+                                        { role: 'Vendedor',                   color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
+                                        { role: 'Projetista',                 color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300' },
+                                        { role: 'Medidor',                    color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300' },
+                                        { role: 'Liberador',                  color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300' },
+                                        { role: 'Financeiro',                 color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' },
+                                        { role: 'Logistica',                  color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300' },
+                                        { role: 'Montador',                   color: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300' },
+                                        { role: 'Coordenador de Montagem',    color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' },
+                                        { role: 'Gerente',                    color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
+                                        { role: 'Admin',                      color: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200' },
+                                        { role: 'Proprietario',               color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300' },
                                     ];
                                     const stageNames: Record<number, string> = {
                                         1: 'Pré-Venda', 2: 'Venda', 3: 'Medição', 4: 'Engenharia',
@@ -1459,7 +1465,8 @@ const Settings: React.FC = () => {
                                             },
                                         }));
                                     };
-                                    // Group steps with SLA by stage
+                                    const roleColorMap = Object.fromEntries(SLA_ROLES.map(r => [r.role, r.color]));
+                                    // Group steps with SLA > 0 by stage
                                     const stepsByStage: Record<number, WorkflowStep[]> = {};
                                     workflowOrder.forEach(id => {
                                         const step = workflowConfig[id];
@@ -1468,51 +1475,73 @@ const Settings: React.FC = () => {
                                         stepsByStage[step.stage].push(step);
                                     });
                                     return (
-                                        <div className="overflow-x-auto rounded-lg border border-slate-100 dark:border-slate-800">
-                                            <table className="w-full text-xs">
-                                                <thead className="bg-slate-50 dark:bg-slate-900/50 sticky top-0">
-                                                    <tr>
-                                                        <th className="text-left py-2 px-3 font-bold text-slate-500 uppercase whitespace-nowrap">Etapa</th>
-                                                        {SLA_ROLES.map(r => (
-                                                            <th key={r.role} className="py-2 px-2 font-bold text-slate-500 uppercase text-center min-w-[42px]" title={r.role}>{r.label}</th>
-                                                        ))}
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {Object.entries(stepsByStage).map(([stageId, steps]) => (
-                                                        <React.Fragment key={`stage-${stageId}`}>
-                                                            <tr>
-                                                                <td colSpan={SLA_ROLES.length + 1} className="py-1.5 px-3 bg-slate-100/60 dark:bg-slate-800/40 text-xs font-bold text-slate-400 uppercase tracking-wide">
-                                                                    {stageNames[Number(stageId)] || `Etapa ${stageId}`}
-                                                                </td>
-                                                            </tr>
-                                                            {(steps as WorkflowStep[]).map((step: WorkflowStep) => {
-                                                                const stepRoles = getStepRoles(step.id, step.ownerRole);
-                                                                return (
-                                                                    <tr key={step.id} className="border-t border-slate-50 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
-                                                                        <td className="py-2 px-3 whitespace-nowrap">
-                                                                            <span className="font-mono text-slate-300 dark:text-slate-600 mr-1">{step.id}</span>
-                                                                            <span className="text-slate-700 dark:text-slate-200 font-medium">{step.label}</span>
-                                                                            <span className="ml-1 text-slate-400">· {step.sla}d</span>
-                                                                        </td>
-                                                                        {SLA_ROLES.map(r => (
-                                                                            <td key={r.role} className="py-2 px-2 text-center">
-                                                                                <input
-                                                                                    type="checkbox"
-                                                                                    checked={stepRoles.includes(r.role)}
-                                                                                    onChange={() => toggleStepRole(step.id, r.role, step.ownerRole)}
-                                                                                    className={`h-4 w-4 rounded cursor-pointer ${r.role === step.ownerRole ? 'accent-amber-500' : 'accent-slate-400'}`}
-                                                                                    title={`${r.role} recebe alerta de "${step.label}"`}
-                                                                                />
-                                                                            </td>
-                                                                        ))}
-                                                                    </tr>
-                                                                );
-                                                            })}
-                                                        </React.Fragment>
-                                                    ))}
-                                                </tbody>
-                                            </table>
+                                        <div className="space-y-1">
+                                            {Object.entries(stepsByStage).map(([stageId, steps]) => (
+                                                <div key={`stage-${stageId}`}>
+                                                    {/* Stage header */}
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1 pt-3 pb-1">
+                                                        {stageNames[Number(stageId)] || `Estágio ${stageId}`}
+                                                    </p>
+                                                    <div className="space-y-1">
+                                                        {(steps as WorkflowStep[]).map((step: WorkflowStep) => {
+                                                            const stepRoles = getStepRoles(step.id, step.ownerRole);
+                                                            const isOpen = expandedSlaStep === step.id;
+                                                            return (
+                                                                <div key={step.id} className={`rounded-xl border transition-all ${isOpen ? 'border-amber-300 dark:border-amber-700 shadow-sm' : 'border-slate-100 dark:border-slate-800'}`}>
+                                                                    {/* Row — click to toggle dropdown */}
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setExpandedSlaStep(isOpen ? null : step.id)}
+                                                                        className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-xl transition-colors"
+                                                                    >
+                                                                        <span className="font-mono text-[10px] text-slate-400 w-7 shrink-0">{step.id}</span>
+                                                                        <span className="text-sm font-medium text-slate-700 dark:text-slate-200 flex-1">{step.label}</span>
+                                                                        <span className="text-xs text-slate-400 shrink-0">{step.sla}d</span>
+                                                                        {/* Selected role badges */}
+                                                                        <div className="flex flex-wrap gap-1 justify-end max-w-[200px] shrink-0">
+                                                                            {stepRoles.map(role => (
+                                                                                <span key={role} className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${roleColorMap[role] || 'bg-slate-100 text-slate-600'}`}>
+                                                                                    {role === 'Coordenador de Montagem' ? 'C.Mont.' : role === 'Proprietario' ? 'Proprietário' : role}
+                                                                                </span>
+                                                                            ))}
+                                                                        </div>
+                                                                        <span className="material-symbols-outlined text-slate-400 text-sm transition-transform shrink-0" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                                                                            expand_more
+                                                                        </span>
+                                                                    </button>
+
+                                                                    {/* Dropdown with role checkboxes */}
+                                                                    {isOpen && (
+                                                                        <div className="px-3 pb-3 pt-1 border-t border-slate-100 dark:border-slate-800">
+                                                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mt-2">
+                                                                                {SLA_ROLES.map(r => {
+                                                                                    const isChecked = stepRoles.includes(r.role);
+                                                                                    const isOwner = r.role === step.ownerRole;
+                                                                                    return (
+                                                                                        <label
+                                                                                            key={r.role}
+                                                                                            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border cursor-pointer transition-all text-xs font-medium ${isChecked ? `${r.color} border-transparent` : 'border-slate-100 dark:border-slate-800 text-slate-500 hover:border-slate-200 dark:hover:border-slate-700'}`}
+                                                                                        >
+                                                                                            <input
+                                                                                                type="checkbox"
+                                                                                                checked={isChecked}
+                                                                                                onChange={() => toggleStepRole(step.id, r.role, step.ownerRole)}
+                                                                                                className="h-3.5 w-3.5 rounded shrink-0"
+                                                                                            />
+                                                                                            <span>{r.role === 'Coordenador de Montagem' ? 'C. Montagem' : r.role}</span>
+                                                                                            {isOwner && <span className="text-[9px] font-bold opacity-60 ml-auto">dono</span>}
+                                                                                        </label>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </div>
                                     );
                                 })()}
