@@ -195,12 +195,23 @@ const Settings: React.FC = () => {
     const [evoInstanceName, setEvoInstanceName] = useState(companySettings.evolutionApi?.instanceName || '');
     const [evoToken, setEvoToken] = useState(companySettings.evolutionApi?.token || '');
     const [evoGlobalEnabled, setEvoGlobalEnabled] = useState(companySettings.evolutionApi?.globalEnabled ?? false);
-    const [evoSettings, setEvoSettings] = useState<any>(companySettings.evolutionApi?.settings || {
-        stageChange: { enabled: true, notifyClient: true, notifySeller: true, notifyManager: true },
-        newObservation: { enabled: true, notifySeller: true, notifyManager: true },
-        assistanceUpdate: { enabled: true, notifyClient: true, notifySeller: true, notifyManager: true },
-        postAssemblyUpdate: { enabled: true, notifyClient: true, notifySeller: true, notifyManager: true },
-        slaAlert: { enabled: true, notifySeller: true, notifyManager: true, preventive: true }
+    const [evoSettings, setEvoSettings] = useState<any>(() => {
+        const saved = companySettings.evolutionApi?.settings;
+        const defaultSlaAlert = {
+            enabled: true, notifySeller: true, notifyManager: true, preventive: true,
+            slaAlertTime: '08:00',
+            slaAlertIntervalSeconds: 8,
+            notifyRoles: ['Vendedor', 'Projetista', 'Gerente'] as Role[],
+        };
+        const defaults = {
+            stageChange: { enabled: true, notifyClient: true, notifySeller: true, notifyManager: true },
+            newObservation: { enabled: true, notifySeller: true, notifyManager: true },
+            assistanceUpdate: { enabled: true, notifyClient: true, notifySeller: true, notifyManager: true },
+            postAssemblyUpdate: { enabled: true, notifyClient: true, notifySeller: true, notifyManager: true },
+            slaAlert: defaultSlaAlert,
+        };
+        if (!saved) return defaults;
+        return { ...defaults, ...saved, slaAlert: { ...defaultSlaAlert, ...(saved.slaAlert || {}) } };
     });
     const [testConnectionStatus, setTestConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
 
@@ -1370,6 +1381,76 @@ const Settings: React.FC = () => {
                                         </p>
                                     </div>
                                 ))}
+                            </div>
+                        </div>
+
+                        {/* SLA Scheduling */}
+                        <div className="bg-white dark:bg-[#1a2632] p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+                            <div className="flex items-center gap-3 mb-2">
+                                <span className="material-symbols-outlined text-2xl text-amber-500">schedule</span>
+                                <h3 className="font-bold text-slate-800 dark:text-white text-lg">Agendamento dos Alertas de SLA</h3>
+                            </div>
+                            <p className="text-sm text-slate-500 mb-6">Define o horário diário em que os avisos de SLA são disparados e quais cargos recebem as mensagens. Um intervalo entre envios evita sobrecarga na Evolution API.</p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Horário Diário de Envio</label>
+                                    <input
+                                        type="time"
+                                        value={evoSettings.slaAlert?.slaAlertTime || '08:00'}
+                                        onChange={e => setEvoSettings((prev: any) => ({
+                                            ...prev,
+                                            slaAlert: { ...prev.slaAlert, slaAlertTime: e.target.value }
+                                        }))}
+                                        className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm"
+                                    />
+                                    <p className="text-xs text-slate-400 mt-1">Os avisos são disparados uma vez por dia neste horário.</p>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Intervalo entre Envios (segundos)</label>
+                                    <input
+                                        type="number"
+                                        min="5"
+                                        max="60"
+                                        value={evoSettings.slaAlert?.slaAlertIntervalSeconds ?? 8}
+                                        onChange={e => setEvoSettings((prev: any) => ({
+                                            ...prev,
+                                            slaAlert: { ...prev.slaAlert, slaAlertIntervalSeconds: Math.max(5, parseInt(e.target.value) || 8) }
+                                        }))}
+                                        className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm"
+                                    />
+                                    <p className="text-xs text-slate-400 mt-1">Aguarda este tempo entre cada envio para não sobrecarregar a API. Mínimo: 5s.</p>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Cargos que recebem alertas de SLA</label>
+                                <p className="text-xs text-slate-400 mb-4">O alerta é enviado para todos os usuários dos cargos selecionados. O responsável da etapa é sempre incluído se o cargo estiver marcado.</p>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                    {(['Vendedor', 'Projetista', 'Medidor', 'Liberador', 'Financeiro', 'Logistica', 'Montador', 'Coordenador de Montagem', 'Gerente', 'Admin', 'Proprietario'] as Role[]).map(role => {
+                                        const currentRoles: Role[] = evoSettings.slaAlert?.notifyRoles || ['Vendedor', 'Projetista', 'Gerente'];
+                                        const isChecked = currentRoles.includes(role);
+                                        return (
+                                            <label key={role} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${isChecked ? 'border-amber-300 bg-amber-50/50 dark:border-amber-700 dark:bg-amber-900/10' : 'border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isChecked}
+                                                    onChange={() => {
+                                                        const updated = isChecked
+                                                            ? currentRoles.filter(r => r !== role)
+                                                            : [...currentRoles, role];
+                                                        setEvoSettings((prev: any) => ({
+                                                            ...prev,
+                                                            slaAlert: { ...prev.slaAlert, notifyRoles: updated }
+                                                        }));
+                                                    }}
+                                                    className="rounded text-amber-500 focus:ring-amber-400 h-4 w-4"
+                                                />
+                                                <span className="text-sm text-slate-700 dark:text-slate-200">{role}</span>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         </div>
 
