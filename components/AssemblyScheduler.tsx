@@ -238,7 +238,7 @@ const AssemblyScheduler: React.FC = () => {
     // ── Queue state ────────────────────────────────────────────────────────────
     const [queueFilter, setQueueFilter] = useState<AssemblyStatus | 'Todos'>('Todos');
     const [postAssemblyFilter, setPostAssemblyFilter] = useState<AssemblyStatus | 'Todos'>('Todos');
-    const [assistanceFilter, setAssistanceFilter] = useState<string>('Todos');
+    const [assistanceFilter, setAssistanceFilter] = useState<AssemblyStatus | 'Todos'>('Todos');
 
     // ── Schedule modal state ───────────────────────────────────────────────────
     const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
@@ -466,9 +466,12 @@ const AssemblyScheduler: React.FC = () => {
     );
 
     const filteredAssistances = useMemo(() =>
-        relevantAssistances.filter(t =>
-            assistanceFilter === 'Todos' || t.status === assistanceFilter
-        ),
+        relevantAssistances.filter(t => {
+            if (assistanceFilter === 'Todos') return true;
+            const sched: AssemblyStatus = t.schedulingStatus
+                || (t.scheduledDate ? 'Agendado' : t.forecastDate ? 'Previsto' : 'Sem Previsão');
+            return sched === assistanceFilter;
+        }),
         [relevantAssistances, assistanceFilter]
     );
 
@@ -1173,16 +1176,13 @@ const AssemblyScheduler: React.FC = () => {
                             </div>
                             {/* Assistance filter chips */}
                             <div className="flex flex-wrap gap-1">
-                                {[
-                                    { key: 'Todos', label: 'Todos' },
-                                    ...assistanceWorkflow.filter(step => step.id !== '10.8').map(step => ({ key: step.id, label: step.label }))
-                                ].map(f => (
+                                {(['Todos', 'Sem Previsão', 'Previsto', 'Agendado', 'Concluído'] as const).map(f => (
                                     <button
-                                        key={f.key}
-                                        onClick={() => setAssistanceFilter(f.key)}
-                                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors ${assistanceFilter === f.key ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+                                        key={f}
+                                        onClick={() => setAssistanceFilter(f)}
+                                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors ${assistanceFilter === f ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
                                     >
-                                        {f.label}
+                                        {f}
                                     </button>
                                 ))}
                             </div>
