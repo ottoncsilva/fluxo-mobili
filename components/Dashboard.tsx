@@ -16,7 +16,7 @@ interface DashboardTask {
 }
 
 const Dashboard: React.FC = () => {
-    const { batches, workflowConfig, currentUser, projects, setCurrentProjectId, assistanceTickets, assistanceWorkflow, companySettings } = useProjects();
+    const { batches, workflowConfig, currentUser, projects, setCurrentProjectId, setCurrentBatchId, assistanceTickets, assistanceWorkflow, companySettings } = useProjects();
 
     // Filter tasks relevant to the user's role AND exclude Completed/Lost
     const myTasks: DashboardTask[] = useMemo(() => {
@@ -110,7 +110,7 @@ const Dashboard: React.FC = () => {
                                 const diffDays = getBusinessDaysDifference(now, deadline, companySettings?.holidays);
 
                                 return (
-                                    <div key={task.id} className="p-3 bg-white dark:bg-[#1e293b] border border-slate-100 dark:border-slate-700/50 rounded-xl hover:shadow-md transition-all group cursor-pointer" onClick={() => task.projectId && setCurrentProjectId(task.projectId)}>
+                                    <div key={task.id} className="p-3 bg-white dark:bg-[#1e293b] border border-slate-100 dark:border-slate-700/50 rounded-xl hover:shadow-md transition-all group cursor-pointer" onClick={() => { if (task.projectId) { setCurrentBatchId(task.id); setCurrentProjectId(task.projectId); } }}>
                                         <div className="flex justify-between items-start mb-2">
                                             <div className="flex items-center gap-2">
                                                 <div className={`size-8 rounded-full flex items-center justify-center text-xs font-bold ${task.type === 'assistance' ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>

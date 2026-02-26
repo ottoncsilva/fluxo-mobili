@@ -41,7 +41,9 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
         canUserEditClient,
         canUserDeleteClient,
         addEnvironment,
-        removeEnvironment
+        removeEnvironment,
+        currentBatchId,
+        setCurrentBatchId,
     } = useProjects();
     const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'ENVIRONMENTS' | 'BRIEFING' | 'TIMELINE'>('OVERVIEW'); // Changed 'ITPP' to 'BRIEFING'
     const [noteContent, setNoteContent] = useState('');
@@ -138,6 +140,18 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
     if (!project) return null;
 
     const projectBatches = batches.filter((b: Batch) => b.projectId === project.id);
+
+    // Batch ativo: o que foi clicado no kanban/dashboard, ou o primeiro disponível
+    const activeBatch = projectBatches.find(b => b.id === currentBatchId) || projectBatches[0];
+    const batchEnvIds = useMemo(() => new Set(activeBatch?.environmentIds || []), [activeBatch]);
+    const batchEnvironments = useMemo(
+        () => project.environments.filter((env: Environment) => batchEnvIds.has(env.id)),
+        [project.environments, batchEnvIds]
+    );
+    const batchTotalValue = useMemo(
+        () => batchEnvironments.reduce((sum: number, env: Environment) => sum + (env.estimated_value || 0), 0),
+        [batchEnvironments]
+    );
 
     const handleAddNote = () => {
         if (!noteContent.trim() || !currentUser) return;
@@ -449,8 +463,40 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
 
                 {/* OVERVIEW TAB */}
                 {activeTab === 'OVERVIEW' && (
-                    <div className="space-y-6">
-                        {projectBatches.map((batch: Batch) => {
+                    <div className="space-y-4">
+                        {/* Seletor de lote — visível somente quando há mais de um lote */}
+                        {projectBatches.length > 1 && (
+                            <div className="flex flex-wrap items-center gap-2 pb-2">
+                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Lote:</span>
+                                {projectBatches.map((b: Batch, i: number) => {
+                                    const s = workflowConfig[b.phase];
+                                    const isActive = b.id === activeBatch?.id;
+                                    const isCompleted = b.phase === '9.0';
+                                    const isLostB = b.phase === '9.1';
+                                    return (
+                                        <button
+                                            key={b.id}
+                                            onClick={() => setCurrentBatchId(b.id)}
+                                            className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                                                isActive
+                                                    ? 'bg-primary text-white border-primary shadow'
+                                                    : 'bg-white dark:bg-[#1a2632] text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-primary hover:text-primary'
+                                            }`}
+                                        >
+                                            {b.name || `Lote ${i + 1}`}
+                                            {isCompleted && <span className="ml-1 text-green-300">✓</span>}
+                                            {isLostB && <span className="ml-1 text-rose-300">✗</span>}
+                                            {!isCompleted && !isLostB && s && <span className="ml-1 opacity-60">· {s.id}</span>}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {/* Hero card do lote ativo */}
+                        {(() => {
+                            const batch = activeBatch;
+                            if (!batch) return null;
                             const step = workflowConfig[batch.phase];
                             const isFinished = batch.phase === '9.0';
                             const isLost = batch.phase === '9.1';
@@ -624,19 +670,69 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                                 </div>
                                             )}
                                         </div>
+
+                                        {/* Ambientes deste lote */}
+                                        {batchEnvironments.length > 0 && (
+                                            <div className="border-t border-slate-100 dark:border-slate-800">
+                                                <div className="px-6 py-3 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between">
+                                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                                                        <span className="material-symbols-outlined text-sm">grid_view</span>
+                                                        Ambientes deste Lote
+                                                    </p>
+                                                    <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                                                        Total: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(batchTotalValue)}
+                                                    </p>
+                                                </div>
+                                                <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                                                    {batchEnvironments.map((env: Environment) => (
+                                                        <div key={env.id} className="px-6 py-2.5 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                                            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{env.name}</span>
+                                                            <div className="flex items-center gap-3">
+                                                                {env.version && env.version > 1 && (
+                                                                    <span className="text-[10px] font-bold bg-primary/10 text-primary px-1.5 py-0.5 rounded">V{env.version}</span>
+                                                                )}
+                                                                <span className="text-sm font-mono font-semibold text-slate-800 dark:text-white">
+                                                                    {env.estimated_value
+                                                                        ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(env.estimated_value)
+                                                                        : <span className="text-slate-400 italic text-xs">Sem valor</span>
+                                                                    }
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             );
-                        })}
+                        })()}
                     </div>
                 )}
 
                 {/* ENVIRONMENTS TAB */}
                 {activeTab === 'ENVIRONMENTS' && (
                     <div className="bg-white dark:bg-[#1a2632] rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-                        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 text-sm text-blue-700 dark:text-blue-300 flex items-center gap-2">
-                            <span className="material-symbols-outlined text-lg">info</span>
-                            Os valores, status e versões podem ser editados diretamente na tabela.
+                        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 text-sm text-blue-700 dark:text-blue-300 flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                                <span className="material-symbols-outlined text-lg">info</span>
+                                <span>
+                                    Ambientes do lote <strong>{activeBatch?.name || 'atual'}</strong>. Os valores, status e versões podem ser editados diretamente na tabela.
+                                </span>
+                            </div>
+                            {projectBatches.length > 1 && (
+                                <div className="flex gap-1 flex-shrink-0">
+                                    {projectBatches.map((b: Batch, i: number) => (
+                                        <button
+                                            key={b.id}
+                                            onClick={() => setCurrentBatchId(b.id)}
+                                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all ${b.id === activeBatch?.id ? 'bg-primary text-white border-primary' : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-primary'}`}
+                                        >
+                                            {b.name || `Lote ${i + 1}`}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                         <table className="w-full text-left">
                             <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-800">
@@ -651,7 +747,7 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                {project.environments.map((env: Environment) => (
+                                {batchEnvironments.map((env: Environment) => (
                                     <tr key={env.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                                         <td className="px-6 py-4 font-bold text-slate-800 dark:text-white">{env.name}</td>
 
@@ -707,9 +803,9 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                             </tbody>
                             <tfoot className="bg-slate-50 dark:bg-slate-900 border-t-2 border-slate-200 dark:border-slate-700">
                                 <tr>
-                                    <td className="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Total Geral</td>
+                                    <td className="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Total deste Lote</td>
                                     <td className="px-6 py-4 font-bold text-emerald-600 dark:text-emerald-400 text-base font-mono">
-                                        R$ {totalEnvironmentsValue.toLocaleString('pt-BR')}
+                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(batchTotalValue)}
                                     </td>
                                     <td></td>
                                     <td></td>

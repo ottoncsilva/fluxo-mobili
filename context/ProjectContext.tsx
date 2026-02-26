@@ -74,6 +74,8 @@ interface ProjectContextType {
     addNote: (projectId: string, content: string, authorId: string) => void;
     updateWorkflowSla: (stepId: string, days: number) => void;
     setCurrentProjectId: (id: string | null) => void;
+    currentBatchId: string | null;
+    setCurrentBatchId: (id: string | null) => void;
     updateEnvironmentStatus: (projectId: string, envId: string, status: Environment['status']) => void;
     updateEnvironmentDetails: (projectId: string, envId: string, updates: Partial<Environment>) => void;
     addEnvironment: (projectId: string, name: string) => void;
@@ -354,6 +356,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
 
     const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+    const [currentBatchId, setCurrentBatchId] = useState<string | null>(null);
     const [assistanceTickets, setAssistanceTickets] = useState<AssistanceTicket[]>([]);
 
     // Data Filtering by Store (Redundant if DB isolation works, but good for safety)
@@ -1806,14 +1809,14 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     return (
         <ProjectContext.Provider value={{
-            currentUser, currentStore, users, stores, allUsers, projects, batches, workflowConfig, workflowOrder, permissions, currentProjectId, origins, assistanceTickets, companySettings, assistanceWorkflow,
+            currentUser, currentStore, users, stores, allUsers, projects, batches, workflowConfig, workflowOrder, permissions, currentProjectId, currentBatchId, origins, assistanceTickets, companySettings, assistanceWorkflow,
             login, createStore, updateStore, logout, toggleStoreStatus, addUser, updateUser, deleteUser, updatePermissions, updateOrigins, updateCompanySettings,
 
             // Dynamic Workflow
             addWorkflowStep, updateWorkflowStep, deleteWorkflowStep, reorderWorkflowSteps,
             addAssistanceStep, updateAssistanceStep, deleteAssistanceStep, reorderAssistanceSteps,
 
-            addProject, deleteProject, advanceBatch, moveBatchToStep, markProjectAsLost, reactivateProject, isLastStep, splitBatch, getProjectById, addNote, updateWorkflowSla, setCurrentProjectId, updateEnvironmentStatus, requestFactoryPart,
+            addProject, deleteProject, advanceBatch, moveBatchToStep, markProjectAsLost, reactivateProject, isLastStep, splitBatch, getProjectById, addNote, updateWorkflowSla, setCurrentProjectId, setCurrentBatchId, updateEnvironmentStatus, requestFactoryPart,
             updateEnvironmentDetails, addEnvironment, removeEnvironment, updateClientData, updateProjectBriefing, formalizeContract, updateProjectSeller, updateProjectPostAssembly, updateProjectPostAssemblyItems,
             addAssistanceTicket, updateAssistanceTicket, deleteAssistanceTicket,
             canUserAdvanceStep, canUserViewStage, canUserEditAssistance, canUserDeleteAssistance,
