@@ -70,7 +70,7 @@ export interface CompanySettings {
         preventive: boolean;
         slaAlertTime?: string;            // Horário diário no formato "HH:MM", ex: "10:00"
         slaAlertIntervalSeconds?: number; // Intervalo em segundos entre cada envio (padrão: 8)
-        notifyRoles?: Role[];             // Cargos que recebem alertas de SLA
+        stepNotifyRoles?: Record<string, Role[]>; // Mapa stepId -> cargos que recebem alerta nessa etapa
       };
     };
   };

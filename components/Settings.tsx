@@ -201,7 +201,7 @@ const Settings: React.FC = () => {
             enabled: true, notifySeller: true, notifyManager: true, preventive: true,
             slaAlertTime: '08:00',
             slaAlertIntervalSeconds: 8,
-            notifyRoles: ['Vendedor', 'Projetista', 'Gerente'] as Role[],
+            stepNotifyRoles: {} as Record<string, Role[]>,
         };
         const defaults = {
             stageChange: { enabled: true, notifyClient: true, notifySeller: true, notifyManager: true },
@@ -1424,33 +1424,98 @@ const Settings: React.FC = () => {
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Cargos que recebem alertas de SLA</label>
-                                <p className="text-xs text-slate-400 mb-4">O alerta é enviado para todos os usuários dos cargos selecionados. O responsável da etapa é sempre incluído se o cargo estiver marcado.</p>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                    {(['Vendedor', 'Projetista', 'Medidor', 'Liberador', 'Financeiro', 'Logistica', 'Montador', 'Coordenador de Montagem', 'Gerente', 'Admin', 'Proprietario'] as Role[]).map(role => {
-                                        const currentRoles: Role[] = evoSettings.slaAlert?.notifyRoles || ['Vendedor', 'Projetista', 'Gerente'];
-                                        const isChecked = currentRoles.includes(role);
-                                        return (
-                                            <label key={role} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${isChecked ? 'border-amber-300 bg-amber-50/50 dark:border-amber-700 dark:bg-amber-900/10' : 'border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={isChecked}
-                                                    onChange={() => {
-                                                        const updated = isChecked
-                                                            ? currentRoles.filter(r => r !== role)
-                                                            : [...currentRoles, role];
-                                                        setEvoSettings((prev: any) => ({
-                                                            ...prev,
-                                                            slaAlert: { ...prev.slaAlert, notifyRoles: updated }
-                                                        }));
-                                                    }}
-                                                    className="rounded text-amber-500 focus:ring-amber-400 h-4 w-4"
-                                                />
-                                                <span className="text-sm text-slate-700 dark:text-slate-200">{role}</span>
-                                            </label>
-                                        );
-                                    })}
-                                </div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Destinatários por Etapa</label>
+                                <p className="text-xs text-slate-400 mb-4">Selecione quais cargos recebem o alerta de SLA para cada etapa. <span className="font-semibold text-amber-600 dark:text-amber-400">Vendedor</span> = vendedor responsável pelo projeto (não todos). Padrão: cargo dono da etapa + Gerente.</p>
+                                {(() => {
+                                    const SLA_ROLES: Array<{ role: Role; label: string }> = [
+                                        { role: 'Vendedor', label: 'Vend.' },
+                                        { role: 'Projetista', label: 'Proj.' },
+                                        { role: 'Medidor', label: 'Med.' },
+                                        { role: 'Liberador', label: 'Lib.' },
+                                        { role: 'Financeiro', label: 'Fin.' },
+                                        { role: 'Logistica', label: 'Log.' },
+                                        { role: 'Montador', label: 'Mont.' },
+                                        { role: 'Coordenador de Montagem', label: 'C.Mt.' },
+                                        { role: 'Gerente', label: 'Ger.' },
+                                    ];
+                                    const stageNames: Record<number, string> = {
+                                        1: 'Pré-Venda', 2: 'Venda', 3: 'Medição', 4: 'Engenharia',
+                                        5: 'Implantação', 6: 'Logística', 7: 'Montagem', 8: 'Pós Montagem', 9: 'Conclusão',
+                                    };
+                                    const getStepRoles = (stepId: string, ownerRole: Role): Role[] => {
+                                        const saved = evoSettings.slaAlert?.stepNotifyRoles?.[stepId];
+                                        return saved?.length ? saved : [ownerRole, 'Gerente'];
+                                    };
+                                    const toggleStepRole = (stepId: string, role: Role, ownerRole: Role) => {
+                                        const current: Role[] = getStepRoles(stepId, ownerRole);
+                                        const updated = current.includes(role)
+                                            ? current.filter(r => r !== role)
+                                            : [...current, role];
+                                        setEvoSettings((prev: any) => ({
+                                            ...prev,
+                                            slaAlert: {
+                                                ...prev.slaAlert,
+                                                stepNotifyRoles: { ...(prev.slaAlert?.stepNotifyRoles || {}), [stepId]: updated },
+                                            },
+                                        }));
+                                    };
+                                    // Group steps with SLA by stage
+                                    const stepsByStage: Record<number, WorkflowStep[]> = {};
+                                    workflowOrder.forEach(id => {
+                                        const step = workflowConfig[id];
+                                        if (!step || step.sla === 0) return;
+                                        if (!stepsByStage[step.stage]) stepsByStage[step.stage] = [];
+                                        stepsByStage[step.stage].push(step);
+                                    });
+                                    return (
+                                        <div className="overflow-x-auto rounded-lg border border-slate-100 dark:border-slate-800">
+                                            <table className="w-full text-xs">
+                                                <thead className="bg-slate-50 dark:bg-slate-900/50 sticky top-0">
+                                                    <tr>
+                                                        <th className="text-left py-2 px-3 font-bold text-slate-500 uppercase whitespace-nowrap">Etapa</th>
+                                                        {SLA_ROLES.map(r => (
+                                                            <th key={r.role} className="py-2 px-2 font-bold text-slate-500 uppercase text-center min-w-[42px]" title={r.role}>{r.label}</th>
+                                                        ))}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {Object.entries(stepsByStage).map(([stageId, steps]) => (
+                                                        <React.Fragment key={`stage-${stageId}`}>
+                                                            <tr>
+                                                                <td colSpan={SLA_ROLES.length + 1} className="py-1.5 px-3 bg-slate-100/60 dark:bg-slate-800/40 text-xs font-bold text-slate-400 uppercase tracking-wide">
+                                                                    {stageNames[Number(stageId)] || `Etapa ${stageId}`}
+                                                                </td>
+                                                            </tr>
+                                                            {(steps as WorkflowStep[]).map((step: WorkflowStep) => {
+                                                                const stepRoles = getStepRoles(step.id, step.ownerRole);
+                                                                return (
+                                                                    <tr key={step.id} className="border-t border-slate-50 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
+                                                                        <td className="py-2 px-3 whitespace-nowrap">
+                                                                            <span className="font-mono text-slate-300 dark:text-slate-600 mr-1">{step.id}</span>
+                                                                            <span className="text-slate-700 dark:text-slate-200 font-medium">{step.label}</span>
+                                                                            <span className="ml-1 text-slate-400">· {step.sla}d</span>
+                                                                        </td>
+                                                                        {SLA_ROLES.map(r => (
+                                                                            <td key={r.role} className="py-2 px-2 text-center">
+                                                                                <input
+                                                                                    type="checkbox"
+                                                                                    checked={stepRoles.includes(r.role)}
+                                                                                    onChange={() => toggleStepRole(step.id, r.role, step.ownerRole)}
+                                                                                    className={`h-4 w-4 rounded cursor-pointer ${r.role === step.ownerRole ? 'accent-amber-500' : 'accent-slate-400'}`}
+                                                                                    title={`${r.role} recebe alerta de "${step.label}"`}
+                                                                                />
+                                                                            </td>
+                                                                        ))}
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                        </React.Fragment>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         </div>
 
