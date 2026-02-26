@@ -50,26 +50,28 @@ export const DashboardKPIs: React.FC = () => {
             }
         });
 
-        const totalSales = filteredProjects.reduce((acc, p) => {
-            const projectBatch = filteredBatches.find(b => b.projectId === p.id);
-            const isDelivered = projectBatch?.phase === '9.0';
-            const isWon = p.client.status === 'Concluido';
-            if (isWon || isDelivered) {
-                return acc + (p.total_estimated_value || 0);
-            }
-            return acc;
-        }, 0);
-
-        // Conversion rate: projects that reached step 2.9+ vs total projects in the period
-        const convertedCount = filteredBatches.filter(b => {
+        // Venda efetivada = projeto chegou na etapa 2.9 (Contrato e Detalhamento), excluindo perdidos (9.1)
+        const effectuatedSales = filteredBatches.filter(b => {
             const stepNum = parseFloat(b.phase);
             return stepNum >= 2.9 && b.phase !== '9.1';
-        }).length;
+        });
+        const effectuatedIds = new Set(effectuatedSales.map(b => b.projectId));
+
+        const totalSales = filteredProjects.reduce((acc, p) => {
+            if (!effectuatedIds.has(p.id)) return acc;
+            // Usa o valor do contrato assinado; se ainda não definido, usa o estimado
+            return acc + (p.contractValue || p.total_estimated_value || 0);
+        }, 0);
+
+        const effectuatedCount = effectuatedSales.length;
+
+        // Taxa de conversão: vendas efetivadas vs projetos elegíveis (excluindo perdidos)
+        const eligibleCount = filteredBatches.filter(b => b.phase !== '9.1').length;
+        const conversionRate = eligibleCount > 0 ? ((effectuatedCount / eligibleCount) * 100).toFixed(1) : '0.0';
 
         const totalInPeriod = filteredProjects.length;
-        const conversionRate = totalInPeriod > 0 ? ((convertedCount / totalInPeriod) * 100).toFixed(1) : '0.0';
 
-        return { totalSales, activeProjects, conversionRate, totalInPeriod };
+        return { totalSales, activeProjects, conversionRate, totalInPeriod, effectuatedCount };
     }, [batches, projects, period]);
 
     return (
@@ -95,6 +97,7 @@ export const DashboardKPIs: React.FC = () => {
                     <h3 className="text-2xl font-extrabold text-slate-800 dark:text-white">
                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(kpiData.totalSales)}
                     </h3>
+                    <p className="text-xs text-slate-400 mt-1">{kpiData.effectuatedCount} venda{kpiData.effectuatedCount !== 1 ? 's' : ''} efetivada{kpiData.effectuatedCount !== 1 ? 's' : ''} (etapa 2.9+)</p>
                 </div>
                 <div className="bg-white dark:bg-[#1a2632] p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
                     <p className="text-sm font-bold text-slate-500 uppercase tracking-wide">Projetos Ativos</p>
@@ -104,7 +107,7 @@ export const DashboardKPIs: React.FC = () => {
                 <div className="bg-white dark:bg-[#1a2632] p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
                     <p className="text-sm font-bold text-slate-500 uppercase tracking-wide">Taxa de Conversão</p>
                     <h3 className="text-2xl font-extrabold text-slate-800 dark:text-white">{kpiData.conversionRate}%</h3>
-                    <p className="text-xs text-slate-400 mt-1">Projetos que chegaram ao detalhamento</p>
+                    <p className="text-xs text-slate-400 mt-1">Projetos efetivados vs elegíveis no período</p>
                 </div>
             </div>
         </div>
@@ -149,13 +152,15 @@ export const DashboardGraphs: React.FC = () => {
         const sales: Record<string, number> = {};
 
         projects.forEach(project => {
-            const isWon = project.client.status === 'Concluido';
             const projectBatch = batches.find(b => b.projectId === project.id);
-            const isDelivered = projectBatch?.phase === '9.0';
+            if (!projectBatch) return;
+            const stepNum = parseFloat(projectBatch.phase);
+            // Venda efetivada ao chegar na etapa 2.9 (Contrato e Detalhamento)
+            const isSaleEffectuated = stepNum >= 2.9 && projectBatch.phase !== '9.1';
 
-            if (isWon || isDelivered) {
+            if (isSaleEffectuated) {
                 const seller = project.sellerName || 'Sem Vendedor';
-                const value = project.total_estimated_value || 0;
+                const value = project.contractValue || project.total_estimated_value || 0;
                 sales[seller] = (sales[seller] || 0) + value;
             }
         });
