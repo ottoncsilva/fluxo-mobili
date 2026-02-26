@@ -327,6 +327,7 @@ export interface AssistanceTicket {
   forecastDate?: string; // ISO date — status "Previsto"
   scheduledDate?: string; // ISO date — status "Agendado" (confirmado)
   schedulingNotes?: string; // Notas específicas do agendamento
+  schedulingStatus?: AssemblyStatus; // Status do agendamento (separado do status do workflow)
 }
 
 export interface AssistanceWorkflowStep {
