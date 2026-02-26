@@ -79,6 +79,7 @@ const getStageBadgePure = (phase: string, workflowConfig: Record<string, Workflo
     if (stage === 5) return { icon: 'precision_manufacturing', cls: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400', label: 'Fabricação' };
     if (stage === 6) return { icon: 'local_shipping', cls: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300', label: 'Logística' };
     if (stage === 7) return { icon: 'construction', cls: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300', label: 'Montagem Ativa' };
+    if (stage === 8) return { icon: 'build_circle', cls: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300', label: 'Pós-Montagem' };
     return null;
 };
 
@@ -179,11 +180,12 @@ const AssemblyScheduler: React.FC = () => {
     const {
         batches, projects, workflowConfig,
         assemblyTeams, updateBatchAssemblySchedule, saveAssemblyTeams,
-        canUserEditAssembly, companySettings, updateCompanySettings, assistanceTickets, assistanceWorkflow,
+        canUserEditAssembly, canUserEditPostAssembly, companySettings, updateCompanySettings, assistanceTickets, assistanceWorkflow,
         updateAssistanceTicket
     } = useProjects();
 
     const canEdit = canUserEditAssembly();
+    const canEditPostAssembly = canUserEditPostAssembly();
 
     // Helper function to check non-working days (weekends + holidays)
     // Uses company settings for customized holidays
@@ -1120,7 +1122,7 @@ const AssemblyScheduler: React.FC = () => {
                                         assemblyTeams={assemblyTeams}
                                         workflowConfig={workflowConfig}
                                         holidays={companySettings?.holidays}
-                                        canEdit={canEdit}
+                                        canEdit={canEditPostAssembly}
                                         onOpenScheduleModal={handleOpenScheduleModal}
                                     />
                                 ))
@@ -1259,6 +1261,8 @@ const AssemblyScheduler: React.FC = () => {
                 const envCount = selectedBatch.environmentIds?.length || project?.environments.length || 1;
                 const defaultDays = envCount * 3;
                 const deadlineChip = getDeadlineChip(selectedBatch.assemblyDeadline);
+                const isPostAssemblyBatch = workflowConfig[selectedBatch.phase]?.stage === 8;
+                const canEditCurrentBatch = isPostAssemblyBatch ? canEditPostAssembly : canEdit;
 
                 return (
                     <div
@@ -1273,8 +1277,8 @@ const AssemblyScheduler: React.FC = () => {
                             <div className="p-5 border-b border-slate-100 dark:border-slate-700 flex justify-between items-start shrink-0">
                                 <div>
                                     <div className="flex items-center gap-2 mb-0.5">
-                                        <span className="material-symbols-outlined text-primary text-xl">calendar_add_on</span>
-                                        <h3 className="text-lg font-bold text-slate-800 dark:text-white">Agendamento de Montagem</h3>
+                                        <span className="material-symbols-outlined text-primary text-xl">{isPostAssemblyBatch ? 'build_circle' : 'calendar_add_on'}</span>
+                                        <h3 className="text-lg font-bold text-slate-800 dark:text-white">{isPostAssemblyBatch ? 'Agendamento de Pós-Montagem' : 'Agendamento de Montagem'}</h3>
                                     </div>
                                     <p className="text-sm text-slate-500">{project?.client.name} · {selectedBatch.name}</p>
                                 </div>
@@ -1393,7 +1397,7 @@ const AssemblyScheduler: React.FC = () => {
                             {/* Footer */}
                             <div className="p-5 border-t border-slate-100 dark:border-slate-700 flex justify-between gap-3 shrink-0">
                                 <div className="flex gap-2">
-                                    {canEdit && (selectedBatch?.assemblySchedule?.status === 'Previsto' || selectedBatch?.assemblySchedule?.status === 'Agendado') && (
+                                    {canEditCurrentBatch && (selectedBatch?.assemblySchedule?.status === 'Previsto' || selectedBatch?.assemblySchedule?.status === 'Agendado') && (
                                         <button
                                             onClick={handleCancelSchedule}
                                             disabled={isSavingSchedule}
