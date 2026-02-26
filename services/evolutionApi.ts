@@ -38,10 +38,14 @@ export const EvolutionApi = {
                 body: JSON.stringify({
                     number: formattedPhone,
                     text: message,
+                    delay: 1200,
+                    presence: 'composing',
+                    linkPreview: false,
+                    // compatibilidade com Evolution API v1
                     options: {
                         delay: 1200,
-                        presence: "composing",
-                        linkPreview: true
+                        presence: 'composing',
+                        linkPreview: false
                     }
                 })
             });
@@ -66,10 +70,12 @@ export const EvolutionApi = {
                 method: 'GET',
                 headers: { 'apikey': token }
             });
-            // Evolution API usually returns instance object with status
+            // Evolution API v2 retorna { instance: { instanceName, state } }
+            // Evolution API v1 retorna { state: "open" | "close" }
             if (response.ok) {
                 const data = await response.json();
-                return data?.instance?.state === 'open';
+                const state = data?.instance?.state ?? data?.state;
+                return state === 'open';
             }
             return false;
         } catch (e) {

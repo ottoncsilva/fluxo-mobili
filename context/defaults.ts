@@ -108,7 +108,15 @@ export const DEFAULT_COMPANY_SETTINGS: CompanySettings = {
             newObservation: { enabled: true, notifySeller: true, notifyManager: true },
             assistanceUpdate: { enabled: true, notifyClient: true, notifySeller: true, notifyManager: true },
             postAssemblyUpdate: { enabled: true, notifyClient: true, notifySeller: true, notifyManager: true },
-            slaAlert: { enabled: true, notifySeller: true, notifyManager: true, preventive: true }
+            slaAlert: {
+                enabled: true,
+                notifySeller: true,
+                notifyManager: true,
+                preventive: true,
+                slaAlertTime: '08:00',
+                slaAlertIntervalSeconds: 8,
+                notifyRoles: ['Vendedor', 'Projetista', 'Gerente']
+            }
         }
     },
     whatsappClientTemplates: [

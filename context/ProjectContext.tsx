@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo } from 'react';
-import { Project, Batch, WorkflowStep, Environment, Client, User, Role, Note, FactoryOrder, PermissionConfig, AssistanceTicket, CompanySettings, AssistanceWorkflowStep, Store, StoreConfig, PostAssemblyEvaluation, AssistanceItem, AssistanceEvent, AssemblyTeam, AssemblySchedule } from '../types';
+import { Project, Batch, WorkflowStep, Environment, Client, User, Role, Note, FactoryOrder, PermissionConfig, AssistanceTicket, CompanySettings, AssistanceWorkflowStep, Store, StoreConfig, PostAssemblyEvaluation, AssistanceItem, AssistanceEvent, AssemblyTeam, AssemblySchedule, WhatsAppLog } from '../types';
 import { addBusinessDays } from '../utils/dateUtils';
 import { db } from '../firebase'; // Import Firebase DB
 import { collection, onSnapshot, addDoc, setDoc, doc, updateDoc, deleteDoc, query, where, getDoc, getDocs, writeBatch, Firestore, deleteField } from "firebase/firestore";
@@ -1587,110 +1587,230 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     // --- SLA Checker Logic ---
     useEffect(() => {
-        if (typeof window === 'undefined') return; // Client-side only check
+        if (typeof window === 'undefined') return;
+
+        const evo = companySettings.evolutionApi;
+
+        // Resolve mensagem a partir do template configurado
+        const buildSlaMessage = (
+            type: 'sla_d0' | 'sla_d1',
+            recipientName: string,
+            project: Project,
+            batch: Batch,
+            step: WorkflowStep,
+            deadline: Date
+        ): string => {
+            const templates = companySettings.whatsappTeamTemplates || [];
+            const template = templates.find(t => t.type === type);
+            if (!template || !template.enabled) return '';
+            const vars: Record<string, string> = {
+                nomeResponsavel: recipientName,
+                nomeProjeto: batch.name || project.client.name,
+                nomeCliente: project.client.name,
+                etapa: step.label,
+                prazo: deadline.toLocaleDateString('pt-BR'),
+                diasRestantes: type === 'sla_d1' ? '1' : '0',
+            };
+            return template.message.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? `{${key}}`);
+        };
+
+        // Resolve destinatários de acordo com notifyRoles configurado
+        const getAlertRecipients = (batch: Batch, project: Project, step: WorkflowStep): User[] => {
+            if (!evo) return [];
+            const slaSettings = evo.settings.slaAlert;
+            const notifyRoles: Role[] = slaSettings.notifyRoles?.length
+                ? slaSettings.notifyRoles
+                : ['Vendedor', 'Projetista', 'Gerente'];
+
+            const seen = new Set<string>();
+            const add = (u: User) => { if (!seen.has(u.id)) { seen.add(u.id); targets.push(u); } };
+            const targets: User[] = [];
+
+            // 1. Responsáveis da etapa (ownerRole) — apenas se o cargo estiver na lista
+            if (notifyRoles.includes(step.ownerRole)) {
+                allUsers
+                    .filter((u: User) => u.storeId === batch.storeId && u.role === step.ownerRole)
+                    .forEach(add);
+            }
+
+            // 2. Vendedor específico do projeto
+            if (slaSettings.notifySeller && project.sellerId && notifyRoles.includes('Vendedor')) {
+                const seller = allUsers.find((u: User) => u.id === project.sellerId);
+                if (seller) add(seller);
+            }
+
+            // 3. Gerentes/Admins cujos cargos estejam na lista
+            if (slaSettings.notifyManager) {
+                const managerRoles: Role[] = ['Admin', 'Proprietario', 'Gerente'];
+                allUsers
+                    .filter((u: User) =>
+                        u.storeId === batch.storeId &&
+                        managerRoles.includes(u.role) &&
+                        notifyRoles.includes(u.role)
+                    )
+                    .forEach(add);
+            }
+
+            return targets;
+        };
+
+        // Envia alertas em lote com intervalo entre cada envio
+        const sendAlertsWithInterval = async (
+            alerts: Array<{ phone: string; message: string; recipientName: string; stepId: string }>,
+            intervalSeconds: number
+        ) => {
+            if (alerts.length === 0) return;
+            const { EvolutionApi } = await import('../services/evolutionApi');
+            const { addWhatsAppLogs } = await import('../services/communicationService');
+            const newLogs: WhatsAppLog[] = [];
+
+            for (let i = 0; i < alerts.length; i++) {
+                if (i > 0) await new Promise(r => setTimeout(r, intervalSeconds * 1000));
+                const alert = alerts[i];
+                const success = await EvolutionApi.sendText({
+                    instanceUrl: evo!.instanceUrl,
+                    instanceName: evo!.instanceName!,
+                    token: evo!.token,
+                    phone: alert.phone,
+                    message: alert.message,
+                });
+                newLogs.push({
+                    sentAt: new Date().toISOString(),
+                    audience: 'team',
+                    stepId: alert.stepId,
+                    recipientName: alert.recipientName,
+                    phone: alert.phone,
+                    success: !!success,
+                });
+            }
+
+            if (newLogs.length > 0) {
+                const updatedLogs = addWhatsAppLogs(companySettings.whatsappLogs || [], newLogs);
+                updateCompanySettings({ ...companySettings, whatsappLogs: updatedLogs });
+            }
+        };
 
         const checkSlaBreaches = async () => {
-            if (!companySettings.evolutionApi?.instanceUrl || !companySettings.evolutionApi.token) return;
+            if (!evo?.globalEnabled || !evo?.instanceUrl || !evo.token) return;
+            if (!evo.settings.slaAlert.enabled) return;
 
-            // Iterate over batches to check for SLA violations
-            // We use a functional update pattern or just local checks to avoid infinite loops
-            // But here we might need to update the batch in DB/State if a notification is sent.
-
+            const slaSettings = evo.settings.slaAlert;
+            const slaAlertTime = slaSettings.slaAlertTime;
+            const intervalSeconds = Math.max(5, slaSettings.slaAlertIntervalSeconds ?? 8);
             const now = new Date();
 
-            for (const batch of allBatches) {
-                // Skip if already notified or if completed/lost
-                if (batch.slaNotificationSent) continue;
-                if (['9.0', '9.1'].includes(batch.phase)) continue;
+            // ── MODO AGENDADO: horário diário configurado ───────────────────────────
+            if (slaAlertTime) {
+                const [alertHour, alertMin] = slaAlertTime.split(':').map(Number);
+                const isTimeToAlert =
+                    now.getHours() > alertHour ||
+                    (now.getHours() === alertHour && now.getMinutes() >= alertMin);
 
-                const step = workflowConfig[batch.phase];
-                if (!step || !step.sla) continue; // No SLA for this step
+                const todayStr = now.toISOString().slice(0, 10); // "YYYY-MM-DD"
+                const todayKey = `fluxo_sla_daily_${currentStore?.id}_${todayStr}`;
+                if (!isTimeToAlert || localStorage.getItem(todayKey) === 'sent') return;
 
-                const lastUpdate = new Date(batch.lastUpdated);
-                const slaMs = step.sla * 24 * 60 * 60 * 1000;
-                const deadline = new Date(lastUpdate.getTime() + slaMs);
-                const timeLeftMs = deadline.getTime() - now.getTime();
+                // Marca ANTES de enviar para evitar disparos duplicados
+                localStorage.setItem(todayKey, 'sent');
 
-                // 1. SLA BREACHED (Corrective)
-                if (now > deadline && !batch.slaNotificationSent) {
-                    console.log(`SLA Breach detected for Batch ${batch.name} (Project ${batch.projectId}) in step ${step.label}`);
+                const alerts: Array<{ phone: string; message: string; recipientName: string; stepId: string }> = [];
+
+                for (const batch of allBatches) {
+                    if (batch.status !== 'Active') continue;
+                    if (['9.0', '9.1'].includes(batch.phase)) continue;
+
+                    const step = workflowConfig[batch.phase];
+                    if (!step || !step.sla) continue;
+
+                    const deadline = new Date(new Date(batch.lastUpdated).getTime() + step.sla * 864e5);
+                    const timeLeftMs = deadline.getTime() - now.getTime();
+                    const isBreached = now > deadline;
+                    const isPreventive = slaSettings.preventive && timeLeftMs > 0 && timeLeftMs < 864e5;
+
+                    if (!isBreached && !isPreventive) continue;
 
                     const project = allProjects.find(p => p.id === batch.projectId);
                     if (!project) continue;
 
-                    const message = `⚠️ *Alerta de Atraso (SLA)*\n\nO projeto *${project.client.name}* - *${batch.name}* está atrasado na etapa: *${step.label}*.\n\nPrazo era: ${deadline.toLocaleDateString()}\nStatus: ATRASADO`;
+                    const type: 'sla_d0' | 'sla_d1' = isBreached ? 'sla_d0' : 'sla_d1';
+                    const recipients = getAlertRecipients(batch, project, step);
 
-                    await notifyInvolvedSLA(batch, project, step, message);
-
-                    const updateData = { slaNotificationSent: true };
-                    if (useCloud && db) persist("batches", batch.id, updateData);
-                    else setAllBatches((prev: Batch[]) => prev.map((b: Batch) => b.id === batch.id ? { ...b, ...updateData } : b));
+                    for (const user of recipients) {
+                        if (!user.phone) continue;
+                        const message = buildSlaMessage(type, user.name, project, batch, step, deadline);
+                        if (!message) continue;
+                        alerts.push({ phone: user.phone, message, recipientName: user.name, stepId: type });
+                    }
                 }
-                // 2. SLA PREVENTIVE (24h before)
-                else if (timeLeftMs > 0 && timeLeftMs < 24 * 60 * 60 * 1000 && !batch.slaPreventiveSent) {
-                    const project = allProjects.find((p: Project) => p.id === batch.projectId);
-                    if (!project) continue;
 
-                    const message = `⏳ *Alerta Preventivo (SLA)*\n\nO projeto *${project.client.name}* vencerá em menos de 24h na etapa: *${step.label}*.\n\nPrazo: ${deadline.toLocaleString()}`;
+                await sendAlertsWithInterval(alerts, intervalSeconds);
+                return; // modo agendado não usa flags por lote
+            }
 
-                    await notifyInvolvedSLA(batch, project, step, message);
+            // ── MODO LEGADO: disparo imediato ao detectar violação ──────────────────
+            for (const batch of allBatches) {
+                if (['9.0', '9.1'].includes(batch.phase)) continue;
 
-                    const updateData = { slaPreventiveSent: true };
-                    if (useCloud && db) persist("batches", batch.id, updateData);
-                    else setAllBatches((prev: Batch[]) => prev.map((b: Batch) => b.id === batch.id ? { ...b, ...updateData } : b));
+                const step = workflowConfig[batch.phase];
+                if (!step || !step.sla) continue;
+
+                const deadline = new Date(new Date(batch.lastUpdated).getTime() + step.sla * 864e5);
+                const timeLeftMs = deadline.getTime() - now.getTime();
+
+                const project = allProjects.find(p => p.id === batch.projectId);
+                if (!project) continue;
+
+                if (now > deadline && !batch.slaNotificationSent) {
+                    const recipients = getAlertRecipients(batch, project, step);
+                    const alerts = recipients
+                        .filter(u => u.phone)
+                        .map(u => ({
+                            phone: u.phone!,
+                            message: buildSlaMessage('sla_d0', u.name, project, batch, step, deadline),
+                            recipientName: u.name,
+                            stepId: 'sla_d0',
+                        }))
+                        .filter(a => a.message);
+
+                    await sendAlertsWithInterval(alerts, intervalSeconds);
+
+                    const upd = { slaNotificationSent: true };
+                    if (useCloud && db) persist("batches", batch.id, upd);
+                    else setAllBatches((prev: Batch[]) => prev.map((b: Batch) => b.id === batch.id ? { ...b, ...upd } : b));
+
+                } else if (slaSettings.preventive && timeLeftMs > 0 && timeLeftMs < 864e5 && !batch.slaPreventiveSent) {
+                    const recipients = getAlertRecipients(batch, project, step);
+                    const alerts = recipients
+                        .filter(u => u.phone)
+                        .map(u => ({
+                            phone: u.phone!,
+                            message: buildSlaMessage('sla_d1', u.name, project, batch, step, deadline),
+                            recipientName: u.name,
+                            stepId: 'sla_d1',
+                        }))
+                        .filter(a => a.message);
+
+                    await sendAlertsWithInterval(alerts, intervalSeconds);
+
+                    const upd = { slaPreventiveSent: true };
+                    if (useCloud && db) persist("batches", batch.id, upd);
+                    else setAllBatches((prev: Batch[]) => prev.map((b: Batch) => b.id === batch.id ? { ...b, ...upd } : b));
                 }
             }
         };
 
-        const notifyInvolvedSLA = async (batch: Batch, project: Project, step: WorkflowStep, message: string) => {
-            const evo = companySettings.evolutionApi;
-            if (!evo?.globalEnabled || !evo.settings.slaAlert.enabled) return;
-
-            let targetUsers: User[] = [];
-
-            // Seller
-            if (step.ownerRole === 'Vendedor' && project.sellerId && evo.settings.slaAlert.notifySeller) {
-                const seller = allUsers.find((u: User) => u.id === project.sellerId);
-                if (seller) targetUsers.push(seller);
-            }
-
-            // Admins/Managers
-            if (evo.settings.slaAlert.notifyManager) {
-                const admins = allUsers.filter((u: User) => u.storeId === batch.storeId && ['Admin', 'Proprietario', 'Gerente'].includes(u.role));
-                targetUsers = [...targetUsers, ...admins];
-            }
-
-            // Remove duplicates
-            const uniqueTargetUsers = targetUsers.filter((u: User, index: number, self: User[]) => index === self.findIndex((t: User) => t.id === u.id));
-
-            for (const user of uniqueTargetUsers) {
-                if (user.phone) {
-                    await sendWhatsApp(user.phone, message);
-                }
-            }
-
-            // Also notify company phone if configured
-            if (companySettings.phone && evo.settings.slaAlert.notifyManager) {
-                await sendWhatsApp(companySettings.phone, `[GESTÃO-SLA]\n${message}`);
-            }
-        };
-
-        // Run check every 1 hour (3600000 ms) or just on mount/updates?
-        // If we only run on mount/dependency change, it runs whenever 'allBatches' changes (which includes the update we just made).
-        // To avoid rapid loops if something goes wrong, maybe we stick to a simplified check or use a ref to track last check?
-        // For now, let's trust 'slaNotificationSent' prevents loops.
-        // We also want to check periodically even if no data changes (e.g. time passes).
-        const intervalId = setInterval(checkSlaBreaches, 60 * 60 * 1000); // Check every hour
-
-        // Also run immediately on data change (debounced slightly?)
-        const timeoutId = setTimeout(checkSlaBreaches, 5000); // Run 5s after data load/change to let things settle
+        // Modo agendado: verifica a cada minuto; modo legado: a cada hora
+        const hasSlaAlertTime = !!evo?.settings?.slaAlert?.slaAlertTime;
+        const intervalMs = hasSlaAlertTime ? 60_000 : 3_600_000;
+        const intervalId = setInterval(checkSlaBreaches, intervalMs);
+        const timeoutId = setTimeout(checkSlaBreaches, 5000);
 
         return () => {
             clearInterval(intervalId);
             clearTimeout(timeoutId);
         };
 
-    }, [allBatches, allProjects, allUsers, workflowConfig, companySettings, useCloud]); // Dependencies: if any of these change, re-run checks
+    }, [allBatches, allProjects, allUsers, workflowConfig, companySettings, useCloud, currentStore]);
 
 
     return (

@@ -63,7 +63,15 @@ export interface CompanySettings {
       newObservation: { enabled: boolean; notifySeller: boolean; notifyManager: boolean; };
       assistanceUpdate: { enabled: boolean; notifyClient: boolean; notifySeller: boolean; notifyManager: boolean; };
       postAssemblyUpdate: { enabled: boolean; notifyClient: boolean; notifySeller: boolean; notifyManager: boolean; };
-      slaAlert: { enabled: boolean; notifySeller: boolean; notifyManager: boolean; preventive: boolean; };
+      slaAlert: {
+        enabled: boolean;
+        notifySeller: boolean;
+        notifyManager: boolean;
+        preventive: boolean;
+        slaAlertTime?: string;            // Horário diário no formato "HH:MM", ex: "10:00"
+        slaAlertIntervalSeconds?: number; // Intervalo em segundos entre cada envio (padrão: 8)
+        notifyRoles?: Role[];             // Cargos que recebem alertas de SLA
+      };
     };
   };
   whatsappClientTemplates?: ClientWhatsAppTemplate[];

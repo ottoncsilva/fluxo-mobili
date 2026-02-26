@@ -96,3 +96,9 @@ export function addWhatsAppLog(currentLogs: WhatsAppLog[], newLog: WhatsAppLog):
     }
     return updated;
 }
+
+export function addWhatsAppLogs(currentLogs: WhatsAppLog[], newLogs: WhatsAppLog[]): WhatsAppLog[] {
+    if (newLogs.length === 0) return currentLogs;
+    const updated = [...newLogs, ...currentLogs];
+    return updated.slice(0, MAX_LOGS);
+}
