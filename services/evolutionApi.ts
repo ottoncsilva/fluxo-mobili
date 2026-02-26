@@ -2,6 +2,7 @@ import { Store } from '../types';
 
 interface SendTextOptions {
     instanceUrl: string;
+    instanceName: string;
     token: string;
     phone: string;
     message: string;
@@ -18,8 +19,8 @@ export const EvolutionApi = {
         return cleaned;
     },
 
-    sendText: async ({ instanceUrl, token, phone, message }: SendTextOptions) => {
-        if (!instanceUrl || !token || !phone) return false;
+    sendText: async ({ instanceUrl, instanceName, token, phone, message }: SendTextOptions) => {
+        if (!instanceUrl || !instanceName || !token || !phone) return false;
 
         try {
             const formattedPhone = EvolutionApi.formatPhone(phone);
@@ -28,13 +29,14 @@ export const EvolutionApi = {
             // Ensure URL doesn't have trailing slash for consistency
             const baseUrl = instanceUrl.replace(/\/$/, '');
 
-            const response = await fetch(`${baseUrl}/message/sendText/${formattedPhone}`, {
+            const response = await fetch(`${baseUrl}/message/sendText/${instanceName}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'apikey': token
                 },
                 body: JSON.stringify({
+                    number: formattedPhone,
                     text: message,
                     options: {
                         delay: 1200,
@@ -56,11 +58,11 @@ export const EvolutionApi = {
         }
     },
 
-    checkConnection: async (instanceUrl: string, token: string) => {
-        if (!instanceUrl || !token) return false;
+    checkConnection: async (instanceUrl: string, instanceName: string, token: string) => {
+        if (!instanceUrl || !instanceName || !token) return false;
         try {
             const baseUrl = instanceUrl.replace(/\/$/, '');
-            const response = await fetch(`${baseUrl}/instance/connect`, {
+            const response = await fetch(`${baseUrl}/instance/connectionState/${instanceName}`, {
                 method: 'GET',
                 headers: { 'apikey': token }
             });

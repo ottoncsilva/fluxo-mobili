@@ -166,6 +166,7 @@ const Settings: React.FC = () => {
             evolutionApi: {
                 ...companySettings.evolutionApi,
                 instanceUrl: evoInstanceUrl,
+                instanceName: evoInstanceName,
                 token: evoToken,
                 globalEnabled: evoGlobalEnabled,
                 settings: evoSettings,
@@ -191,6 +192,7 @@ const Settings: React.FC = () => {
 
     // Evolution API State
     const [evoInstanceUrl, setEvoInstanceUrl] = useState(companySettings.evolutionApi?.instanceUrl || '');
+    const [evoInstanceName, setEvoInstanceName] = useState(companySettings.evolutionApi?.instanceName || '');
     const [evoToken, setEvoToken] = useState(companySettings.evolutionApi?.token || '');
     const [evoGlobalEnabled, setEvoGlobalEnabled] = useState(companySettings.evolutionApi?.globalEnabled ?? false);
     const [evoSettings, setEvoSettings] = useState<any>(companySettings.evolutionApi?.settings || {
@@ -225,6 +227,7 @@ const Settings: React.FC = () => {
             evolutionApi: {
                 ...companySettings.evolutionApi,
                 instanceUrl: evoInstanceUrl,
+                instanceName: evoInstanceName,
                 token: evoToken,
                 globalEnabled: evoGlobalEnabled,
                 settings: evoSettings,
@@ -242,7 +245,7 @@ const Settings: React.FC = () => {
         setTestConnectionStatus('testing');
         // Dynamic import to avoid SSR issues if any, though likely client side.
         const { EvolutionApi } = await import('../services/evolutionApi');
-        const success = await EvolutionApi.checkConnection(evoInstanceUrl, evoToken);
+        const success = await EvolutionApi.checkConnection(evoInstanceUrl, evoInstanceName, evoToken);
         setTestConnectionStatus(success ? 'success' : 'error');
         setTimeout(() => setTestConnectionStatus('idle'), 3000);
     };
@@ -1243,7 +1246,11 @@ const Settings: React.FC = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="md:col-span-2">
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-2">URL da Instância</label>
-                                    <input type="text" value={evoInstanceUrl} onChange={e => setEvoInstanceUrl(e.target.value)} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm" placeholder="https://api.evolution.com/instance/minha-empresa" />
+                                    <input type="text" value={evoInstanceUrl} onChange={e => setEvoInstanceUrl(e.target.value)} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm" placeholder="https://api.evolution.com" />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Nome da Instância</label>
+                                    <input type="text" value={evoInstanceName} onChange={e => setEvoInstanceName(e.target.value)} className="w-full rounded-lg border-slate-200 dark:bg-slate-800 text-sm" placeholder="Ex: minha-empresa" />
                                 </div>
                                 <div className="md:col-span-2">
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-2">API Token</label>
@@ -1253,7 +1260,7 @@ const Settings: React.FC = () => {
                             <div className="mt-4 flex items-center gap-3">
                                 <button
                                     onClick={handleTestConnection}
-                                    disabled={testConnectionStatus === 'testing' || !evoInstanceUrl || !evoToken}
+                                    disabled={testConnectionStatus === 'testing' || !evoInstanceUrl || !evoInstanceName || !evoToken}
                                     className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors ${testConnectionStatus === 'success' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : testConnectionStatus === 'error' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'}`}
                                 >
                                     <span className="material-symbols-outlined text-sm">{testConnectionStatus === 'testing' ? 'refresh' : testConnectionStatus === 'success' ? 'check_circle' : testConnectionStatus === 'error' ? 'error' : 'wifi_tethering'}</span>
@@ -1561,11 +1568,10 @@ const Settings: React.FC = () => {
                                                     <td className="px-4 py-3 text-slate-600 dark:text-slate-400 font-mono">{holiday.date}</td>
                                                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{holiday.name}</td>
                                                     <td className="px-4 py-3">
-                                                        <span className={`text-xs font-bold px-2 py-1 rounded ${
-                                                            holiday.type === 'fixed'
+                                                        <span className={`text-xs font-bold px-2 py-1 rounded ${holiday.type === 'fixed'
                                                                 ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
                                                                 : 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300'
-                                                        }`}>
+                                                            }`}>
                                                             {holiday.type === 'fixed' ? 'Fixo' : `Móvel (${holiday.year})`}
                                                         </span>
                                                     </td>

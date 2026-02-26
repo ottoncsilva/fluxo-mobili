@@ -31,13 +31,14 @@ export async function sendClientNotification(
     }
 
     const api = settings.evolutionApi;
-    if (!api?.instanceUrl || !api?.token) {
+    if (!api?.instanceUrl || !api?.token || !api?.instanceName) {
         return { success: false, log };
     }
 
     const message = resolveTemplate(template.message, vars);
     const success = await EvolutionApi.sendText({
         instanceUrl: api.instanceUrl,
+        instanceName: api.instanceName,
         token: api.token,
         phone: clientPhone,
         message,
@@ -71,13 +72,14 @@ export async function sendTeamSlaAlert(
     }
 
     const api = settings.evolutionApi;
-    if (!api?.instanceUrl || !api?.token) {
+    if (!api?.instanceUrl || !api?.token || !api?.instanceName) {
         return { success: false, log };
     }
 
     const message = resolveTemplate(template.message, { ...vars, nomeResponsavel: recipientName });
     const success = await EvolutionApi.sendText({
         instanceUrl: api.instanceUrl,
+        instanceName: api.instanceName,
         token: api.token,
         phone: recipientPhone,
         message,

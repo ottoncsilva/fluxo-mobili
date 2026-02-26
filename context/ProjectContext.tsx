@@ -1500,11 +1500,12 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     // Helper to send notifications
     const sendWhatsApp = async (phone: string | undefined, message: string) => {
-        if (!phone || !companySettings.evolutionApi?.instanceUrl || !companySettings.evolutionApi?.token || !companySettings.evolutionApi.globalEnabled) return;
+        if (!phone || !companySettings.evolutionApi?.instanceUrl || !companySettings.evolutionApi?.instanceName || !companySettings.evolutionApi?.token || !companySettings.evolutionApi.globalEnabled) return;
 
         const { EvolutionApi } = await import('../services/evolutionApi');
         await EvolutionApi.sendText({
             instanceUrl: companySettings.evolutionApi.instanceUrl,
+            instanceName: companySettings.evolutionApi.instanceName,
             token: companySettings.evolutionApi.token,
             phone,
             message
@@ -1569,13 +1570,14 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     const notifySalesNewLead = async (client: Client) => {
         // Notify Sales (Company Phone) when a new lead is created
-        if (!companySettings.evolutionApi?.globalEnabled || !companySettings.evolutionApi?.instanceUrl || !companySettings.phone) return;
+        if (!companySettings.evolutionApi?.globalEnabled || !companySettings.evolutionApi?.instanceUrl || !companySettings.evolutionApi?.instanceName || !companySettings.phone) return;
 
         const message = `🔔 *Novo Lead Cadastrado*\n\n👤 Nome: ${client.name}\n📱 Telefone: ${client.phone}\n📍 Origem: ${client.origin || 'Não informado'}\n\nAcesse o sistema para mais detalhes.`;
 
         await import('../services/evolutionApi').then(({ EvolutionApi }) => {
             EvolutionApi.sendText({
                 instanceUrl: companySettings.evolutionApi!.instanceUrl,
+                instanceName: companySettings.evolutionApi!.instanceName!,
                 token: companySettings.evolutionApi!.token,
                 phone: companySettings.phone,
                 message
