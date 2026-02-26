@@ -1614,41 +1614,32 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             return template.message.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? `{${key}}`);
         };
 
-        // Resolve destinatários de acordo com notifyRoles configurado
+        // Resolve destinatários por etapa, usando stepNotifyRoles configurado
         const getAlertRecipients = (batch: Batch, project: Project, step: WorkflowStep): User[] => {
             if (!evo) return [];
             const slaSettings = evo.settings.slaAlert;
-            const notifyRoles: Role[] = slaSettings.notifyRoles?.length
-                ? slaSettings.notifyRoles
-                : ['Vendedor', 'Projetista', 'Gerente'];
+            // Fallback: ownerRole + Gerente quando a etapa ainda não foi configurada
+            const rolesForStep: Role[] = (slaSettings.stepNotifyRoles as Record<string, Role[]> | undefined)?.[step.id]?.length
+                ? (slaSettings.stepNotifyRoles as Record<string, Role[]>)[step.id]
+                : [step.ownerRole, 'Gerente'];
 
             const seen = new Set<string>();
             const add = (u: User) => { if (!seen.has(u.id)) { seen.add(u.id); targets.push(u); } };
             const targets: User[] = [];
 
-            // 1. Responsáveis da etapa (ownerRole) — apenas se o cargo estiver na lista
-            if (notifyRoles.includes(step.ownerRole)) {
-                allUsers
-                    .filter((u: User) => u.storeId === batch.storeId && u.role === step.ownerRole)
-                    .forEach(add);
-            }
-
-            // 2. Vendedor específico do projeto
-            if (slaSettings.notifySeller && project.sellerId && notifyRoles.includes('Vendedor')) {
-                const seller = allUsers.find((u: User) => u.id === project.sellerId);
-                if (seller) add(seller);
-            }
-
-            // 3. Gerentes/Admins cujos cargos estejam na lista
-            if (slaSettings.notifyManager) {
-                const managerRoles: Role[] = ['Admin', 'Proprietario', 'Gerente'];
-                allUsers
-                    .filter((u: User) =>
-                        u.storeId === batch.storeId &&
-                        managerRoles.includes(u.role) &&
-                        notifyRoles.includes(u.role)
-                    )
-                    .forEach(add);
+            for (const role of rolesForStep) {
+                if (role === 'Vendedor') {
+                    // Vendedor = vendedor específico do projeto (não todos os vendedores)
+                    const seller = project.sellerId
+                        ? allUsers.find((u: User) => u.id === project.sellerId)
+                        : undefined;
+                    if (seller) add(seller);
+                } else {
+                    // Outros cargos: todos os usuários da loja com esse cargo
+                    allUsers
+                        .filter((u: User) => u.storeId === batch.storeId && u.role === role)
+                        .forEach(add);
+                }
             }
 
             return targets;

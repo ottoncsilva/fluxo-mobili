@@ -201,7 +201,7 @@ const Settings: React.FC = () => {
             enabled: true, notifySeller: true, notifyManager: true, preventive: true,
             slaAlertTime: '08:00',
             slaAlertIntervalSeconds: 8,
-            notifyRoles: ['Vendedor', 'Projetista', 'Gerente'] as Role[],
+            stepNotifyRoles: {} as Record<string, Role[]>,
         };
         const defaults = {
             stageChange: { enabled: true, notifyClient: true, notifySeller: true, notifyManager: true },
@@ -229,6 +229,7 @@ const Settings: React.FC = () => {
     const [commLogs] = useState<WhatsAppLog[]>(companySettings.whatsappLogs || []);
     const [commSaveMsg, setCommSaveMsg] = useState<string | null>(null);
     const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+    const [expandedSlaStep, setExpandedSlaStep] = useState<string | null>(null);
 
     const handleSaveCommunications = async () => {
         setSaving(true);
@@ -1424,33 +1425,126 @@ const Settings: React.FC = () => {
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Cargos que recebem alertas de SLA</label>
-                                <p className="text-xs text-slate-400 mb-4">O alerta é enviado para todos os usuários dos cargos selecionados. O responsável da etapa é sempre incluído se o cargo estiver marcado.</p>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                    {(['Vendedor', 'Projetista', 'Medidor', 'Liberador', 'Financeiro', 'Logistica', 'Montador', 'Coordenador de Montagem', 'Gerente', 'Admin', 'Proprietario'] as Role[]).map(role => {
-                                        const currentRoles: Role[] = evoSettings.slaAlert?.notifyRoles || ['Vendedor', 'Projetista', 'Gerente'];
-                                        const isChecked = currentRoles.includes(role);
-                                        return (
-                                            <label key={role} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${isChecked ? 'border-amber-300 bg-amber-50/50 dark:border-amber-700 dark:bg-amber-900/10' : 'border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={isChecked}
-                                                    onChange={() => {
-                                                        const updated = isChecked
-                                                            ? currentRoles.filter(r => r !== role)
-                                                            : [...currentRoles, role];
-                                                        setEvoSettings((prev: any) => ({
-                                                            ...prev,
-                                                            slaAlert: { ...prev.slaAlert, notifyRoles: updated }
-                                                        }));
-                                                    }}
-                                                    className="rounded text-amber-500 focus:ring-amber-400 h-4 w-4"
-                                                />
-                                                <span className="text-sm text-slate-700 dark:text-slate-200">{role}</span>
-                                            </label>
-                                        );
-                                    })}
-                                </div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Destinatários por Etapa</label>
+                                <p className="text-xs text-slate-400 mb-4">
+                                    Clique em uma etapa para escolher quais cargos recebem o alerta de SLA.{' '}
+                                    <span className="font-semibold text-amber-600 dark:text-amber-400">Vendedor</span> = vendedor responsável pelo projeto específico.
+                                </p>
+                                {(() => {
+                                    const SLA_ROLES: Array<{ role: Role; color: string }> = [
+                                        { role: 'Vendedor',                   color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
+                                        { role: 'Projetista',                 color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300' },
+                                        { role: 'Medidor',                    color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300' },
+                                        { role: 'Liberador',                  color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300' },
+                                        { role: 'Financeiro',                 color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' },
+                                        { role: 'Logistica',                  color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300' },
+                                        { role: 'Montador',                   color: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300' },
+                                        { role: 'Coordenador de Montagem',    color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' },
+                                        { role: 'Gerente',                    color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
+                                        { role: 'Admin',                      color: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200' },
+                                        { role: 'Proprietario',               color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300' },
+                                    ];
+                                    const stageNames: Record<number, string> = {
+                                        1: 'Pré-Venda', 2: 'Venda', 3: 'Medição', 4: 'Engenharia',
+                                        5: 'Implantação', 6: 'Logística', 7: 'Montagem', 8: 'Pós Montagem', 9: 'Conclusão',
+                                    };
+                                    const getStepRoles = (stepId: string, ownerRole: Role): Role[] => {
+                                        const saved = evoSettings.slaAlert?.stepNotifyRoles?.[stepId];
+                                        return saved?.length ? saved : [ownerRole, 'Gerente'];
+                                    };
+                                    const toggleStepRole = (stepId: string, role: Role, ownerRole: Role) => {
+                                        const current: Role[] = getStepRoles(stepId, ownerRole);
+                                        const updated = current.includes(role)
+                                            ? current.filter(r => r !== role)
+                                            : [...current, role];
+                                        setEvoSettings((prev: any) => ({
+                                            ...prev,
+                                            slaAlert: {
+                                                ...prev.slaAlert,
+                                                stepNotifyRoles: { ...(prev.slaAlert?.stepNotifyRoles || {}), [stepId]: updated },
+                                            },
+                                        }));
+                                    };
+                                    const roleColorMap = Object.fromEntries(SLA_ROLES.map(r => [r.role, r.color]));
+                                    // Group steps with SLA > 0 by stage
+                                    const stepsByStage: Record<number, WorkflowStep[]> = {};
+                                    workflowOrder.forEach(id => {
+                                        const step = workflowConfig[id];
+                                        if (!step || step.sla === 0) return;
+                                        if (!stepsByStage[step.stage]) stepsByStage[step.stage] = [];
+                                        stepsByStage[step.stage].push(step);
+                                    });
+                                    return (
+                                        <div className="space-y-1">
+                                            {Object.entries(stepsByStage).map(([stageId, steps]) => (
+                                                <div key={`stage-${stageId}`}>
+                                                    {/* Stage header */}
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1 pt-3 pb-1">
+                                                        {stageNames[Number(stageId)] || `Estágio ${stageId}`}
+                                                    </p>
+                                                    <div className="space-y-1">
+                                                        {(steps as WorkflowStep[]).map((step: WorkflowStep) => {
+                                                            const stepRoles = getStepRoles(step.id, step.ownerRole);
+                                                            const isOpen = expandedSlaStep === step.id;
+                                                            return (
+                                                                <div key={step.id} className={`rounded-xl border transition-all ${isOpen ? 'border-amber-300 dark:border-amber-700 shadow-sm' : 'border-slate-100 dark:border-slate-800'}`}>
+                                                                    {/* Row — click to toggle dropdown */}
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setExpandedSlaStep(isOpen ? null : step.id)}
+                                                                        className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-xl transition-colors"
+                                                                    >
+                                                                        <span className="font-mono text-[10px] text-slate-400 w-7 shrink-0">{step.id}</span>
+                                                                        <span className="text-sm font-medium text-slate-700 dark:text-slate-200 flex-1">{step.label}</span>
+                                                                        <span className="text-xs text-slate-400 shrink-0">{step.sla}d</span>
+                                                                        {/* Selected role badges */}
+                                                                        <div className="flex flex-wrap gap-1 justify-end max-w-[200px] shrink-0">
+                                                                            {stepRoles.map(role => (
+                                                                                <span key={role} className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${roleColorMap[role] || 'bg-slate-100 text-slate-600'}`}>
+                                                                                    {role === 'Coordenador de Montagem' ? 'C.Mont.' : role === 'Proprietario' ? 'Proprietário' : role}
+                                                                                </span>
+                                                                            ))}
+                                                                        </div>
+                                                                        <span className="material-symbols-outlined text-slate-400 text-sm transition-transform shrink-0" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                                                                            expand_more
+                                                                        </span>
+                                                                    </button>
+
+                                                                    {/* Dropdown with role checkboxes */}
+                                                                    {isOpen && (
+                                                                        <div className="px-3 pb-3 pt-1 border-t border-slate-100 dark:border-slate-800">
+                                                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mt-2">
+                                                                                {SLA_ROLES.map(r => {
+                                                                                    const isChecked = stepRoles.includes(r.role);
+                                                                                    const isOwner = r.role === step.ownerRole;
+                                                                                    return (
+                                                                                        <label
+                                                                                            key={r.role}
+                                                                                            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border cursor-pointer transition-all text-xs font-medium ${isChecked ? `${r.color} border-transparent` : 'border-slate-100 dark:border-slate-800 text-slate-500 hover:border-slate-200 dark:hover:border-slate-700'}`}
+                                                                                        >
+                                                                                            <input
+                                                                                                type="checkbox"
+                                                                                                checked={isChecked}
+                                                                                                onChange={() => toggleStepRole(step.id, r.role, step.ownerRole)}
+                                                                                                className="h-3.5 w-3.5 rounded shrink-0"
+                                                                                            />
+                                                                                            <span>{r.role === 'Coordenador de Montagem' ? 'C. Montagem' : r.role}</span>
+                                                                                            {isOwner && <span className="text-[9px] font-bold opacity-60 ml-auto">dono</span>}
+                                                                                        </label>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         </div>
 

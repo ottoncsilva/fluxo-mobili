@@ -115,7 +115,7 @@ export const DEFAULT_COMPANY_SETTINGS: CompanySettings = {
                 preventive: true,
                 slaAlertTime: '08:00',
                 slaAlertIntervalSeconds: 8,
-                notifyRoles: ['Vendedor', 'Projetista', 'Gerente']
+                stepNotifyRoles: {}
             }
         }
     },
