@@ -8,6 +8,8 @@ import LotModal from './LotModal';
 import ContractModal from './ContractModal';
 import EditableField from './EditableField'; // Assuming this component is available
 import EnvironmentValuesModal from './EnvironmentValuesModal';
+import SaleClosingModal, { SaleClosingData } from './SaleClosingModal';
+import StepObservationModal from './StepObservationModal';
 
 interface ProjectDetailsProps {
     onBack: () => void;
@@ -44,6 +46,7 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
         removeEnvironment,
         currentBatchId,
         setCurrentBatchId,
+        closeSale,
     } = useProjects();
     const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'ENVIRONMENTS' | 'BRIEFING' | 'TIMELINE'>('OVERVIEW'); // Changed 'ITPP' to 'BRIEFING'
     const [noteContent, setNoteContent] = useState('');
@@ -91,6 +94,12 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
     // Contract Modal
     const [isContractOpen, setIsContractOpen] = useState(false);
 
+    // Sale Closing Modal (etapa 2.8 → 2.9)
+    const [showSaleClosingModal, setShowSaleClosingModal] = useState(false);
+    const [pendingSaleBatch, setPendingSaleBatch] = useState<Batch | null>(null);
+
+    // Observation Modal (concluir qualquer etapa)
+    const [pendingObsData, setPendingObsData] = useState<{ batch: Batch; targetStepId: string | null; currentStepLabel: string; nextStepLabel: string } | null>(null);
 
     const project = currentProjectId ? getProjectById(currentProjectId) : null;
 
@@ -193,6 +202,13 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
         }
     };
 
+    const getNextStepLabel = (phase: string, targetStepId?: string): string => {
+        if (targetStepId) return workflowConfig[targetStepId]?.label || targetStepId;
+        const idx = workflowOrder.indexOf(phase);
+        if (idx !== -1 && idx < workflowOrder.length - 1) return workflowConfig[workflowOrder[idx + 1]]?.label || '';
+        return 'Concluído';
+    };
+
     const handleAdvance = (batch: Batch) => {
         // Interceptar etapa 2.3: mostrar modal de valores antes da decisão
         if (batch.phase === '2.3') {
@@ -210,11 +226,10 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
             return;
         }
 
-        setIsUpdatingStep(batch.id);
-        setTimeout(() => {
-            advanceBatch(batch.id);
-            setIsUpdatingStep(null);
-        }, 300);
+        // Etapa linear: mostrar modal de observação antes de avançar
+        const currentStepLabel = step?.label || batch.phase;
+        const nextStepLabel = getNextStepLabel(batch.phase);
+        setPendingObsData({ batch, targetStepId: null, currentStepLabel, nextStepLabel });
     };
 
     // Continua o fluxo após fechar o EnvironmentValuesModal (com ou sem valores)
@@ -224,11 +239,10 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
         if (options.length > 0) {
             setDecisionModalData({ batch, step });
         } else {
-            setIsUpdatingStep(batch.id);
-            setTimeout(() => {
-                advanceBatch(batch.id);
-                setIsUpdatingStep(null);
-            }, 300);
+            // Etapa linear: mostrar modal de observação
+            const currentStepLabel = step?.label || batch.phase;
+            const nextStepLabel = getNextStepLabel(batch.phase);
+            setPendingObsData({ batch, targetStepId: null, currentStepLabel, nextStepLabel });
         }
     };
 
@@ -262,8 +276,56 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
 
     const handleDecisionSelect = (targetStepId: string) => {
         if (!decisionModalData) return;
-        moveBatchToStep(decisionModalData.batch.id, targetStepId);
+        const { batch } = decisionModalData;
+
+        // Interceptar 2.8 → 2.9: abrir SaleClosingModal
+        if (batch.phase === '2.8' && targetStepId === '2.9') {
+            setDecisionModalData(null);
+            setPendingSaleBatch(batch);
+            setShowSaleClosingModal(true);
+            return;
+        }
+
+        // Demais decisões: mostrar modal de observação antes de avançar
+        const currentStepLabel = workflowConfig[batch.phase]?.label || batch.phase;
+        const nextStepLabel = workflowConfig[targetStepId]?.label || targetStepId;
         setDecisionModalData(null);
+        setPendingObsData({ batch, targetStepId, currentStepLabel, nextStepLabel });
+    };
+
+    const handleObservationConfirm = (observation: string) => {
+        if (!pendingObsData || !currentUser) return;
+        const { batch, targetStepId } = pendingObsData;
+        if (observation.trim()) {
+            addNote(project!.id, observation.trim(), currentUser.id);
+        }
+        setPendingObsData(null);
+        if (targetStepId) {
+            moveBatchToStep(batch.id, targetStepId);
+        } else {
+            setIsUpdatingStep(batch.id);
+            setTimeout(() => { advanceBatch(batch.id); setIsUpdatingStep(null); }, 300);
+        }
+    };
+
+    const handleObservationSkip = () => {
+        if (!pendingObsData) return;
+        const { batch, targetStepId } = pendingObsData;
+        setPendingObsData(null);
+        if (targetStepId) {
+            moveBatchToStep(batch.id, targetStepId);
+        } else {
+            setIsUpdatingStep(batch.id);
+            setTimeout(() => { advanceBatch(batch.id); setIsUpdatingStep(null); }, 300);
+        }
+    };
+
+    const handleSaleClosingConfirm = (data: SaleClosingData) => {
+        if (!pendingSaleBatch || !project) return;
+        closeSale(project.id, data);
+        moveBatchToStep(pendingSaleBatch.id, '2.9');
+        setShowSaleClosingModal(false);
+        setPendingSaleBatch(null);
     };
 
 
@@ -1488,6 +1550,29 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
                 onClose={() => setIsContractOpen(false)}
                 project={project}
             />
+
+            {/* Observation Modal (concluir qualquer etapa) */}
+            {pendingObsData && (
+                <StepObservationModal
+                    isOpen={true}
+                    currentStepLabel={pendingObsData.currentStepLabel}
+                    nextStepLabel={pendingObsData.nextStepLabel}
+                    batchName={`Lote ${pendingObsData.batch.id.substring(0, 4)}`}
+                    onConfirm={handleObservationConfirm}
+                    onSkip={handleObservationSkip}
+                    onCancel={() => setPendingObsData(null)}
+                />
+            )}
+
+            {/* Sale Closing Modal (2.8 → 2.9) */}
+            {showSaleClosingModal && pendingSaleBatch && (
+                <SaleClosingModal
+                    isOpen={true}
+                    batchName={`Lote ${pendingSaleBatch.id.substring(0, 4)}`}
+                    onConfirm={handleSaleClosingConfirm}
+                    onCancel={() => { setShowSaleClosingModal(false); setPendingSaleBatch(null); }}
+                />
+            )}
         </div>
     );
 }

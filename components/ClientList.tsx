@@ -1,71 +1,49 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useProjects } from '../context/ProjectContext';
-import { ViewState } from '../types';
+import NewAtendimentoModal from './NewAtendimentoModal';
 
 const ClientList: React.FC = () => {
-  const { projects, batches, workflowConfig, setCurrentProjectId, currentUser, deleteProject, assistanceTickets, canUserDeleteClient, canUserEditClient } = useProjects();
-  const [filter, setFilter] = useState<'Todos' | 'Ativos' | 'EmAndamento' | 'Concluidos' | 'Perdidos'>('Todos');
+  const { allClients, projects, setCurrentClientId } = useProjects();
+  const [filter, setFilter] = useState<'Todos' | 'Ativos' | 'Concluidos' | 'Perdidos'>('Todos');
   const [searchTerm, setSearchTerm] = useState('');
+  const [showNewAtendimento, setShowNewAtendimento] = useState(false);
 
-  const filteredProjects = projects.filter(p => {
-    // Search Filter
-    const matchesSearch = p.client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.client.email.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredClients = useMemo(() => {
+    return allClients.filter(client => {
+      const matchesSearch =
+        client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        client.phone.includes(searchTerm);
 
-    if (!matchesSearch) return false;
+      if (!matchesSearch) return false;
 
-    // Status Filter Logic
-    if (filter === 'Todos') return true;
+      if (filter === 'Todos') return true;
+      if (filter === 'Perdidos') return client.status === 'Perdido';
+      if (filter === 'Concluidos') return client.status === 'Concluido';
+      if (filter === 'Ativos') return client.status === 'Ativo';
+      return true;
+    });
+  }, [allClients, filter, searchTerm]);
 
-    if (filter === 'Perdidos') return p.client.status === 'Perdido';
-    if (filter === 'Concluidos') return p.client.status === 'Concluido';
+  const atendimentoCount = (clientId: string) =>
+    projects.filter(p => p.clientId === clientId).length;
 
-    const projectBatches = batches.filter(b => b.projectId === p.id);
+  const clientTotalValue = (clientId: string) => {
+    return projects
+      .filter(p => p.clientId === clientId)
+      .reduce((acc, p) => acc + p.environments.reduce((s, e) => s + (e.estimated_value || 0), 0), 0);
+  };
 
-    // Calculate the "max" stage of the project
-    let maxStage = 0;
-    if (projectBatches.length > 0) {
-      maxStage = Math.max(...projectBatches.map(b => {
-        const configStage = workflowConfig[b.phase]?.stage;
-        if (configStage !== undefined) return configStage;
+  const totalFilteredValue = useMemo(() =>
+    filteredClients.reduce((acc, c) => acc + clientTotalValue(c.id), 0),
+    [filteredClients, projects]
+  );
 
-        // Fallback for phases like '10.1' that might be in legacy data
-        const fallbackStage = Math.floor(parseFloat(b.phase));
-        return isNaN(fallbackStage) ? 1 : fallbackStage;
-      }));
-    } else {
-      // If no batches (new project), assume stage 1
-      maxStage = 1;
-    }
-
-    // Checking if there are active assistance tickets for this client (Stage 10)
-    // Using simple lookup for assistanceTickets (needs to be destructured from useProjects if available)
-
-    if (filter === 'Ativos') {
-      if (p.client.status !== 'Ativo') return false;
-      // Active/Unsold: Max Stage <= 2 (Pre-Sales & Sales)
-      return maxStage <= 2;
-    }
-
-    if (filter === 'EmAndamento') {
-      // Em Andamento implies sold, so it can be Ativo with Stage > 2
-      // OR it could be Concluído but has an ongoing Assistance ticket (if we decide to include them here)
-      // For now, if Ativo and > 2
-      if (p.client.status === 'Ativo') return maxStage > 2;
-
-      // If it's a legacy or strange phase > 9 and not explicitly "Perdido"
-      if (p.client.status !== 'Perdido' && maxStage > 9) return true;
-
-      return false;
-    }
-
-    return false;
-  });
-
-  const totalFilteredValue = filteredProjects.reduce((acc, p) => {
-    const pTotal = p.environments.reduce((sum, env) => sum + (env.estimated_value || 0), 0);
-    return acc + pTotal;
-  }, 0);
+  const statusColor = (status: string) => {
+    if (status === 'Perdido') return 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400';
+    if (status === 'Concluido') return 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400';
+    return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400';
+  };
 
   return (
     <div className="flex flex-col h-full bg-slate-50 dark:bg-[#101922]">
@@ -75,8 +53,7 @@ const ClientList: React.FC = () => {
           {[
             { id: 'Todos', label: 'Todos' },
             { id: 'Ativos', label: 'Ativos' },
-            { id: 'EmAndamento', label: 'Vendidos (Em Andamento)' },
-            { id: 'Concluidos', label: 'Vendidos (Concluídos)' },
+            { id: 'Concluidos', label: 'Concluídos' },
             { id: 'Perdidos', label: 'Perdidos' }
           ].map((tab) => (
             <button
@@ -88,7 +65,7 @@ const ClientList: React.FC = () => {
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-4 w-full md:w-auto">
+        <div className="flex items-center gap-3 w-full md:w-auto">
           <div className="relative flex-1 md:w-64">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
             <input
@@ -96,15 +73,20 @@ const ClientList: React.FC = () => {
               placeholder="Buscar cliente..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-lg border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-sm focus:ring-primary focus:border-primary"
+              className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-sm focus:ring-primary focus:border-primary focus:outline-none"
             />
           </div>
-          {/* The Button requested */}
+          <button
+            onClick={() => setShowNewAtendimento(true)}
+            className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold py-2 px-4 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center gap-2 whitespace-nowrap text-sm"
+          >
+            <span className="material-symbols-outlined text-sm">add_task</span> Novo Atendimento
+          </button>
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('navigate-registration'))}
-            className="bg-primary text-white font-bold py-2 px-4 rounded-lg shadow-lg shadow-primary/20 hover:bg-primary-600 transition-colors flex items-center gap-2 whitespace-nowrap"
+            className="bg-primary text-white font-bold py-2 px-4 rounded-lg shadow-lg shadow-primary/20 hover:bg-primary/90 transition-colors flex items-center gap-2 whitespace-nowrap text-sm"
           >
-            <span className="material-symbols-outlined text-sm">add</span> Novo Cliente
+            <span className="material-symbols-outlined text-sm">person_add</span> Novo Cliente
           </button>
         </div>
       </div>
@@ -114,7 +96,7 @@ const ClientList: React.FC = () => {
         <div className="bg-white dark:bg-[#1a2632] p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Valor Total (Filtro)</p>
-            <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">R$ {totalFilteredValue.toLocaleString()}</p>
+            <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">R$ {totalFilteredValue.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}</p>
           </div>
           <div className="size-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600">
             <span className="material-symbols-outlined">payments</span>
@@ -122,8 +104,8 @@ const ClientList: React.FC = () => {
         </div>
         <div className="bg-white dark:bg-[#1a2632] p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
           <div>
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Clientes Listados</p>
-            <p className="text-2xl font-bold text-slate-800 dark:text-white">{filteredProjects.length}</p>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Clientes Cadastrados</p>
+            <p className="text-2xl font-bold text-slate-800 dark:text-white">{filteredClients.length}</p>
           </div>
           <div className="size-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
             <span className="material-symbols-outlined">groups</span>
@@ -139,129 +121,84 @@ const ClientList: React.FC = () => {
               <tr>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Cliente</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Contato</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Vendedor</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Etapa Atual</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Ambientes</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Investimento</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Atendimentos</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Investimento Total</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Ação</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {filteredProjects.map((project) => {
-                const totalValue = project.environments.reduce((acc, env) => acc + (env.estimated_value || 0), 0);
-
-                // Determine display status/stage
-                const projectBatches = batches.filter(b => b.projectId === project.id);
-                const phase = projectBatches.length > 0 ? projectBatches[0].phase : '1.1';
-                const currentStep = workflowConfig[phase];
-
-                let maxStage = 0;
-                if (projectBatches.length > 0) {
-                  maxStage = Math.max(...projectBatches.map(b => {
-                    const configStage = workflowConfig[b.phase]?.stage;
-                    if (configStage !== undefined) return configStage;
-                    const fallbackStage = Math.floor(parseFloat(b.phase));
-                    return isNaN(fallbackStage) ? 1 : fallbackStage;
-                  }));
-                } else {
-                  maxStage = 1;
-                }
-
-                let displayStatus: string = project.client.status;
-                let statusColor = 'bg-slate-100 text-slate-600';
-
-                if (project.client.status === 'Perdido') {
-                  displayStatus = 'Perdido';
-                  statusColor = 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400';
-                } else if (project.client.status === 'Concluido') {
-                  displayStatus = 'Concluído';
-                  statusColor = 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400';
-                } else if (maxStage > 2) {
-                  displayStatus = 'Em Andamento';
-                  statusColor = 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400';
-                } else {
-                  displayStatus = 'Ativo';
-                  statusColor = 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400';
-                }
+              {filteredClients.map((client) => {
+                const count = atendimentoCount(client.id);
+                const totalValue = clientTotalValue(client.id);
 
                 return (
-                  <tr key={project.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                  <tr
+                    key={client.id}
+                    className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer"
+                    onClick={() => setCurrentClientId(client.id)}
+                  >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="size-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold overflow-hidden">
-                          {project.client.name.charAt(0)}
+                        <div className="size-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold overflow-hidden shrink-0">
+                          {client.name.charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <p className="font-bold text-slate-900 dark:text-white">{project.client.name}</p>
-                          <p className="text-xs text-slate-500">Origem: {project.client.origin || 'N/A'}</p>
+                          <p className="font-bold text-slate-900 dark:text-white">{client.name}</p>
+                          <p className="text-xs text-slate-500">Origem: {client.origin || 'N/A'}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">
-                      <p>{project.client.email}</p>
-                      <p className="text-xs text-slate-400">{project.client.phone}</p>
+                      <p>{client.email}</p>
+                      <p className="text-xs text-slate-400">{client.phone}</p>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded">
-                        {project.sellerName || 'N/A'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${statusColor}`}>
-                        {displayStatus}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">
-                        {currentStep ? `${currentStep.id} ${currentStep.label}` : 'N/A'}
+                      <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${statusColor(client.status)}`}>
+                        {client.status}
                       </span>
                     </td>
                     <td className="px-6 py-4">
                       <span className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 rounded text-xs font-semibold text-slate-600 dark:text-slate-300">
-                        {project.environments.length} Ambientes
+                        {count} atend.
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm font-medium text-slate-700 dark:text-slate-200">
-                      R$ {totalValue.toLocaleString()}
+                      {totalValue > 0 ? `R$ ${totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}` : '—'}
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-4">
-                        <button
-                          onClick={() => setCurrentProjectId(project.id)}
-                          className="text-primary font-bold text-sm hover:underline flex items-center gap-1"
-                        >
-                          Ver Detalhes <span className="material-symbols-outlined text-sm">arrow_forward</span>
-                        </button>
-
-                        {canUserDeleteClient() && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (confirm(`Tem certeza que deseja excluir o cliente ${project.client.name}? Esta ação não pode ser desfeita.`)) {
-                                deleteProject(project.id);
-                              }
-                            }}
-                            className="text-slate-400 hover:text-red-600 transition-colors"
-                            title="Excluir Cliente"
-                          >
-                            <span className="material-symbols-outlined text-sm">delete</span>
-                          </button>
-                        )}
-                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setCurrentClientId(client.id); }}
+                        className="text-primary font-bold text-sm hover:underline flex items-center gap-1"
+                      >
+                        Ver Ficha <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                      </button>
                     </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
-          {filteredProjects.length === 0 && (
+          {filteredClients.length === 0 && (
             <div className="p-12 text-center text-slate-400">
-              Nenhum cliente encontrado com este filtro.
+              {allClients.length === 0
+                ? 'Nenhum cliente cadastrado ainda. Clique em "Novo Cliente" para começar.'
+                : 'Nenhum cliente encontrado com este filtro.'}
             </div>
           )}
         </div>
       </div>
+
+      {showNewAtendimento && (
+        <NewAtendimentoModal
+          isOpen={true}
+          onClose={() => setShowNewAtendimento(false)}
+          onNewClient={() => {
+            setShowNewAtendimento(false);
+            window.dispatchEvent(new CustomEvent('navigate-registration'));
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -76,12 +76,18 @@ interface ProjectContextType {
     setCurrentProjectId: (id: string | null) => void;
     currentBatchId: string | null;
     setCurrentBatchId: (id: string | null) => void;
+    allClients: Client[];
+    currentClientId: string | null;
+    setCurrentClientId: (id: string | null) => void;
+    addClient: (client: Omit<Client, 'id'>) => Promise<string>;
+    updateMasterClient: (clientId: string, updates: Partial<Client>) => void;
     updateEnvironmentStatus: (projectId: string, envId: string, status: Environment['status']) => void;
     updateEnvironmentDetails: (projectId: string, envId: string, updates: Partial<Environment>) => void;
     addEnvironment: (projectId: string, name: string) => void;
     removeEnvironment: (projectId: string, envId: string) => void;
     updateClientData: (projectId: string, updates: Partial<Client>, noteMessage?: string | null) => void;
     updateProjectBriefing: (projectId: string, updates: Partial<Client>) => void;
+    closeSale: (projectId: string, data: { saleDate: string; deliveryDeadlineDays: number; observations: string }) => void;
     formalizeContract: (projectId: string, finalEnvironments: Environment[], contractValue: number, contractDate: string) => void;
     updateProjectSeller: (projectId: string, sellerId: string, sellerName: string) => void;
     requestFactoryPart: (projectId: string, envId: string, description: string) => void;
@@ -121,6 +127,7 @@ const STORAGE_KEY_STORES = 'fluxo_erp_stores_data';
 const STORAGE_KEY_USERS_LIST = 'fluxo_erp_users_list';
 const STORAGE_KEY_PROJECTS = 'fluxo_erp_projects';
 const STORAGE_KEY_BATCHES = 'fluxo_erp_batches';
+const STORAGE_KEY_CLIENTS = 'fluxo_erp_clients';
 
 export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     // Estado de autenticação vem do AuthContext (currentUser, setCurrentUser, useCloud)
@@ -159,6 +166,15 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             return saved ? JSON.parse(saved) : SEED_BATCHES;
         } catch (e) { return SEED_BATCHES; }
     });
+
+    const [allClients, setAllClients] = useState<Client[]>(() => {
+        if (useCloud) return [];
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY_CLIENTS);
+            return saved ? JSON.parse(saved) : [];
+        } catch (e) { return []; }
+    });
+    const [currentClientId, setCurrentClientId] = useState<string | null>(null);
 
     // --- SAAS DATA SEGREGATION LOGIC ---
     // If we are in Cloud Mode, we MUST only fetch data belonging to the current user's store
@@ -233,12 +249,24 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
                 const loadedTickets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as AssistanceTicket[];
                 setAssistanceTickets(loadedTickets);
             });
+
+            // 5. CLIENTS (master registry)
+            let unsubClients = () => {};
+            if (currentUser.role !== 'SuperAdmin') {
+                const qClients = query(collection(db, "clients"), where("storeId", "==", currentUser.storeId));
+                unsubClients = onSnapshot(qClients, (snapshot) => {
+                    const loadedClients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Client[];
+                    setAllClients(loadedClients);
+                });
+            }
+
             return () => {
                 unsubStores();
                 unsubUsers();
                 unsubProjects();
                 unsubBatches();
                 unsubAssistance();
+                unsubClients();
             };
         } else {
             // If logged out, clear sensitive data
@@ -390,6 +418,34 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     useEffect(() => { if (!useCloud) localStorage.setItem(STORAGE_KEY_USERS_LIST, JSON.stringify(allUsers)); }, [allUsers, useCloud]);
     useEffect(() => { if (!useCloud) localStorage.setItem(STORAGE_KEY_PROJECTS, JSON.stringify(allProjects)); }, [allProjects, useCloud]);
     useEffect(() => { if (!useCloud) localStorage.setItem(STORAGE_KEY_BATCHES, JSON.stringify(allBatches)); }, [allBatches, useCloud]);
+    useEffect(() => { if (!useCloud) localStorage.setItem(STORAGE_KEY_CLIENTS, JSON.stringify(allClients)); }, [allClients, useCloud]);
+
+    // Migrate existing projects: auto-create master client records for projects without clientId
+    const [migrationDone, setMigrationDone] = useState(false);
+    useEffect(() => {
+        if (migrationDone || !currentUser || allProjects.length === 0) return;
+        const projectsWithout = allProjects.filter(p => !p.clientId && p.storeId === currentUser.storeId);
+        if (projectsWithout.length === 0) { setMigrationDone(true); return; }
+        setMigrationDone(true);
+        const phoneMap = new Map<string, string>();
+        allClients.forEach(c => { if (c.phone) phoneMap.set(`${c.storeId}:${c.phone}`, c.id); });
+        const migrate = async () => {
+            for (const project of projectsWithout) {
+                const key = `${currentUser.storeId}:${project.client.phone}`;
+                let clientId = phoneMap.get(key);
+                if (!clientId) {
+                    clientId = await addClient({ ...project.client, storeId: currentUser.storeId });
+                    if (project.client.phone) phoneMap.set(key, clientId);
+                }
+                if (useCloud && db) {
+                    persist("projects", project.id, { clientId });
+                } else {
+                    setAllProjects(prev => prev.map(p => p.id !== project.id ? p : { ...p, clientId }));
+                }
+            }
+        };
+        migrate();
+    }, [migrationDone, currentUser, allProjects.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Helper to persist to DB — returns a Promise so callers can await writes
     const persist = async <T extends object>(collectionName: string, docId: string, data: T): Promise<void> => {
@@ -641,13 +697,39 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     const getProjectById = (id: string) => projects.find(p => p.id === id);
 
+    const addClient = async (clientData: Omit<Client, 'id'>): Promise<string> => {
+        const newId = `cl-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+        const newClient: Client = { ...clientData as Client, id: newId };
+        if (useCloud && db) {
+            await setDoc(doc(db, "clients", newId), newClient);
+        } else {
+            setAllClients(prev => [...prev, newClient]);
+        }
+        return newId;
+    };
+
+    const updateMasterClient = (clientId: string, updates: Partial<Client>) => {
+        if (useCloud && db) {
+            updateDoc(doc(db, "clients", clientId), updates as Record<string, unknown>);
+        } else {
+            setAllClients(prev => prev.map(c => c.id !== clientId ? c : { ...c, ...updates }));
+        }
+    };
+
     const addProject = async (client: Client, environments: Environment[]): Promise<void> => {
         if (!currentUser) return;
+
+        // Create or reuse master client record
+        let clientId = client.id && allClients.some(c => c.id === client.id) ? client.id : undefined;
+        if (!clientId) {
+            clientId = await addClient({ ...client, storeId: currentUser.storeId });
+        }
 
         const newProject: Project = {
             id: `p-${Date.now()}`,
             storeId: currentUser.storeId,
             client: { ...client, storeId: currentUser.storeId },
+            clientId,
             sellerId: currentUser.id,
             sellerName: currentUser.name || 'Vendedor',
             created_at: new Date().toISOString(),
@@ -1117,6 +1199,12 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         } else {
             setAllProjects(prev => prev.map(p => p.id !== projectId ? p : { ...p, client: newClient }));
         }
+
+        // Sync to master client record if linked
+        if (project.clientId) {
+            updateMasterClient(project.clientId, updates);
+        }
+
         if (noteMessage !== null) {
             addNote(projectId, noteMessage || 'Dados cadastrais do cliente atualizados.', currentUser?.id || 'sys');
         }
@@ -1156,6 +1244,30 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             : 'Dados do Briefing atualizados.';
 
         updateClientData(projectId, updates, noteMsg);
+    };
+
+    const closeSale = (projectId: string, data: { saleDate: string; deliveryDeadlineDays: number; observations: string }) => {
+        const project = allProjects.find(p => p.id === projectId);
+        if (!project) return;
+
+        const saleClosedAt = new Date(data.saleDate + 'T12:00:00').toISOString();
+        const deliveryDate = new Date(data.saleDate + 'T12:00:00');
+        deliveryDate.setDate(deliveryDate.getDate() + data.deliveryDeadlineDays);
+        const deliveryDeadline = deliveryDate.toISOString();
+
+        const updates = { saleClosedAt, deliveryDeadline };
+
+        if (useCloud) {
+            persist("projects", projectId, updates);
+        } else {
+            setAllProjects(prev => prev.map(p => p.id !== projectId ? p : { ...p, ...updates }));
+        }
+
+        // Nota de sistema sobre o fechamento
+        const deliveryStr = deliveryDate.toLocaleDateString('pt-BR');
+        const baseNote = `✅ Venda fechada em ${new Date(saleClosedAt).toLocaleDateString('pt-BR')}. Prazo de entrega combinado: ${deliveryStr}.`;
+        const fullNote = data.observations.trim() ? `${baseNote}\n📝 ${data.observations.trim()}` : baseNote;
+        addNote(projectId, fullNote, currentUser?.id || 'sys');
     };
 
     const formalizeContract = (projectId: string, finalEnvironments: Environment[], contractValue: number, contractDate: string) => {
@@ -1809,15 +1921,15 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     return (
         <ProjectContext.Provider value={{
-            currentUser, currentStore, users, stores, allUsers, projects, batches, workflowConfig, workflowOrder, permissions, currentProjectId, currentBatchId, origins, assistanceTickets, companySettings, assistanceWorkflow,
+            currentUser, currentStore, users, stores, allUsers, projects, batches, workflowConfig, workflowOrder, permissions, currentProjectId, currentBatchId, allClients, currentClientId, setCurrentClientId, origins, assistanceTickets, companySettings, assistanceWorkflow,
             login, createStore, updateStore, logout, toggleStoreStatus, addUser, updateUser, deleteUser, updatePermissions, updateOrigins, updateCompanySettings,
 
             // Dynamic Workflow
             addWorkflowStep, updateWorkflowStep, deleteWorkflowStep, reorderWorkflowSteps,
             addAssistanceStep, updateAssistanceStep, deleteAssistanceStep, reorderAssistanceSteps,
 
-            addProject, deleteProject, advanceBatch, moveBatchToStep, markProjectAsLost, reactivateProject, isLastStep, splitBatch, getProjectById, addNote, updateWorkflowSla, setCurrentProjectId, setCurrentBatchId, updateEnvironmentStatus, requestFactoryPart,
-            updateEnvironmentDetails, addEnvironment, removeEnvironment, updateClientData, updateProjectBriefing, formalizeContract, updateProjectSeller, updateProjectPostAssembly, updateProjectPostAssemblyItems,
+            addProject, deleteProject, advanceBatch, moveBatchToStep, markProjectAsLost, reactivateProject, isLastStep, splitBatch, getProjectById, addNote, updateWorkflowSla, setCurrentProjectId, setCurrentBatchId, addClient, updateMasterClient, updateEnvironmentStatus, requestFactoryPart,
+            updateEnvironmentDetails, addEnvironment, removeEnvironment, updateClientData, updateProjectBriefing, closeSale, formalizeContract, updateProjectSeller, updateProjectPostAssembly, updateProjectPostAssemblyItems,
             addAssistanceTicket, updateAssistanceTicket, deleteAssistanceTicket,
             canUserAdvanceStep, canUserViewStage, canUserEditAssistance, canUserDeleteAssistance,
             canUserViewAssembly, canUserEditAssembly,
