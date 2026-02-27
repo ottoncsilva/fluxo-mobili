@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAgenda, Appointment, AppointmentType } from '../context/AgendaContext';
 import { useProjects } from '../context/ProjectContext';
+import { useToast } from '../context/ToastContext';
 import { Client } from '../types';
 
 interface AppointmentModalProps {
@@ -21,6 +22,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
 }) => {
     const { appointmentTypes, addAppointment, updateAppointment, deleteAppointment } = useAgenda();
     const { projects, currentUser } = useProjects();
+    const { showToast } = useToast();
 
     // Derive clients from projects since it's not directly exposed in context
     const clients = useMemo(() => {
@@ -86,12 +88,12 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!currentUser) {
-            alert("Sessão inválida. Por favor, faça login novamente.");
+            showToast("Sessão inválida. Por favor, faça login novamente.", 'error');
             return;
         }
 
         if (!title || !date || !time || !typeId) {
-            alert("Por favor, preencha todos os campos obrigatórios.");
+            showToast("Por favor, preencha todos os campos obrigatórios.", 'error');
             return;
         }
 
@@ -134,7 +136,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
         } catch (error: unknown) {
             console.error("Erro ao agendar:", error);
             const message = error instanceof Error ? error.message : "Erro desconhecido";
-            alert(`Falha ao agendar: ${message}`);
+            showToast(`Falha ao agendar: ${message}`, 'error');
         }
     };
 

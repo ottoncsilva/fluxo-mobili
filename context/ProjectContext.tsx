@@ -4,6 +4,7 @@ import { addBusinessDays } from '../utils/dateUtils';
 import { db } from '../firebase'; // Import Firebase DB
 import { collection, onSnapshot, addDoc, setDoc, doc, updateDoc, deleteDoc, query, where, getDoc, getDocs, writeBatch, Firestore, deleteField } from "firebase/firestore";
 import { useAuth } from './AuthContext';
+import { useToast } from './ToastContext';
 import {
     INITIAL_WORKFLOW_CONFIG,
     INITIAL_WORKFLOW_ORDER,
@@ -132,6 +133,7 @@ const STORAGE_KEY_CLIENTS = 'fluxo_erp_clients';
 export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     // Estado de autenticação vem do AuthContext (currentUser, setCurrentUser, useCloud)
     const { currentUser, setCurrentUser, useCloud } = useAuth();
+    const { showToast } = useToast();
 
     // Load All Stores (Only if SuperAdmin or Initial Load for login check - In real app, only check via cloud function)
     const [stores, setStores] = useState<Store[]>(() => {
@@ -529,7 +531,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         const newStoreId = `store-${Date.now()}`;
 
         if (stores.some(s => s.slug === storeSlug)) {
-            alert("ID de loja (slug) já existe.");
+            showToast("ID de loja (slug) já existe.", 'error');
             return;
         }
 
@@ -621,7 +623,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         if (!useCloud) {
             setAllUsers(prev => prev.filter(u => u.id !== userId));
         } else {
-            alert("Contact support to hard delete users in SaaS mode.");
+            showToast("Entre em contato com o suporte para excluir usuários no modo SaaS.", 'info');
         }
     }
 
@@ -785,7 +787,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
                 console.log(`Project ${projectId} and associated data deleted.`);
             } catch (error) {
                 console.error("Error deleting project:", error);
-                alert("Erro ao excluir projeto via nuvem.");
+                showToast("Erro ao excluir projeto. Tente novamente.", 'error');
             }
         } else {
             // Local State Deletion
@@ -914,7 +916,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         // O destino não é verificado — actionableSteps define quem CONCLUI o step,
         // não quem pode receber o lote nele.
         if (!isHighLevelRole && !canUserAdvanceStep(batch.phase)) {
-            alert("Você não tem permissão para concluir esta etapa.");
+            showToast("Você não tem permissão para concluir esta etapa.", 'error');
             return;
         }
 
@@ -959,7 +961,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         const isHighLevelRole = currentUser && ['Admin', 'Proprietario', 'Gerente'].includes(currentUser.role);
 
         if (!isHighLevelRole && !canUserAdvanceStep(batch.phase)) {
-            alert("Você não tem permissão para concluir esta etapa.");
+            showToast("Você não tem permissão para concluir esta etapa.", 'error');
             return;
         }
 
@@ -1302,6 +1304,12 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         } else {
             setAllProjects(prev => prev.map(p => p.id !== projectId ? p : { ...p, ...updates, client: { ...p.client, ...clientUpdates } }));
         }
+
+        // Sync consultant_name to master client record if linked
+        if (project.clientId) {
+            updateMasterClient(project.clientId, { consultant_name: sellerName });
+        }
+
         addNote(projectId, `Vendedor responsável alterado para: ${sellerName}`, currentUser?.id || 'sys');
     };
 

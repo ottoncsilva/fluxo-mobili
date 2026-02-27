@@ -9,6 +9,7 @@ import {
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useProjects } from '../context/ProjectContext';
+import { useToast } from '../context/ToastContext';
 import { AssemblyTeam, AssemblySchedule, AssemblyStatus, AssistanceStatus, AssistanceTicket, Batch, WorkflowStep, Project } from '../types';
 import { getBusinessDaysDifference, isHoliday, addBusinessDays } from '../utils/dateUtils';
 
@@ -184,6 +185,7 @@ const AssemblyScheduler: React.FC = () => {
         updateAssistanceTicket
     } = useProjects();
 
+    const { showToast } = useToast();
     const canEdit = canUserEditAssembly();
     const canEditPostAssembly = canUserEditPostAssembly();
     const canEditAssistance = canUserEditAssistance();
@@ -710,7 +712,7 @@ const AssemblyScheduler: React.FC = () => {
     const handleSaveTeamForm = () => {
         if (!teamForm.name.trim()) return;
         if (teamForm.serviceTypes.length === 0) {
-            alert('Selecione pelo menos um tipo de serviço (Montagem ou Assistência)');
+            showToast('Selecione pelo menos um tipo de serviço (Montagem ou Assistência)', 'error');
             return;
         }
         if (editingTeam) {
