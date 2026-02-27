@@ -5,6 +5,9 @@ import AuditDrawer from './AuditDrawer';
 import LotModal from './LotModal';
 import StepDecisionModal from './StepDecisionModal';
 import EnvironmentValuesModal from './EnvironmentValuesModal';
+import SaleClosingModal, { SaleClosingData } from './SaleClosingModal';
+import StepObservationModal from './StepObservationModal';
+import NewAtendimentoModal from './NewAtendimentoModal';
 import { addBusinessDays, getBusinessDaysDifference } from '../utils/dateUtils';
 import { useToast } from '../context/ToastContext';
 
@@ -32,6 +35,14 @@ const KanbanBoard: React.FC = () => {
     const [subStepFilter, setSubStepFilter] = useState<string | null>(null);
     const [decisionModalData, setDecisionModalData] = useState<{ batch: Batch, step: WorkflowStep } | null>(null);
     const [envValuesData, setEnvValuesData] = useState<{ batch: Batch; project: Project } | null>(null);
+    const [showNewAtendimentoModal, setShowNewAtendimentoModal] = useState(false);
+
+    // Sale Closing Modal (etapa 2.8 → 2.9)
+    const [showSaleClosingModal, setShowSaleClosingModal] = useState(false);
+    const [pendingSaleBatch, setPendingSaleBatch] = useState<Batch | null>(null);
+
+    // Observation Modal
+    const [pendingObsData, setPendingObsData] = useState<{ batch: Batch; targetStepId: string | null; currentStepLabel: string; nextStepLabel: string } | null>(null);
 
     // Visibility Toggles
     const [showCompleted, setShowCompleted] = useState(false);
@@ -42,7 +53,7 @@ const KanbanBoard: React.FC = () => {
     const [filterSeller, setFilterSeller] = useState('');
     const [showMyTasksOnly, setShowMyTasksOnly] = useState(false);
 
-    const { batches, projects, workflowConfig, workflowOrder, setCurrentProjectId, setCurrentBatchId, canUserViewStage, splitBatch, advanceBatch, moveBatchToStep, canUserAdvanceStep, getBranchingOptions, currentUser, updateEnvironmentDetails, companySettings } = useProjects();
+    const { batches, projects, workflowConfig, workflowOrder, setCurrentProjectId, setCurrentBatchId, canUserViewStage, splitBatch, advanceBatch, moveBatchToStep, canUserAdvanceStep, getBranchingOptions, currentUser, updateEnvironmentDetails, companySettings, closeSale, addNote } = useProjects();
     const { showToast } = useToast();
 
     const handleCardClick = (batchId: string, phase: string, projectId: string) => {
@@ -51,13 +62,33 @@ const KanbanBoard: React.FC = () => {
     };
 
 
-    const handleDecisionSelect = async (nextStepId: string) => {
-        if (!decisionModalData) return;
-        await moveBatchToStep(decisionModalData.batch.id, nextStepId);
-        setDecisionModalData(null);
+    const getNextStepLabel = (phase: string, targetStepId?: string): string => {
+        if (targetStepId) return workflowConfig[targetStepId]?.label || targetStepId;
+        const idx = workflowOrder.indexOf(phase);
+        if (idx !== -1 && idx < workflowOrder.length - 1) return workflowConfig[workflowOrder[idx + 1]]?.label || '';
+        return 'Concluído';
     };
 
-    const handleAdvanceClick = async (e: React.MouseEvent, batch: Batch) => {
+    const handleDecisionSelect = (nextStepId: string) => {
+        if (!decisionModalData) return;
+        const { batch } = decisionModalData;
+
+        // Interceptar 2.8 → 2.9: abrir SaleClosingModal
+        if (batch.phase === '2.8' && nextStepId === '2.9') {
+            setDecisionModalData(null);
+            setPendingSaleBatch(batch);
+            setShowSaleClosingModal(true);
+            return;
+        }
+
+        // Demais decisões: mostrar modal de observação antes de avançar
+        const currentStepLabel = workflowConfig[batch.phase]?.label || batch.phase;
+        const nextStepLabel = workflowConfig[nextStepId]?.label || nextStepId;
+        setDecisionModalData(null);
+        setPendingObsData({ batch, targetStepId: nextStepId, currentStepLabel, nextStepLabel });
+    };
+
+    const handleAdvanceClick = (e: React.MouseEvent, batch: Batch) => {
         e.stopPropagation();
 
         // Interceptar etapa 2.3 para preencher valores dos ambientes antes da decisão
@@ -73,10 +104,50 @@ const KanbanBoard: React.FC = () => {
         if (options.length > 0) {
             setDecisionModalData({ batch, step: workflowConfig[batch.phase] });
         } else {
-            await advanceBatch(batch.id);
-            const stepLabel = workflowConfig[batch.phase]?.label || 'Etapa';
+            // Etapa linear: mostrar modal de observação
+            const currentStepLabel = workflowConfig[batch.phase]?.label || batch.phase;
+            const nextStepLabel = getNextStepLabel(batch.phase);
+            setPendingObsData({ batch, targetStepId: null, currentStepLabel, nextStepLabel });
+        }
+    };
+
+    const handleObservationConfirm = (observation: string) => {
+        if (!pendingObsData) return;
+        const { batch, targetStepId } = pendingObsData;
+        const project = projects.find((p: Project) => p.id === batch.projectId);
+        if (observation.trim() && currentUser && project) {
+            addNote(project.id, observation.trim(), currentUser.id);
+        }
+        const stepLabel = workflowConfig[batch.phase]?.label || 'Etapa';
+        setPendingObsData(null);
+        if (targetStepId) {
+            moveBatchToStep(batch.id, targetStepId);
+        } else {
+            advanceBatch(batch.id);
             showToast(`✓ ${stepLabel} concluída`);
         }
+    };
+
+    const handleObservationSkip = () => {
+        if (!pendingObsData) return;
+        const { batch, targetStepId } = pendingObsData;
+        const stepLabel = workflowConfig[batch.phase]?.label || 'Etapa';
+        setPendingObsData(null);
+        if (targetStepId) {
+            moveBatchToStep(batch.id, targetStepId);
+        } else {
+            advanceBatch(batch.id);
+            showToast(`✓ ${stepLabel} concluída`);
+        }
+    };
+
+    const handleSaleClosingConfirm = (data: SaleClosingData) => {
+        if (!pendingSaleBatch) return;
+        const project = projects.find((p: Project) => p.id === pendingSaleBatch.projectId);
+        if (project) closeSale(project.id, data);
+        moveBatchToStep(pendingSaleBatch.id, '2.9');
+        setShowSaleClosingModal(false);
+        setPendingSaleBatch(null);
     };
 
     // Salva os valores de cada ambiente e segue para o StepDecisionModal
@@ -102,8 +173,15 @@ const KanbanBoard: React.FC = () => {
         }
 
         setEnvValuesData(null);
-        // Abre o StepDecisionModal normalmente (Aprovar → 2.4 | Revisar → 2.2)
-        setDecisionModalData({ batch, step: workflowConfig[batch.phase] });
+        const options = getBranchingOptions(batch.phase);
+        if (options.length > 0) {
+            // Abre o StepDecisionModal normalmente (Aprovar → 2.4 | Revisar → 2.2)
+            setDecisionModalData({ batch, step: workflowConfig[batch.phase] });
+        } else {
+            const currentStepLabel = workflowConfig[batch.phase]?.label || batch.phase;
+            const nextStepLabel = getNextStepLabel(batch.phase);
+            setPendingObsData({ batch, targetStepId: null, currentStepLabel, nextStepLabel });
+        }
     };
 
     // Lista única de vendedores para o filtro
@@ -385,6 +463,13 @@ const KanbanBoard: React.FC = () => {
                             </div>
 
                             <span className="text-xs text-slate-400 shrink-0">{batches.length} lotes</span>
+                            <button
+                                onClick={() => setShowNewAtendimentoModal(true)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary/90 transition-colors shrink-0"
+                            >
+                                <span className="material-symbols-outlined text-sm">add_task</span>
+                                <span className="hidden md:inline">Novo Atendimento</span>
+                            </button>
                             <button onClick={() => setIsAuditOpen(true)} className="text-slate-500 hover:text-primary transition-colors shrink-0">
                                 <span className="material-symbols-outlined text-xl">history</span>
                             </button>
@@ -598,6 +683,38 @@ const KanbanBoard: React.FC = () => {
                     currentStep={decisionModalData.step}
                     options={getBranchingOptions(decisionModalData.batch.phase)}
                     onSelect={handleDecisionSelect}
+                />
+            )}
+            {/* Observation Modal */}
+            {pendingObsData && (
+                <StepObservationModal
+                    isOpen={true}
+                    currentStepLabel={pendingObsData.currentStepLabel}
+                    nextStepLabel={pendingObsData.nextStepLabel}
+                    batchName={`Lote ${pendingObsData.batch.id.substring(0, 4)}`}
+                    onConfirm={handleObservationConfirm}
+                    onSkip={handleObservationSkip}
+                    onCancel={() => setPendingObsData(null)}
+                />
+            )}
+            {/* Sale Closing Modal (2.8 → 2.9) */}
+            {showSaleClosingModal && pendingSaleBatch && (
+                <SaleClosingModal
+                    isOpen={true}
+                    batchName={`Lote ${pendingSaleBatch.id.substring(0, 4)}`}
+                    onConfirm={handleSaleClosingConfirm}
+                    onCancel={() => { setShowSaleClosingModal(false); setPendingSaleBatch(null); }}
+                />
+            )}
+            {/* Novo Atendimento Modal */}
+            {showNewAtendimentoModal && (
+                <NewAtendimentoModal
+                    isOpen={true}
+                    onClose={() => setShowNewAtendimentoModal(false)}
+                    onNewClient={() => {
+                        setShowNewAtendimentoModal(false);
+                        window.dispatchEvent(new CustomEvent('navigate-registration'));
+                    }}
                 />
             )}
         </>

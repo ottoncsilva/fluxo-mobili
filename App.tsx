@@ -12,6 +12,7 @@ import Dashboard from './components/Dashboard';
 import Agenda from './components/Agenda';
 import AssemblyScheduler from './components/AssemblyScheduler';
 import SuperAdminDashboard from './components/SuperAdminDashboard';
+import ClientProfile from './components/ClientProfile';
 import { ProjectProvider, useProjects } from './context/ProjectContext';
 import { AuthProvider } from './context/AuthContext';
 import { NotificationProvider, useNotifications } from './context/NotificationContext';
@@ -21,7 +22,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 
 const AppContent: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.DASHBOARD);
-  const { currentProjectId, setCurrentProjectId, currentUser, logout, permissions, companySettings, projects } = useProjects();
+  const { currentProjectId, setCurrentProjectId, currentClientId, setCurrentClientId, currentUser, logout, permissions, companySettings, projects } = useProjects();
   const { unreadCount, notifications, markAllAsRead } = useNotifications();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showMobileSearch, setShowMobileSearch] = useState(false);
@@ -54,6 +55,7 @@ const AppContent: React.FC = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (currentProjectId) setCurrentProjectId(null);
+        else if (currentClientId) setCurrentClientId(null);
         else if (showNotifications) setShowNotifications(false);
         else if (showSearchResults) setShowSearchResults(false);
         else if (showMobileSearch) { setShowMobileSearch(false); setSearchQuery(''); }
@@ -62,7 +64,7 @@ const AppContent: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentProjectId, showNotifications, showSearchResults, showMobileSearch, showMoreMenu, setCurrentProjectId]);
+  }, [currentProjectId, currentClientId, showNotifications, showSearchResults, showMobileSearch, showMoreMenu, setCurrentProjectId, setCurrentClientId]);
 
   // Fechar busca ao clicar fora
   useEffect(() => {
@@ -501,6 +503,24 @@ const AppContent: React.FC = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <ProjectDetails onBack={handleBackToKanban} />
+          </div>
+        </div>
+      )}
+
+      {/* Client Profile Modal Overlay */}
+      {currentClientId && !currentProjectId && currentUser.role !== 'SuperAdmin' && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 md:p-6 animate-fade-in"
+          onClick={() => setCurrentClientId(null)}
+        >
+          <div
+            className="bg-white dark:bg-[#101922] w-full max-w-[95vw] md:max-w-[90vw] lg:max-w-[900px] h-[95dvh] md:h-[85dvh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-scale-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ClientProfile
+              onClose={() => setCurrentClientId(null)}
+              onNavigateToRegistration={() => { setCurrentClientId(null); setCurrentView(ViewState.CLIENT_REGISTRATION); }}
+            />
           </div>
         </div>
       )}

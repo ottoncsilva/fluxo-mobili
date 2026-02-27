@@ -252,6 +252,11 @@ export interface Project {
   contractValue?: number; // The closed total value
   contractSigned?: boolean; // Flag to lock client edits
   contractDate?: string;
+  // Fechamento de venda (etapa 2.8 → 2.9)
+  saleClosedAt?: string;       // ISO date: quando a venda foi fechada
+  deliveryDeadline?: string;   // ISO date: prazo de entrega combinado com o cliente
+  // Separação Cliente/Atendimento
+  clientId?: string;           // Referência ao registro mestre na collection 'clients'
 }
 
 export interface Batch {
