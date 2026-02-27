@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useProjects } from '../context/ProjectContext';
+import { useToast } from '../context/ToastContext';
 import { Environment, Client } from '../types';
 import { maskPhone, maskCPF, maskCEP, unmask } from '../utils/masks';
 import { fetchAddressByCEP } from '../utils/cepUtils';
@@ -10,6 +11,7 @@ interface RegistrationFormProps {
 
 const RegistrationForm: React.FC<RegistrationFormProps> = ({ onComplete }) => {
     const { addProject, currentUser, origins } = useProjects();
+    const { showToast } = useToast();
     const [currentStep, setCurrentStep] = useState(1); // 1: Lead, 2: Briefing, 3: Ambientes
 
     // Address Separation State
@@ -96,7 +98,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onComplete }) => {
         try {
             const address = await fetchAddressByCEP(addressFields.cep);
             if (address === null) {
-                alert('CEP não encontrado.');
+                showToast('CEP não encontrado.', 'error');
             } else {
                 setAddressFields((prev: typeof addressFields) => ({
                     ...prev,
@@ -109,7 +111,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onComplete }) => {
             }
         } catch (error) {
             console.error('Erro ao buscar CEP:', error);
-            alert((error as Error).message || 'Erro ao buscar CEP. Tente novamente mais tarde.');
+            showToast((error as Error).message || 'Erro ao buscar CEP. Tente novamente mais tarde.', 'error');
         } finally {
             setIsSearchingCep(false);
         }
@@ -134,19 +136,19 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onComplete }) => {
 
     const validateStep1 = () => {
         if (!formData.name || !formData.phone) {
-            alert("Por favor, preencha Nome e WhatsApp.");
+            showToast("Por favor, preencha Nome e WhatsApp.", 'error');
             return false;
         }
 
         // Validate Address Fields
         if (!addressFields.street || !addressFields.number || !addressFields.neighborhood || !addressFields.city || !addressFields.state) {
-            alert("Por favor, preencha todos os campos do endereço.");
+            showToast("Por favor, preencha todos os campos do endereço.", 'error');
             return false;
         }
 
         // Validate Cod. EFinance
         if (!formData.cod_efinance || formData.cod_efinance.length !== 5) {
-            alert("O Cód. EFinance é obrigatório e deve ter 5 dígitos numéricos.");
+            showToast("O Cód. EFinance é obrigatório e deve ter 5 dígitos numéricos.", 'error');
             return false;
         }
         return true;
@@ -154,7 +156,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onComplete }) => {
 
     const validateStep2 = () => {
         if (!formData.property_type) {
-            alert("Por favor, selecione o tipo de imóvel.");
+            showToast("Por favor, selecione o tipo de imóvel.", 'error');
             return false;
         }
         return true;
@@ -172,7 +174,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onComplete }) => {
 
     const handleSave = async () => {
         if (environments.length === 0) {
-            alert("Adicione pelo menos um ambiente.");
+            showToast("Adicione pelo menos um ambiente.", 'error');
             return;
         }
 
@@ -197,11 +199,11 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onComplete }) => {
 
         try {
             await addProject(clientData, environments);
-            alert("Cliente cadastrado com sucesso!");
+            showToast("Cliente cadastrado com sucesso!");
             if (onComplete) onComplete();
         } catch (error) {
             console.error(error);
-            alert("Erro ao salvar cliente. Tente novamente.");
+            showToast("Erro ao salvar cliente. Tente novamente.", 'error');
         }
     };
 

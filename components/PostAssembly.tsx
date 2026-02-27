@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useProjects } from '../context/ProjectContext';
+import { useToast } from '../context/ToastContext';
 import { Project, Batch, AssistanceItem, AssistanceEvent } from '../types';
 import { getBusinessDaysDifference } from '../utils/dateUtils';
 
@@ -16,6 +17,7 @@ const PostAssembly: React.FC = () => {
         canUserEditPostAssembly,
         canUserDeletePostAssembly
     } = useProjects();
+    const { showToast } = useToast();
 
     const canEdit = canUserEditPostAssembly();
 
@@ -81,7 +83,7 @@ const PostAssembly: React.FC = () => {
 
     const handleAddItemToDraft = () => {
         if (!tempEnv || !tempProb) {
-            alert("Ambiente e Problema são obrigatórios para adicionar o item.");
+            showToast("Ambiente e Problema são obrigatórios para adicionar o item.", 'error');
             return;
         }
         setNewItems(prev => [...prev, {
@@ -106,7 +108,7 @@ const PostAssembly: React.FC = () => {
 
     const handleStartPostAssembly = async () => {
         if (!projectToStart) {
-            alert("Selecione um projeto.");
+            showToast("Selecione um projeto.", 'error');
             return;
         }
 

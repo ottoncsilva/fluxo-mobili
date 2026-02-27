@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useProjects } from '../context/ProjectContext';
+import { useToast } from '../context/ToastContext';
 import { AssistanceTicket, AssistanceStatus, AssistanceItem, AssistanceEvent, AssistanceWorkflowStep, AssemblyTeam } from '../types';
 import { getBusinessDaysDifference } from '../utils/dateUtils';
 
@@ -7,6 +8,7 @@ import { getBusinessDaysDifference } from '../utils/dateUtils';
 
 const TechnicalAssistance: React.FC = () => {
     const { assistanceTickets, updateAssistanceTicket, addAssistanceTicket, deleteAssistanceTicket, projects, assistanceWorkflow, canUserEditAssistance, canUserDeleteAssistance, currentUser, companySettings, assemblyTeams } = useProjects();
+    const { showToast } = useToast();
 
     // Filters
     const [hideCompleted, setHideCompleted] = useState(false);
@@ -72,7 +74,7 @@ const TechnicalAssistance: React.FC = () => {
 
     const handleAddItemToDraft = () => {
         if (!tempEnv || !tempProb) {
-            alert("Ambiente e Problema são obrigatórios para adicionar o item.");
+            showToast("Ambiente e Problema são obrigatórios para adicionar o item.", 'error');
             return;
         }
         setNewItems(prev => [...prev, {
@@ -97,7 +99,7 @@ const TechnicalAssistance: React.FC = () => {
 
     const handleCreateTicket = () => {
         if (!selectedClient || !ticketTitle || newItems.length === 0) {
-            alert("Preencha o cliente, título e adicione pelo menos um item.");
+            showToast("Preencha o cliente, título e adicione pelo menos um item.", 'error');
             return;
         }
         const clientName = projects.find(p => p.client.id === selectedClient)?.client.name || 'Cliente';

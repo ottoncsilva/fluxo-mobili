@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useProjects } from '../context/ProjectContext';
+import { useToast } from '../context/ToastContext';
 import { Batch, Client, Project, Note, WorkflowStep, Environment, Role, EnvironmentValueEntry, User } from '../types';
 import { maskPhone, maskCPF, maskCEP } from '../utils/masks';
 import { fetchAddressByCEP } from '../utils/cepUtils';
@@ -48,6 +49,7 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
         setCurrentBatchId,
         closeSale,
     } = useProjects();
+    const { showToast } = useToast();
     const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'ENVIRONMENTS' | 'BRIEFING' | 'TIMELINE'>('OVERVIEW'); // Changed 'ITPP' to 'BRIEFING'
     const [noteContent, setNoteContent] = useState('');
 
@@ -183,7 +185,7 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
         try {
             const address = await fetchAddressByCEP(addressFields.cep);
             if (address === null) {
-                alert('CEP não encontrado.');
+                showToast('CEP não encontrado.', 'error');
             } else {
                 setAddressFields((prev: typeof addressFields) => ({
                     ...prev,
@@ -196,7 +198,7 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
             }
         } catch (error) {
             console.error('Erro ao buscar CEP:', error);
-            alert((error as Error).message || 'Erro ao buscar CEP. Tente novamente mais tarde.');
+            showToast((error as Error).message || 'Erro ao buscar CEP. Tente novamente mais tarde.', 'error');
         } finally {
             setIsSearchingCep(false);
         }
@@ -373,7 +375,7 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
 
     const handleConfirmLost = () => {
         if (!lostReason.trim()) {
-            alert("Por favor, informe o motivo da perda.");
+            showToast("Por favor, informe o motivo da perda.", 'error');
             return;
         }
         markProjectAsLost(project.id, lostReason);

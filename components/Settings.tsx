@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useProjects } from '../context/ProjectContext';
+import { useToast } from '../context/ToastContext';
 import { useAgenda } from '../context/AgendaContext';
 import { Role, User, PermissionConfig, AssistanceStatus, WorkflowStep, AssistanceWorkflowStep, ClientWhatsAppTemplate, TeamSlaTemplate, WhatsAppLog } from '../types';
 import { DEFAULT_CLIENT_TEMPLATES, DEFAULT_TEAM_TEMPLATES } from '../context/defaults';
@@ -80,6 +81,7 @@ const Settings: React.FC = () => {
     } = useProjects();
 
     const { appointmentTypes, addAppointmentType, updateAppointmentType, deleteAppointmentType, agendaUsers, toggleAgendaUser } = useAgenda();
+    const { showToast } = useToast();
 
     const [activeTab, setActiveTab] = useState<'COMPANY' | 'USERS' | 'PERMISSIONS' | 'ORIGINS' | 'AGENDA' | 'APPEARANCE' | 'ASSISTANCE' | 'WORKFLOW' | 'POST_ASSEMBLY' | 'INTEGRATIONS' | 'HOLIDAYS' | 'COMMUNICATIONS'>('COMPANY');
 
@@ -100,8 +102,8 @@ const Settings: React.FC = () => {
     const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        if (!ALLOWED_IMAGE_TYPES.includes(file.type)) { alert('Apenas imagens são permitidas (JPG, PNG, GIF, WEBP, SVG).'); return; }
-        if (file.size > 500 * 1024) { alert('A imagem deve ter no máximo 500KB.'); return; }
+        if (!ALLOWED_IMAGE_TYPES.includes(file.type)) { showToast('Apenas imagens são permitidas (JPG, PNG, GIF, WEBP, SVG).', 'error'); return; }
+        if (file.size > 500 * 1024) { showToast('A imagem deve ter no máximo 500KB.', 'error'); return; }
         const reader = new FileReader();
         reader.onload = (ev) => {
             const base64 = ev.target?.result as string;
@@ -295,11 +297,11 @@ const Settings: React.FC = () => {
 
     const handleSaveUser = () => {
         if (!uName) {
-            alert("Nome é obrigatório");
+            showToast("Nome é obrigatório", 'error');
             return;
         }
         if (uIsSystemUser && (!uUsername || (!editingUser && !uPass))) {
-            alert("Para usuários do sistema, Usuário e Senha são obrigatórios.");
+            showToast("Para usuários do sistema, Usuário e Senha são obrigatórios.", 'error');
             return;
         }
 
@@ -337,7 +339,7 @@ const Settings: React.FC = () => {
             logoUrl: companyLogo,
             socialMedia: companySocial
         });
-        alert("Dados da empresa salvos com sucesso!");
+        showToast("Dados da empresa salvos com sucesso!");
     };
 
     const handleAddOrigin = () => {
@@ -396,11 +398,11 @@ const Settings: React.FC = () => {
 
     const handleAddWorkflowStep = () => {
         if (!newStepId || !newStepLabel) {
-            alert("ID e Etapa são obrigatórios.");
+            showToast("ID e Etapa são obrigatórios.", 'error');
             return;
         }
         if (workflowConfig[newStepId]) {
-            alert("Este ID de etapa já existe.");
+            showToast("Este ID de etapa já existe.", 'error');
             return;
         }
         addWorkflowStep({
@@ -425,7 +427,7 @@ const Settings: React.FC = () => {
 
     const handleAddAssistStep = () => {
         if (!newAssistId || !newAssistLabel) {
-            alert("Código e Etapa são obrigatórios.");
+            showToast("Código e Etapa são obrigatórios.", 'error');
             return;
         }
         addAssistanceStep({
@@ -455,7 +457,7 @@ const Settings: React.FC = () => {
     // Holiday Handlers
     const handleAddHoliday = async () => {
         if (!newHolidayDate || !newHolidayName) {
-            alert('Data e nome do feriado são obrigatórios.');
+            showToast('Data e nome do feriado são obrigatórios.', 'error');
             return;
         }
 
@@ -473,7 +475,7 @@ const Settings: React.FC = () => {
         );
 
         if (isDuplicate) {
-            alert('Este feriado já está cadastrado.');
+            showToast('Este feriado já está cadastrado.', 'error');
             return;
         }
 
@@ -1127,7 +1129,7 @@ const Settings: React.FC = () => {
                                     onClick={async () => {
                                         if (window.confirm('Tem certeza? Isso redefinirá as origens para o padrão do sistema.')) {
                                             await resetStoreDefaults('origins');
-                                            alert('Origens restauradas!');
+                                            showToast('Origens restauradas!');
                                         }
                                     }}
                                     className="text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 px-3 py-1 rounded text-xs font-bold border border-rose-200 dark:border-rose-800 transition-colors"
@@ -1783,7 +1785,7 @@ const Settings: React.FC = () => {
                                     onClick={async () => {
                                         if (window.confirm('Tem certeza? Isso redefinirá as etapas de assistência para o padrão do sistema. Personalizações serão perdidas.')) {
                                             await resetStoreDefaults('assistance');
-                                            alert('Padrões restaurados!');
+                                            showToast('Padrões restaurados!');
                                         }
                                     }}
                                     className="text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 px-3 py-1 rounded text-xs font-bold border border-rose-200 dark:border-rose-800 transition-colors"

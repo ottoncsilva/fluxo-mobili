@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { useProjects } from '../context/ProjectContext';
+import { useToast } from '../context/ToastContext';
 import { CompanySettings, Store, User } from '../types';
 
 const SuperAdminDashboard: React.FC = () => {
   const { stores, allUsers, toggleStoreStatus, createStore, updateStore, updateUser } = useProjects();
+  const { showToast } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
@@ -45,7 +47,7 @@ const SuperAdminDashboard: React.FC = () => {
   const handleCreateStore = (e: React.FormEvent) => {
       e.preventDefault();
       if(!newStoreName || !newStoreSlug || !adminUsername || !adminPassword) {
-          alert("Todos os campos são obrigatórios.");
+          showToast("Todos os campos são obrigatórios.", 'error');
           return;
       }
       
@@ -96,7 +98,7 @@ const SuperAdminDashboard: React.FC = () => {
       if (editSlug !== stores.find(s => s.id === editingStoreId)?.slug) {
           const slugExists = stores.some(s => s.slug === editSlug && s.id !== editingStoreId);
           if (slugExists) {
-              alert("Este ID de Login (Slug) já está em uso por outra loja.");
+              showToast("Este ID de Login (Slug) já está em uso por outra loja.", 'error');
               return;
           }
       }

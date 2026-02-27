@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useProjects } from '../context/ProjectContext';
+import { useToast } from '../context/ToastContext';
 import { Batch, Environment } from '../types';
 
 interface SplitBatchModalProps {
@@ -12,6 +13,7 @@ interface SplitBatchModalProps {
 
 const SplitBatchModal: React.FC<SplitBatchModalProps> = ({ isOpen, onClose, batch, onSplitConfirmed }) => {
     const { projects } = useProjects();
+    const { showToast } = useToast();
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
     // Get the project and its environments associated with this batch
@@ -46,7 +48,7 @@ const SplitBatchModal: React.FC<SplitBatchModalProps> = ({ isOpen, onClose, batc
 
     const handleConfirm = () => {
         if (selectedIds.length === 0) {
-            alert("Selecione pelo menos um ambiente para avançar.");
+            showToast("Selecione pelo menos um ambiente para avançar.", 'error');
             return;
         }
         onSplitConfirmed(selectedIds);

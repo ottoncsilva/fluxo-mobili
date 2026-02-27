@@ -547,17 +547,17 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <ProjectProvider>
-          <NotificationProvider>
-            <AgendaProvider>
-              <ToastProvider>
+        <ToastProvider>
+          <ProjectProvider>
+            <NotificationProvider>
+              <AgendaProvider>
                 <ErrorBoundary>
                   <AppContent />
                 </ErrorBoundary>
-              </ToastProvider>
-            </AgendaProvider>
-          </NotificationProvider>
-        </ProjectProvider>
+              </AgendaProvider>
+            </NotificationProvider>
+          </ProjectProvider>
+        </ToastProvider>
       </AuthProvider>
     </ErrorBoundary>
   );
