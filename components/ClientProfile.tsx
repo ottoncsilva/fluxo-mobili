@@ -31,10 +31,14 @@ const ClientProfile: React.FC<ClientProfileProps> = ({ onClose, onNavigateToRegi
         [allClients, currentClientId]
     );
 
-    const clientProjects = useMemo(
-        () => projects.filter(p => p.clientId === currentClientId),
-        [projects, currentClientId]
-    );
+    // Include projects linked by clientId OR by phone match (fallback for legacy/migrating data)
+    const clientProjects = useMemo(() => {
+        if (!client) return [];
+        return projects.filter(p =>
+            p.clientId === currentClientId ||
+            (!p.clientId && p.client.phone === client.phone && p.storeId === client.storeId)
+        );
+    }, [projects, currentClientId, client]);
 
     if (!client) return null;
 
@@ -177,6 +181,10 @@ const ClientProfile: React.FC<ClientProfileProps> = ({ onClose, onNavigateToRegi
                                     const phaseLabel = getPhaseLabel(project.id);
                                     const envCount = project.environments.length;
                                     const totalValue = project.environments.reduce((s, e) => s + (e.estimated_value || 0), 0);
+                                    const projectBatches = batches.filter(b => b.projectId === project.id);
+                                    const batchName = projectBatches.length > 1
+                                        ? `${projectBatches.length} lotes`
+                                        : (projectBatches[0]?.name || 'Projeto Completo');
                                     return (
                                         <div
                                             key={project.id}
@@ -184,11 +192,12 @@ const ClientProfile: React.FC<ClientProfileProps> = ({ onClose, onNavigateToRegi
                                         >
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-sm font-bold text-slate-800 dark:text-white truncate">
-                                                    {project.sellerName || '—'}
+                                                    {batchName}
                                                 </p>
                                                 <p className="text-xs text-slate-500 mt-0.5">
                                                     {new Date(project.created_at).toLocaleDateString('pt-BR')} · {envCount} ambiente{envCount !== 1 ? 's' : ''}
                                                     {totalValue > 0 && ` · R$ ${totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`}
+                                                    {project.sellerName && ` · ${project.sellerName}`}
                                                 </p>
                                                 <span className="inline-block mt-1.5 px-2 py-0.5 bg-primary/10 text-primary text-xs font-bold rounded">
                                                     {phaseLabel}
