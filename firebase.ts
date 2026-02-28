@@ -28,7 +28,6 @@ if (firebaseConfig.apiKey && firebaseConfig.projectId) {
         // ignoreUndefinedProperties: evita erro do Firestore quando campos opcionais são undefined
         db = initializeFirestore(app, { ignoreUndefinedProperties: true });
         auth = getAuth(app);
-        console.log("Firebase initialized successfully");
     } catch (error) {
         console.error("Error initializing Firebase:", error);
     }

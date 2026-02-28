@@ -43,7 +43,7 @@ export async function fetchAddressByCEP(rawCep: string): Promise<ViaCEPAddress |
         };
     } catch (error) {
         clearTimeout(timeoutId);
-        if ((error as Error).name === 'AbortError') {
+        if (error instanceof Error && error.name === 'AbortError') {
             throw new Error('Tempo de resposta excedido ao buscar CEP. Tente novamente.');
         }
         throw error;

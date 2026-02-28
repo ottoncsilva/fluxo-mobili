@@ -31,6 +31,7 @@ export const EvolutionApi = {
 
             const response = await fetch(`${baseUrl}/message/sendText/${instanceName}`, {
                 method: 'POST',
+                signal: AbortSignal.timeout(10_000),
                 headers: {
                     'Content-Type': 'application/json',
                     'apikey': token
@@ -68,6 +69,7 @@ export const EvolutionApi = {
             const baseUrl = instanceUrl.replace(/\/$/, '');
             const response = await fetch(`${baseUrl}/instance/connectionState/${instanceName}`, {
                 method: 'GET',
+                signal: AbortSignal.timeout(10_000),
                 headers: { 'apikey': token }
             });
             // Evolution API v2 retorna { instance: { instanceName, state } }

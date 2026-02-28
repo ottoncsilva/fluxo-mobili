@@ -65,9 +65,10 @@ export const AgendaProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     // Load Data
     useEffect(() => {
         if (useCloud && db) {
+            if (!currentUser) return;
             // Firestore Subscriptions
 
-            // Appointments - Filtered by storeId 
+            // Appointments - Filtered by storeId
             const qApts = query(collection(db, "appointments"), where("storeId", "==", currentUser.storeId));
             const unsubAppointments = onSnapshot(qApts, (snapshot: QuerySnapshot<DocumentData>) => {
                 const loadedApts = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() })) as Appointment[];
@@ -103,7 +104,7 @@ export const AgendaProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             if (savedApts) setAppointments(JSON.parse(savedApts));
             if (savedUsers) setAgendaUsers(JSON.parse(savedUsers));
         }
-    }, [useCloud]);
+    }, [useCloud, currentUser?.storeId]);
 
     // Persist Logic (Only for LocalStorage, Firestore handles via methods)
     useEffect(() => {
@@ -125,11 +126,8 @@ export const AgendaProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                 storeId: currentUser.storeId
             };
 
-            console.log("AgendaContext: Adding appointment", newApt);
-
             if (useCloud && db) {
                 await setDoc(doc(db, "appointments", newApt.id), newApt);
-                console.log("AgendaContext: Appointment added to Firestore");
             } else {
                 const updated = [...appointments, newApt];
                 setAppointments(updated);

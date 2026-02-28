@@ -198,7 +198,7 @@ export default function ProjectDetails({ onBack }: ProjectDetailsProps) {
             }
         } catch (error) {
             console.error('Erro ao buscar CEP:', error);
-            showToast((error as Error).message || 'Erro ao buscar CEP. Tente novamente mais tarde.', 'error');
+            showToast(error instanceof Error ? error.message : 'Erro ao buscar CEP. Tente novamente mais tarde.', 'error');
         } finally {
             setIsSearchingCep(false);
         }
