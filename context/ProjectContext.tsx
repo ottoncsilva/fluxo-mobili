@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
 import { Project, Batch, WorkflowStep, Environment, Client, User, Role, Note, FactoryOrder, PermissionConfig, AssistanceTicket, CompanySettings, AssistanceWorkflowStep, Store, StoreConfig, PostAssemblyEvaluation, AssistanceItem, AssistanceEvent, AssemblyTeam, AssemblySchedule, WhatsAppLog } from '../types';
 import { addBusinessDays } from '../utils/dateUtils';
 import { db } from '../firebase'; // Import Firebase DB
@@ -415,12 +415,19 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         return currentStore?.settings || DEFAULT_COMPANY_SETTINGS;
     }, [currentStore]);
 
-    // Effects for Persistence (LocalStorage Fallback)
-    useEffect(() => { if (!useCloud) localStorage.setItem(STORAGE_KEY_STORES, JSON.stringify(stores)); }, [stores, useCloud]);
-    useEffect(() => { if (!useCloud) localStorage.setItem(STORAGE_KEY_USERS_LIST, JSON.stringify(allUsers)); }, [allUsers, useCloud]);
-    useEffect(() => { if (!useCloud) localStorage.setItem(STORAGE_KEY_PROJECTS, JSON.stringify(allProjects)); }, [allProjects, useCloud]);
-    useEffect(() => { if (!useCloud) localStorage.setItem(STORAGE_KEY_BATCHES, JSON.stringify(allBatches)); }, [allBatches, useCloud]);
-    useEffect(() => { if (!useCloud) localStorage.setItem(STORAGE_KEY_CLIENTS, JSON.stringify(allClients)); }, [allClients, useCloud]);
+    // Effects for Persistence (LocalStorage Fallback) — debounced to avoid serializing on every keystroke
+    const lsTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+    const debouncedLsSave = (key: string, value: unknown) => {
+        clearTimeout(lsTimers.current[key]);
+        lsTimers.current[key] = setTimeout(() => {
+            localStorage.setItem(key, JSON.stringify(value));
+        }, 500);
+    };
+    useEffect(() => { if (!useCloud) debouncedLsSave(STORAGE_KEY_STORES, stores); }, [stores, useCloud]);
+    useEffect(() => { if (!useCloud) debouncedLsSave(STORAGE_KEY_USERS_LIST, allUsers); }, [allUsers, useCloud]);
+    useEffect(() => { if (!useCloud) debouncedLsSave(STORAGE_KEY_PROJECTS, allProjects); }, [allProjects, useCloud]);
+    useEffect(() => { if (!useCloud) debouncedLsSave(STORAGE_KEY_BATCHES, allBatches); }, [allBatches, useCloud]);
+    useEffect(() => { if (!useCloud) debouncedLsSave(STORAGE_KEY_CLIENTS, allClients); }, [allClients, useCloud]);
 
     // Migrate existing projects: auto-create master client records for projects without clientId
     const [migrationDone, setMigrationDone] = useState(false);
@@ -528,7 +535,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
 
     const createStore = (storeName: string, storeSlug: string, adminName: string, adminUsername: string, adminPass: string) => {
-        const newStoreId = `store-${Date.now()}`;
+        const newStoreId = crypto.randomUUID();
 
         if (stores.some(s => s.slug === storeSlug)) {
             showToast("ID de loja (slug) já existe.", 'error');
@@ -545,7 +552,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         };
 
         const newAdmin: User = {
-            id: `u-${Date.now()}`,
+            id: crypto.randomUUID(),
             storeId: newStoreId,
             name: adminName,
             username: adminUsername,
@@ -700,7 +707,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     const getProjectById = (id: string) => projects.find(p => p.id === id);
 
     const addClient = async (clientData: Omit<Client, 'id'>): Promise<string> => {
-        const newId = `cl-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+        const newId = crypto.randomUUID();
         const newClient: Client = { ...clientData as Client, id: newId };
         if (useCloud && db) {
             await setDoc(doc(db, "clients", newId), newClient);
@@ -728,21 +735,21 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         }
 
         const newProject: Project = {
-            id: `p-${Date.now()}`,
+            id: crypto.randomUUID(),
             storeId: currentUser.storeId,
             client: { ...client, storeId: currentUser.storeId },
             clientId,
             sellerId: currentUser.id,
             sellerName: currentUser.name || 'Vendedor',
             created_at: new Date().toISOString(),
-            environments: environments.map(e => ({ ...e, id: `env-${Date.now()}-${Math.random().toString(36).substr(2, 9)}` })),
-            notes: [{ id: `n-${Date.now()}`, storeId: currentUser.storeId, content: 'Projeto iniciado.', authorId: 'sys', authorName: 'Sistema', createdAt: new Date().toISOString(), type: 'SYSTEM' }],
+            environments: environments.map(e => ({ ...e, id: crypto.randomUUID() })),
+            notes: [{ id: crypto.randomUUID(), storeId: currentUser.storeId, content: 'Projeto iniciado.', authorId: 'sys', authorName: 'Sistema', createdAt: new Date().toISOString(), type: 'SYSTEM' }],
             factoryOrders: []
         };
 
         // Create initial batch
         const newBatch: Batch = {
-            id: `b-${Date.now()}`,
+            id: crypto.randomUUID(),
             storeId: currentUser.storeId,
             projectId: newProject.id,
             name: 'Projeto Completo',
@@ -800,7 +807,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         if (!currentUser) return;
         const author = authorId === 'sys' ? { name: 'Sistema' } : users.find(u => u.id === authorId);
         const newNote: Note = {
-            id: `n-${Date.now()}-${Math.random()}`,
+            id: crypto.randomUUID(),
             storeId: currentUser.storeId,
             content,
             authorId,
@@ -1073,7 +1080,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         }
 
         const newBatch: Batch = {
-            id: `b-${Date.now()}`,
+            id: crypto.randomUUID(),
             storeId: currentUser.storeId,
             projectId: originalBatch.projectId,
             name: newName,
@@ -1137,7 +1144,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         if (!project) return;
 
         const newEnv: Environment = {
-            id: `env-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            id: crypto.randomUUID(),
             name,
             status: 'Pending',
             version: 1,
@@ -1315,7 +1322,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     const requestFactoryPart = (projectId: string, envId: string, description: string) => {
         const order: FactoryOrder = {
-            id: `fo-${Date.now()}`,
+            id: crypto.randomUUID(),
             environmentId: envId,
             environmentName: allProjects.find(p => p.id === projectId)?.environments.find(e => e.id === envId)?.name || 'Ambiente',
             partDescription: description,
@@ -1391,7 +1398,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         const code = `ASS-${String(nextNum).padStart(5, '0')}`;
 
         const newTicket: AssistanceTicket = {
-            id: `t-${Date.now()}`,
+            id: crypto.randomUUID(),
             storeId: currentUser.storeId,
             code,
             ...ticketData,
