@@ -1,5 +1,5 @@
 {
-  "name": "Leão Medições - Portal",
-  "description": "Sistema de agendamento e faturamento para serviços de medição de móveis planejados.",
+  "name": "FluxoPlanejados ERP",
+  "description": "A comprehensive furniture management ERP featuring Kanban boards, audit timelines, production lot management, and mobile inspection views.",
   "requestFramePermissions": []
 }

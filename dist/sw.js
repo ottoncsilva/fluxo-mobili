@@ -1,1 +1,58 @@
-if(!self.define){let e,s={};const r=(r,i)=>(r=new URL(r+".js",i).href,s[r]||new Promise(s=>{if("document"in self){const e=document.createElement("script");e.src=r,e.onload=s,document.head.appendChild(e)}else e=r,importScripts(r),s()}).then(()=>{let e=s[r];if(!e)throw new Error(`Module ${r} didn’t register its module`);return e}));self.define=(i,n)=>{const l=e||("document"in self?document.currentScript.src:"")||location.href;if(s[l])return;let t={};const o=e=>r(e,l),u={module:{uri:l},exports:t,require:o};s[l]=Promise.all(i.map(e=>u[e]||o(e))).then(e=>(n(...e),t))}}define(["./workbox-8c29f6e4"],function(e){"use strict";self.skipWaiting(),e.clientsClaim(),e.precacheAndRoute([{url:"registerSW.js",revision:"1872c500de691dce40960bb85481de07"},{url:"index.html",revision:"2df488563cf5dcdbc6c257629e33b002"},{url:"assets/react-vendor-BYfkj5S3.js",revision:null},{url:"assets/pdf-renderer-CsdQypR9.js",revision:null},{url:"assets/index-tBylOA9V.css",revision:null},{url:"assets/index-CPApleYV.js",revision:null},{url:"assets/firebase-3cEapGcK.js",revision:null},{url:"assets/charts-DpKMybyL.js",revision:null},{url:"assets/calendar-BWPwx175.js",revision:null},{url:"manifest.webmanifest",revision:"d2f8588a39166d328766fba909311745"}],{}),e.cleanupOutdatedCaches(),e.registerRoute(new e.NavigationRoute(e.createHandlerBoundToURL("index.html")))});
+const CACHE_NAME = 'fluxoerp-v1';
+const STATIC_ASSETS = [
+  '/',
+  '/index.html',
+];
+
+// Install: Cache static assets
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(STATIC_ASSETS);
+    })
+  );
+  self.skipWaiting();
+});
+
+// Activate: Clean old caches
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+      );
+    })
+  );
+  self.clients.claim();
+});
+
+// Fetch: Network first, fall back to cache
+self.addEventListener('fetch', (event) => {
+  // Skip non-GET requests
+  if (event.request.method !== 'GET') return;
+  
+  // Skip Firebase/API requests
+  if (event.request.url.includes('firestore.googleapis.com') ||
+      event.request.url.includes('firebase') ||
+      event.request.url.includes('googleapis.com')) {
+    return;
+  }
+
+  event.respondWith(
+    fetch(event.request)
+      .then((response) => {
+        // Cache successful responses
+        if (response.status === 200) {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseClone);
+          });
+        }
+        return response;
+      })
+      .catch(() => {
+        // If network fails, try cache
+        return caches.match(event.request);
+      })
+  );
+});
