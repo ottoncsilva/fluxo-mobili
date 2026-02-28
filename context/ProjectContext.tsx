@@ -38,7 +38,7 @@ interface ProjectContextType {
     assistanceWorkflow: AssistanceWorkflowStep[];
 
     login: (storeSlug: string, username: string, pass: string) => Promise<string | boolean>; // Updated to Promise for Async
-    createStore: (storeName: string, storeSlug: string, adminName: string, adminUsername: string, adminPass: string) => void;
+    createStore: (storeName: string, storeSlug: string, adminName: string, adminUsername: string, adminPass: string) => Promise<void>;
     updateStore: (storeId: string, updates: Partial<Store> & { settings?: CompanySettings }) => void;
     logout: () => void;
 
@@ -361,8 +361,6 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
                 if (data.lastPostAssemblyNumber !== undefined) setLastPostAssemblyNumber(data.lastPostAssemblyNumber);
                 if (data.lastAssistanceNumber !== undefined) setLastAssistanceNumber(data.lastAssistanceNumber);
                 if (data.assemblyTeams) setAssemblyTeams(data.assemblyTeams);
-            } else {
-                console.log("No remote config found, using defaults.");
             }
         });
 
@@ -463,10 +461,18 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         }
     };
 
+    // Hashes a plaintext password with SHA-256 (Web Crypto — no extra dependency needed)
+    const hashPassword = async (plain: string): Promise<string> => {
+        const data = new TextEncoder().encode(plain);
+        const buffer = await crypto.subtle.digest('SHA-256', data);
+        return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+    };
+
     // Auth Logic - Updated for Async DB Check
     const login = async (storeSlug: string, username: string, pass: string): Promise<string | boolean> => {
-        // 1. Check for Super Admin (Secure Password)
-        if (storeSlug.toLowerCase() === 'admin' && username.toLowerCase() === 'admin' && pass === 'Dell@7567') {
+        // 1. Check for Super Admin — password loaded from env var, never hardcoded
+        const superAdminPass = import.meta.env.VITE_SUPER_ADMIN_PASS;
+        if (storeSlug.toLowerCase() === 'admin' && username.toLowerCase() === 'admin' && superAdminPass && pass === superAdminPass) {
             const superAdminUser: User = {
                 id: 'super-admin',
                 storeId: 'admin-dashboard',
@@ -490,22 +496,24 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
         // 4. Find User (Async in Cloud Mode)
         let user: User | undefined;
+        const hashedPass = await hashPassword(pass);
 
         if (useCloud && db) {
-            // Secure Login: Query DB for this specific user instead of filtering loaded list
-            // NOTE: In production SaaS, this should be replaced by Firebase Auth (email/pass)
-            // Here we do a query to find the user document.
-            // Warning: Storing passwords in Firestore is bad practice. This is a demo implementation.
             try {
                 const usersRef = collection(db, "users");
-                const q = query(
-                    usersRef,
-                    where("storeId", "==", store.id),
-                    where("username", "==", username),
-                    where("password", "==", pass),
-                    where("isSystemUser", "==", true)
-                );
-                const querySnapshot = await getDocs(q);
+                const baseFilter = [where("storeId", "==", store.id), where("username", "==", username), where("isSystemUser", "==", true)];
+
+                // Try hashed password first (new accounts)
+                let querySnapshot = await getDocs(query(usersRef, ...baseFilter, where("password", "==", hashedPass)));
+
+                if (querySnapshot.empty) {
+                    // Fallback: plaintext (legacy accounts) — migrate on success
+                    querySnapshot = await getDocs(query(usersRef, ...baseFilter, where("password", "==", pass)));
+                    if (!querySnapshot.empty) {
+                        updateDoc(doc(db, "users", querySnapshot.docs[0].id), { password: hashedPass });
+                    }
+                }
+
                 if (!querySnapshot.empty) {
                     user = { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() } as User;
                 }
@@ -514,13 +522,17 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
                 return false;
             }
         } else {
-            // LocalStorage Mode
+            // LocalStorage Mode — accept both hash (new) and plaintext (legacy)
             user = allUsers.find(u =>
                 u.storeId === store.id &&
                 u.username.toLowerCase() === username.toLowerCase() &&
-                u.password === pass &&
+                (u.password === hashedPass || u.password === pass) &&
                 u.isSystemUser
             );
+            // Migrate plaintext password to hash
+            if (user && user.password === pass) {
+                updateUser({ ...user, password: hashedPass });
+            }
         }
 
         if (user) {
@@ -534,7 +546,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         setCurrentUser(null); // AuthContext remove do localStorage automaticamente
     };
 
-    const createStore = (storeName: string, storeSlug: string, adminName: string, adminUsername: string, adminPass: string) => {
+    const createStore = async (storeName: string, storeSlug: string, adminName: string, adminUsername: string, adminPass: string): Promise<void> => {
         const newStoreId = crypto.randomUUID();
 
         if (stores.some(s => s.slug === storeSlug)) {
@@ -556,7 +568,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             storeId: newStoreId,
             name: adminName,
             username: adminUsername,
-            password: adminPass,
+            password: await hashPassword(adminPass),
             role: 'Admin',
             isSystemUser: true,
             contractType: 'PJ'
@@ -791,7 +803,6 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
                     await deleteDoc(doc(db, "batches", batch.id));
                 }
 
-                console.log(`Project ${projectId} and associated data deleted.`);
             } catch (error) {
                 console.error("Error deleting project:", error);
                 showToast("Erro ao excluir projeto. Tente novamente.", 'error');
@@ -1700,18 +1711,18 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     const notifySalesNewLead = async (client: Client) => {
         // Notify Sales (Company Phone) when a new lead is created
-        if (!companySettings.evolutionApi?.globalEnabled || !companySettings.evolutionApi?.instanceUrl || !companySettings.evolutionApi?.instanceName || !companySettings.phone) return;
+        const evoApi = companySettings.evolutionApi;
+        if (!evoApi?.globalEnabled || !evoApi.instanceUrl || !evoApi.instanceName || !companySettings.phone) return;
 
         const message = `🔔 *Novo Lead Cadastrado*\n\n👤 Nome: ${client.name}\n📱 Telefone: ${client.phone}\n📍 Origem: ${client.origin || 'Não informado'}\n\nAcesse o sistema para mais detalhes.`;
 
-        await import('../services/evolutionApi').then(({ EvolutionApi }) => {
-            EvolutionApi.sendText({
-                instanceUrl: companySettings.evolutionApi!.instanceUrl,
-                instanceName: companySettings.evolutionApi!.instanceName!,
-                token: companySettings.evolutionApi!.token,
-                phone: companySettings.phone,
-                message
-            });
+        const { EvolutionApi } = await import('../services/evolutionApi');
+        EvolutionApi.sendText({
+            instanceUrl: evoApi.instanceUrl,
+            instanceName: evoApi.instanceName,
+            token: evoApi.token ?? '',
+            phone: companySettings.phone,
+            message
         });
     };
 
@@ -1789,9 +1800,9 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
                 if (i > 0) await new Promise(r => setTimeout(r, intervalSeconds * 1000));
                 const alert = alerts[i];
                 const success = await EvolutionApi.sendText({
-                    instanceUrl: evo!.instanceUrl,
-                    instanceName: evo!.instanceName!,
-                    token: evo!.token,
+                    instanceUrl: evo?.instanceUrl ?? '',
+                    instanceName: evo?.instanceName ?? '',
+                    token: evo?.token ?? '',
                     phone: alert.phone,
                     message: alert.message,
                 });
