@@ -1,171 +1,19 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>FluxoERP - Gestão de Planejados</title>
-  <meta name="description" content="Sistema de gestão para empresas de móveis planejados" />
-  <meta name="theme-color" content="#137fec" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="FluxoERP" />
-  <link rel="manifest" href="/manifest.json" />
-  <link rel="apple-touch-icon" href="/icon.svg" />
-  <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-  <!-- Tailwind via CDN for simplicity in this setup -->
-  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&family=Noto+Sans:wght@400;500;700&display=swap"
-    rel="stylesheet" />
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
-    rel="stylesheet" />
-  <script>
-    tailwind.config = {
-      darkMode: "class",
-      theme: {
-        extend: {
-          colors: {
-            primary: {
-              DEFAULT: "#137fec",
-              50: "#eff6ff",
-              100: "#dbeafe",
-              200: "#bfdbfe",
-              300: "#93c5fd",
-              400: "#60a5fa",
-              500: "#137fec",
-              600: "#2563eb",
-              700: "#1d4ed8",
-              800: "#1e40af",
-              900: "#1e3a8a",
-            },
-            background: {
-              light: "#f6f7f8",
-              dark: "#101922",
-            },
-          },
-          fontFamily: {
-            display: ["Manrope", "sans-serif"],
-            body: ["Noto Sans", "sans-serif"],
-          },
-        },
-      },
-    };
-  </script>
-  <style>
-    body {
-      font-family: 'Manrope', sans-serif;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    .material-symbols-outlined {
-      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-    }
-
-    /* Dark mode: força scrollbars nativos do browser para o tema escuro */
-    .dark {
-      color-scheme: dark;
-    }
-
-    /* Custom scrollbar */
-    .custom-scrollbar::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-
-    .custom-scrollbar::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    .custom-scrollbar::-webkit-scrollbar-thumb {
-      background-color: #cbd5e1;
-      border-radius: 20px;
-    }
-
-    .dark .custom-scrollbar::-webkit-scrollbar-thumb {
-      background-color: #334155;
-    }
-
-    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-      background-color: #94a3b8;
-    }
-
-    .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-      background-color: #475569;
-    }
-
-    /* Firefox: scrollbar-color para todos os elementos com overflow */
-    .dark * {
-      scrollbar-color: #334155 transparent;
-    }
-
-    input[type="checkbox"]:checked {
-      background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e");
-    }
-
-    /* PWA standalone mode: safe area padding for notched phones */
-    .content-bottom-nav {
-      padding-bottom: 4rem;
-    }
-    @supports(padding: env(safe-area-inset-bottom)) {
-      .bottom-nav {
-        padding-bottom: env(safe-area-inset-bottom);
-      }
-      .content-bottom-nav {
-        padding-bottom: calc(4rem + env(safe-area-inset-bottom));
-      }
-    }
-    @media (min-width: 768px) {
-      .content-bottom-nav {
-        padding-bottom: 0 !important;
-      }
-    }
-
-    /* Fade-in animation for popups */
-    @keyframes fade-in {
-      from { opacity: 0; transform: scale(0.95); }
-      to { opacity: 1; transform: scale(1); }
-    }
-    .animate-fade-in {
-      animation: fade-in 0.15s ease-out;
-    }
-
-    /* Mobile: ensure scrollbar is visible but subtle */
-    @media (max-width: 767px) {
-      .custom-scrollbar::-webkit-scrollbar {
-        width: 4px;
-        height: 4px;
-      }
-    }
-  </style>
-
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@^19.2.4",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "react/": "https://esm.sh/react@^19.2.4/",
-    "vite": "https://esm.sh/vite@^7.3.1",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.4",
-    "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
-    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js",
-    "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js",
-    "firebase/": "https://esm.sh/firebase@^12.9.0/"
-  }
-}
-</script>
-  <script type="module" crossorigin src="/assets/index-sgmP4E7f.js"></script>
-</head>
-
-<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white h-screen overflow-hidden">
-  <div id="root"></div>
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(() => { });
-      });
-    }
-  </script>
-</body>
-
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Google AI Studio App</title>
+    <script type="module" crossorigin src="/assets/index-CPApleYV.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/react-vendor-BYfkj5S3.js">
+    <link rel="modulepreload" crossorigin href="/assets/pdf-renderer-CsdQypR9.js">
+    <link rel="modulepreload" crossorigin href="/assets/firebase-3cEapGcK.js">
+    <link rel="modulepreload" crossorigin href="/assets/calendar-BWPwx175.js">
+    <link rel="modulepreload" crossorigin href="/assets/charts-DpKMybyL.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-tBylOA9V.css">
+  <link rel="manifest" href="/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
+  <body>
+    <div id="root"></div>
+  </body>
 </html>
+
