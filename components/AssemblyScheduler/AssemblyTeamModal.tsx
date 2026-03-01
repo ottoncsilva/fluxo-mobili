@@ -23,6 +23,7 @@ export const AssemblyTeamModal: React.FC<AssemblyTeamModalProps> = ({
      const { showToast } = useToast();
      const [localTeams, setLocalTeams] = useState<AssemblyTeam[]>([]);
      const [editingTeam, setEditingTeam] = useState<AssemblyTeam | null>(null);
+     const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
      const [teamForm, setTeamForm] = useState({
           name: '',
           color: 'blue',
@@ -55,13 +56,20 @@ export const AssemblyTeamModal: React.FC<AssemblyTeamModalProps> = ({
      const handleDeleteTeam = (teamId: string) => {
           const hasActiveBatches = batches.some(b => b.assemblySchedule?.teamId === teamId);
           if (hasActiveBatches) {
-               if (!window.confirm('Esta equipe possui montagens agendadas. Ao excluir, os lotes vinculados ficarão sem equipe. Deseja continuar?')) return;
+               // Show inline confirmation instead of window.confirm
+               setPendingDeleteId(teamId);
+               return;
           }
+          commitDeleteTeam(teamId);
+     };
+
+     const commitDeleteTeam = (teamId: string) => {
           setLocalTeams(prev => prev.filter(t => t.id !== teamId));
           if (editingTeam?.id === teamId) {
                setEditingTeam(null);
                setTeamForm({ name: '', color: 'blue', memberInput: '', members: [], serviceTypes: ['assembly'] });
           }
+          setPendingDeleteId(null);
      };
 
      const handleAddMember = () => {
@@ -120,37 +128,62 @@ export const AssemblyTeamModal: React.FC<AssemblyTeamModalProps> = ({
                                    {localTeams.map(team => {
                                         const map = TEAM_COLOR_MAP[team.color] || TEAM_COLOR_MAP.slate;
                                         const isEditing = editingTeam?.id === team.id;
+                                        const isPendingDelete = pendingDeleteId === team.id;
                                         return (
-                                             <div key={team.id} className={`p-3 rounded-lg border transition-all flex items-start justify-between group ${isEditing ? 'border-primary bg-primary/5' : 'border-slate-200 dark:border-slate-700 hover:border-primary/30'} ${isEditing ? map.light : ''}`}>
-                                                  <div className="flex flex-col gap-1 overflow-hidden pr-2">
-                                                       <div className="flex items-center gap-2">
-                                                            <div className={`w-3 h-3 rounded-full shrink-0 ${map.bg}`} />
-                                                            <span className="font-bold text-sm text-slate-800 dark:text-white truncate">{team.name}</span>
-                                                       </div>
-                                                       {(team.serviceTypes || ['assembly']).length > 0 && (
-                                                            <div className="flex flex-wrap gap-1 mt-1">
-                                                                 {(team.serviceTypes || ['assembly']).includes('assembly') && (
-                                                                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 uppercase">Montagem</span>
-                                                                 )}
-                                                                 {(team.serviceTypes || []).includes('assistance') && (
-                                                                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 uppercase">Assistência</span>
-                                                                 )}
+                                             <div key={team.id} className={`p-3 rounded-lg border transition-all flex flex-col gap-2 group ${isEditing ? 'border-primary bg-primary/5' : 'border-slate-200 dark:border-slate-700 hover:border-primary/30'} ${isEditing ? map.light : ''}`}>
+                                                  <div className="flex items-start justify-between">
+                                                       <div className="flex flex-col gap-1 overflow-hidden pr-2">
+                                                            <div className="flex items-center gap-2">
+                                                                 <div className={`w-3 h-3 rounded-full shrink-0 ${map.bg}`} />
+                                                                 <span className="font-bold text-sm text-slate-800 dark:text-white truncate">{team.name}</span>
                                                             </div>
-                                                       )}
-                                                       {team.members.length > 0 && (
-                                                            <span className="text-xs text-slate-500 truncate mt-1">
-                                                                 {team.members.join(', ')}
-                                                            </span>
-                                                       )}
+                                                            {(team.serviceTypes || ['assembly']).length > 0 && (
+                                                                 <div className="flex flex-wrap gap-1 mt-1">
+                                                                      {(team.serviceTypes || ['assembly']).includes('assembly') && (
+                                                                           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 uppercase">Montagem</span>
+                                                                      )}
+                                                                      {(team.serviceTypes || []).includes('assistance') && (
+                                                                           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 uppercase">Assistência</span>
+                                                                      )}
+                                                                 </div>
+                                                            )}
+                                                            {team.members.length > 0 && (
+                                                                 <span className="text-xs text-slate-500 truncate mt-1">
+                                                                      {team.members.join(', ')}
+                                                                 </span>
+                                                            )}
+                                                       </div>
+                                                       <div className="flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                                            <button onClick={() => handleEditTeam(team)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-primary transition-colors">
+                                                                 <span className="material-symbols-outlined text-sm">edit</span>
+                                                            </button>
+                                                            <button type="button" onClick={() => handleDeleteTeam(team.id)} className="p-1.5 rounded-lg text-slate-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:text-rose-600 transition-colors">
+                                                                 <span className="material-symbols-outlined text-sm">delete</span>
+                                                            </button>
+                                                       </div>
                                                   </div>
-                                                  <div className="flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                                       <button onClick={() => handleEditTeam(team)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-primary transition-colors">
-                                                            <span className="material-symbols-outlined text-sm">edit</span>
-                                                       </button>
-                                                       <button type="button" onClick={() => handleDeleteTeam(team.id)} className="p-1.5 rounded-lg text-slate-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:text-rose-600 transition-colors">
-                                                            <span className="material-symbols-outlined text-sm">delete</span>
-                                                       </button>
-                                                  </div>
+                                                  {/* Inline delete confirmation */}
+                                                  {isPendingDelete && (
+                                                       <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg p-2.5 flex flex-col gap-2">
+                                                            <p className="text-[11px] text-rose-700 dark:text-rose-300 font-medium">
+                                                                 ⚠️ Esta equipe tem montagens agendadas. Ao excluir, os lotes ficarão sem equipe.
+                                                            </p>
+                                                            <div className="flex gap-2">
+                                                                 <button
+                                                                      onClick={() => setPendingDeleteId(null)}
+                                                                      className="flex-1 py-1 rounded-md text-[11px] font-bold border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                                                 >
+                                                                      Cancelar
+                                                                 </button>
+                                                                 <button
+                                                                      onClick={() => commitDeleteTeam(team.id)}
+                                                                      className="flex-1 py-1 rounded-md text-[11px] font-bold bg-rose-600 text-white hover:bg-rose-700 transition-colors"
+                                                                 >
+                                                                      Excluir mesmo assim
+                                                                 </button>
+                                                            </div>
+                                                       </div>
+                                                  )}
                                              </div>
                                         );
                                    })}

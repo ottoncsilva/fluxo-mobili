@@ -67,3 +67,31 @@ export const getStageBadgePure = (phase: string, workflowConfig: Record<string, 
      if (stage === 8) return { icon: 'build_circle', cls: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300', label: 'Pós-Montagem' };
      return null;
 };
+
+// ─── Assistance constants ─────────────────────────────────────────────────────
+
+/** SLA padrão de assistência técnica em dias úteis (etapas 10.1–10.6) */
+export const ASSISTANCE_SLA_DAYS = 31;
+
+/** Mapa de cores para status do workflow de assistência técnica */
+export const ASSISTANCE_STATUS_COLORS: Record<string, string> = {
+     '10.1': 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300',
+     '10.2': 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300',
+     '10.3': 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300',
+     '10.4': 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300',
+     '10.5': 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300',
+     '10.6': 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300',
+     '10.7': 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300',
+};
+
+// ─── Date helpers ─────────────────────────────────────────────────────────────
+
+/**
+ * Interpreta uma string de data como hora local (sem conversão UTC).
+ * Necessário porque `new Date('2026-03-16')` interpreta como UTC 00:00,
+ * o que pode causar deslocamentos de um dia em fusos negativos.
+ */
+export const parseLocalDate = (dateStr: string): Date => {
+     const parts = dateStr.split('T')[0].split('-');
+     return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+};

@@ -2,7 +2,7 @@
 // Módulo de Agendamento de Montagens
 // Gantt visual (uma linha por equipe) + Fila lateral (etapas 5/6/7)
 
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
     startOfWeek, addDays, eachDayOfInterval, differenceInDays,
     isWeekend, format
@@ -10,13 +10,16 @@ import {
 import { ptBR } from 'date-fns/locale';
 import { useProjects } from '../context/ProjectContext';
 import { useToast } from '../context/ToastContext';
-import { AssemblyTeam, AssemblySchedule, AssemblyStatus, AssistanceStatus, AssistanceTicket, Batch, WorkflowStep, Project } from '../types';
-import { getBusinessDaysDifference, isHoliday, addBusinessDays } from '../utils/dateUtils';
-import { TEAM_COLOR_MAP, COLOR_OPTIONS, STATUS_STYLES, GANTT_WEEKS, VISIBILITY_MULTIPLIER, WEEKDAY_ABBR, NON_WORKING_HEADER_STYLE, NON_WORKING_GRID_STYLE, clamp, getDeadlineChipPure, getStageBadgePure } from './AssemblyScheduler/utils';
+import { AssemblyTeam, AssemblySchedule, AssemblyStatus, AssistanceTicket, Batch } from '../types';
+import { isHoliday, addBusinessDays, getBusinessDaysDifference } from '../utils/dateUtils';
+import { TEAM_COLOR_MAP, STATUS_STYLES, GANTT_WEEKS, VISIBILITY_MULTIPLIER, WEEKDAY_ABBR, NON_WORKING_HEADER_STYLE, clamp, getDeadlineChipPure, getStageBadgePure, ASSISTANCE_SLA_DAYS, parseLocalDate } from './AssemblyScheduler/utils';
 import { QueueBatchCard } from './AssemblyScheduler/QueueBatchCard';
+import { QueueAssistanceCard } from './AssemblyScheduler/QueueAssistanceCard';
+import { GanttDayGrid } from './AssemblyScheduler/GanttDayGrid';
 import { AssemblyScheduleModal } from './AssemblyScheduler/AssemblyScheduleModal';
 import { AssistanceScheduleModal } from './AssemblyScheduler/AssistanceScheduleModal';
 import { AssemblyTeamModal } from './AssemblyScheduler/AssemblyTeamModal';
+import { useGanttDrag } from '../hooks/useGanttDrag';
 
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -61,11 +64,12 @@ const AssemblyScheduler: React.FC = () => {
     const ganttEndDate = addDays(ganttStartDate, totalDays - 1);
     const ganttDays = eachDayOfInterval({ start: ganttStartDate, end: ganttEndDate });
 
-    // ── Drag panning refs ──────────────────────────────────────────────────────
-    const ganttBodyRef = useRef<HTMLDivElement>(null);
-    const dragRef = useRef<{ startX: number; startAnchor: Date } | null>(null);
-    const hasDraggedRef = useRef(false);
-    const [isDragging, setIsDragging] = useState(false);
+    // ── Drag panning (delegated to custom hook) ────────────────────────────────
+    const {
+        ganttBodyRef, isDragging, hasDraggedRef,
+        handleGanttMouseDown, handleGanttMouseMove, handleGanttMouseUp,
+        handleGanttTouchStart, handleGanttTouchMove, handleGanttTouchEnd,
+    } = useGanttDrag({ ganttAnchor, totalDays, setGanttAnchor });
 
     // ── Month groups for header ────────────────────────────────────────────────
     const monthGroups = useMemo(() => {
@@ -103,13 +107,6 @@ const AssemblyScheduler: React.FC = () => {
     const [mobileTab, setMobileTab] = useState<'GANTT' | 'QUEUE'>('QUEUE');
 
     // ── Gantt helpers ──────────────────────────────────────────────────────────
-    // Helper to parse date strings correctly (avoiding timezone issues)
-    // "2026-03-16" should be interpreted as local 00:00, not UTC
-    const parseLocalDate = (dateStr: string): Date => {
-        const parts = dateStr.split('T')[0].split('-');
-        return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-    };
-
     const dateToPercent = (date: Date | string): number => {
         const d = typeof date === 'string' ? parseLocalDate(date) : date;
         const diff = differenceInDays(d, ganttStartDate);
@@ -126,48 +123,6 @@ const AssemblyScheduler: React.FC = () => {
         if (!date) return false;
         const d = parseLocalDate(date);
         return d >= ganttStartDate && d <= ganttEndDate;
-    };
-
-    // ── Drag pan handlers ──────────────────────────────────────────────────────
-    const handleGanttMouseDown = (e: React.MouseEvent) => {
-        e.preventDefault();
-        hasDraggedRef.current = false;
-        dragRef.current = { startX: e.clientX, startAnchor: ganttAnchor };
-        setIsDragging(true);
-    };
-
-    const handleGanttMouseMove = (e: React.MouseEvent) => {
-        if (!dragRef.current || !ganttBodyRef.current) return;
-        const deltaX = e.clientX - dragRef.current.startX;
-        if (Math.abs(deltaX) > 5) hasDraggedRef.current = true;
-        // Subtract 128px (label column width) to use only the bar area width
-        const colWidth = (ganttBodyRef.current.clientWidth - 128) / totalDays;
-        const daysDelta = Math.round(-deltaX / colWidth);
-        setGanttAnchor(addDays(dragRef.current.startAnchor, daysDelta));
-    };
-
-    const handleGanttMouseUp = () => {
-        dragRef.current = null;
-        setIsDragging(false);
-    };
-
-    const handleGanttTouchStart = (e: React.TouchEvent) => {
-        hasDraggedRef.current = false;
-        dragRef.current = { startX: e.touches[0].clientX, startAnchor: ganttAnchor };
-    };
-
-    const handleGanttTouchMove = (e: React.TouchEvent) => {
-        if (!dragRef.current || !ganttBodyRef.current) return;
-        const deltaX = e.touches[0].clientX - dragRef.current.startX;
-        if (Math.abs(deltaX) > 5) hasDraggedRef.current = true;
-        // Subtract 128px (label column width) to use only the bar area width
-        const colWidth = (ganttBodyRef.current.clientWidth - 128) / totalDays;
-        const daysDelta = Math.round(-deltaX / colWidth);
-        setGanttAnchor(addDays(dragRef.current.startAnchor, daysDelta));
-    };
-
-    const handleGanttTouchEnd = () => {
-        dragRef.current = null;
     };
 
     // ── Derived data ───────────────────────────────────────────────────────────
@@ -282,8 +237,7 @@ const AssemblyScheduler: React.FC = () => {
     }, [assemblyTeams, ganttEvents]);
 
     // ── Technical Assistance Scheduling ───────────────────────────────────────
-    // SLA acumulado de assistência: 10.1 até 10.6 = 31 dias úteis
-    const ASSISTANCE_SLA_DAYS = 31;
+    // SLA acumulado de assistência: 10.1 até 10.6 = 31 dias úteis (from utils)
 
     const relevantAssistances = useMemo(() =>
         assistanceTickets.filter(t =>
@@ -638,23 +592,14 @@ const AssemblyScheduler: React.FC = () => {
                                         )}
                                     </div>
 
-                                    {/* Gantt bar area — minHeight reduced 30% (68→48) */}
+                                    {/* Gantt bar area */}
                                     <div className="flex-1 relative" style={{ minHeight: 48 }}>
                                         {/* Background grid */}
-                                        {ganttDays.map((day, i) => {
-                                            const nonWorking = isNonWorkingDay(day);
-                                            return (
-                                                <div
-                                                    key={i}
-                                                    className={`absolute top-0 bottom-0 border-r border-slate-200 dark:border-slate-700 ${nonWorking ? 'bg-slate-50/90 dark:bg-slate-800/50' : ''}`}
-                                                    style={{
-                                                        left: `${(i / totalDays) * 100}%`,
-                                                        width: `${(1 / totalDays) * 100}%`,
-                                                        ...(nonWorking ? NON_WORKING_GRID_STYLE : {})
-                                                    }}
-                                                />
-                                            );
-                                        })}
+                                        <GanttDayGrid
+                                            ganttDays={ganttDays}
+                                            totalDays={totalDays}
+                                            isNonWorkingDay={isNonWorkingDay}
+                                        />
 
                                         {/* Today column - full width with orange overlay */}
                                         {isInGanttRange(new Date().toISOString()) && (
@@ -740,23 +685,15 @@ const AssemblyScheduler: React.FC = () => {
                                         )}
                                     </div>
 
-                                    {/* Gantt bar area — minHeight reduced 30% (68→48) */}
+                                    {/* Gantt bar area */}
                                     <div className="flex-1 relative" style={{ minHeight: 48 }}>
                                         {/* Background grid */}
-                                        {ganttDays.map((day, i) => {
-                                            const nonWorking = isNonWorkingDay(day);
-                                            return (
-                                                <div
-                                                    key={`asst-grid-${i}`}
-                                                    className={`absolute top-0 bottom-0 border-r border-slate-200 dark:border-slate-700 ${nonWorking ? 'bg-slate-50/90 dark:bg-slate-800/50' : ''}`}
-                                                    style={{
-                                                        left: `${(i / totalDays) * 100}%`,
-                                                        width: `${(1 / totalDays) * 100}%`,
-                                                        ...(nonWorking ? NON_WORKING_GRID_STYLE : {})
-                                                    }}
-                                                />
-                                            );
-                                        })}
+                                        <GanttDayGrid
+                                            ganttDays={ganttDays}
+                                            totalDays={totalDays}
+                                            isNonWorkingDay={isNonWorkingDay}
+                                            keyPrefix="asst-"
+                                        />
 
                                         {/* Today column */}
                                         {isInGanttRange(new Date().toISOString()) && (
@@ -946,99 +883,18 @@ const AssemblyScheduler: React.FC = () => {
                                     </p>
                                 </div>
                             ) : (
-                                filteredAssistances.map(ticket => {
-                                    const project = projects.find(p => p.client.id === ticket.clientId);
-                                    const clientName = project?.client.name || ticket.clientId || 'Cliente';
-                                    const team = assemblyTeams.find(t => t.id === ticket.teamId);
-                                    const createdDate = new Date(ticket.createdAt);
-                                    const deadline = addBusinessDays(createdDate, ASSISTANCE_SLA_DAYS, companySettings?.holidays);
-                                    const daysRemaining = getBusinessDaysDifference(new Date(), deadline, companySettings?.holidays);
-                                    const statusLabel = assistanceWorkflow.find(s => s.id === ticket.status)?.label || ticket.status;
-
-                                    const statusColor = ({
-                                        '10.1': 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300',
-                                        '10.2': 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300',
-                                        '10.3': 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300',
-                                        '10.4': 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300',
-                                        '10.5': 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300',
-                                        '10.6': 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300',
-                                        '10.7': 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300',
-                                    } as Record<string, string>)[ticket.status] || 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400';
-
-                                    const slaColor = daysRemaining < 7
-                                        ? 'text-rose-600 dark:text-rose-400 font-bold'
-                                        : daysRemaining < 15
-                                            ? 'text-amber-600 dark:text-amber-400'
-                                            : 'text-emerald-600 dark:text-emerald-400';
-
-                                    const schedulingStatus = (ticket.schedulingStatus
-                                        || (ticket.scheduledDate ? 'Agendado' : ticket.forecastDate ? 'Previsto' : 'Sem Previsão')) as AssemblyStatus;
-
-                                    return (
-                                        <div key={ticket.id} className="bg-white dark:bg-[#1e2936] rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                                            {/* Scheduling status bar */}
-                                            <div className={`px-2.5 py-1 flex items-center justify-between ${STATUS_STYLES[schedulingStatus]}`}>
-                                                <span className="text-[10px] font-bold uppercase tracking-wide">{schedulingStatus}</span>
-                                                <div className="flex items-center gap-1.5">
-                                                    {ticket.priority === 'Urgente' && (
-                                                        <span className="material-symbols-outlined text-rose-500 text-sm animate-pulse">priority_high</span>
-                                                    )}
-                                                    {team && (
-                                                        <div className="flex items-center gap-1">
-                                                            <div className={`w-2 h-2 rounded-full ${TEAM_COLOR_MAP[team.color]?.bg || 'bg-slate-400'}`} />
-                                                            <span className="text-[10px] font-bold">{team.name}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            <div className="p-2">
-                                                {/* Client + code */}
-                                                <div className="font-bold text-slate-800 dark:text-white text-sm truncate">{clientName}</div>
-                                                <div className="text-[10px] text-slate-400 mb-1.5">{ticket.code || `ASS-${ticket.id.substring(0, 5)}`}</div>
-
-                                                {/* Workflow step badge */}
-                                                <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold mb-1.5 ${statusColor}`}>
-                                                    <span className="material-symbols-outlined text-[11px]">support_agent</span>
-                                                    {statusLabel}
-                                                </div>
-
-                                                {/* SLA countdown */}
-                                                <div className={`text-[10px] mb-1.5 flex items-center gap-1 ${slaColor}`}>
-                                                    <span className="material-symbols-outlined text-[12px]">schedule</span>
-                                                    SLA: {daysRemaining} d.ú. restantes
-                                                </div>
-
-                                                {/* Scheduled date */}
-                                                {ticket.scheduledDate && (
-                                                    <div className="text-[10px] text-slate-500 mb-1.5 flex items-center gap-1">
-                                                        <span className="material-symbols-outlined text-[12px]">event</span>
-                                                        {format(new Date(ticket.scheduledDate), "dd/MM/yy", { locale: ptBR })}
-                                                    </div>
-                                                )}
-                                                {!ticket.scheduledDate && ticket.forecastDate && (
-                                                    <div className="text-[10px] text-amber-600 mb-1.5 flex items-center gap-1">
-                                                        <span className="material-symbols-outlined text-[12px]">event_available</span>
-                                                        Prev: {format(new Date(ticket.forecastDate), "dd/MM/yy", { locale: ptBR })}
-                                                    </div>
-                                                )}
-
-                                                {/* Schedule button */}
-                                                {canEditAssistance && (
-                                                    <button
-                                                        onClick={() => handleOpenAssistanceScheduleModal(ticket)}
-                                                        className="w-full mt-1 py-1 rounded-lg text-[10px] font-bold bg-primary text-white hover:bg-primary/90 transition-colors flex items-center justify-center gap-1"
-                                                    >
-                                                        <span className="material-symbols-outlined text-[13px]">
-                                                            {schedulingStatus === 'Sem Previsão' ? 'calendar_add_on' : 'edit_calendar'}
-                                                        </span>
-                                                        {schedulingStatus === 'Sem Previsão' ? 'Agendar' : 'Editar'}
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })
+                                filteredAssistances.map(ticket => (
+                                    <QueueAssistanceCard
+                                        key={ticket.id}
+                                        ticket={ticket}
+                                        project={projects.find(p => p.client.id === ticket.clientId)}
+                                        assemblyTeams={assemblyTeams}
+                                        assistanceWorkflow={assistanceWorkflow as any}
+                                        holidays={companySettings?.holidays}
+                                        canEdit={canEditAssistance}
+                                        onOpen={handleOpenAssistanceScheduleModal}
+                                    />
+                                ))
                             )}
                         </div>
 
