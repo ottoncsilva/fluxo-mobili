@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useProjects } from '../context/ProjectContext';
 import NewAtendimentoModal from './NewAtendimentoModal';
-import { ViewState } from '../types';
+
 
 interface ClientProfileProps {
     onClose: () => void;
