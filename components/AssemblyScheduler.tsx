@@ -12,169 +12,12 @@ import { useProjects } from '../context/ProjectContext';
 import { useToast } from '../context/ToastContext';
 import { AssemblyTeam, AssemblySchedule, AssemblyStatus, AssistanceStatus, AssistanceTicket, Batch, WorkflowStep, Project } from '../types';
 import { getBusinessDaysDifference, isHoliday, addBusinessDays } from '../utils/dateUtils';
+import { TEAM_COLOR_MAP, COLOR_OPTIONS, STATUS_STYLES, GANTT_WEEKS, VISIBILITY_MULTIPLIER, WEEKDAY_ABBR, NON_WORKING_HEADER_STYLE, NON_WORKING_GRID_STYLE, clamp, getDeadlineChipPure, getStageBadgePure } from './AssemblyScheduler/utils';
+import { QueueBatchCard } from './AssemblyScheduler/QueueBatchCard';
+import { AssemblyScheduleModal } from './AssemblyScheduler/AssemblyScheduleModal';
+import { AssistanceScheduleModal } from './AssemblyScheduler/AssistanceScheduleModal';
+import { AssemblyTeamModal } from './AssemblyScheduler/AssemblyTeamModal';
 
-// ─── Color map (static for Tailwind purge safety) ────────────────────────────
-const TEAM_COLOR_MAP: Record<string, { bg: string; border: string; text: string; light: string }> = {
-    blue: { bg: 'bg-blue-500', border: 'border-blue-600', text: 'text-white', light: 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' },
-    emerald: { bg: 'bg-emerald-500', border: 'border-emerald-600', text: 'text-white', light: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300' },
-    violet: { bg: 'bg-violet-500', border: 'border-violet-600', text: 'text-white', light: 'bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300' },
-    orange: { bg: 'bg-orange-500', border: 'border-orange-600', text: 'text-white', light: 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300' },
-    rose: { bg: 'bg-rose-500', border: 'border-rose-600', text: 'text-white', light: 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300' },
-    amber: { bg: 'bg-amber-500', border: 'border-amber-600', text: 'text-white', light: 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300' },
-    cyan: { bg: 'bg-cyan-500', border: 'border-cyan-600', text: 'text-white', light: 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300' },
-    indigo: { bg: 'bg-indigo-500', border: 'border-indigo-600', text: 'text-white', light: 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300' },
-    teal: { bg: 'bg-teal-500', border: 'border-teal-600', text: 'text-white', light: 'bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-300' },
-    pink: { bg: 'bg-pink-500', border: 'border-pink-600', text: 'text-white', light: 'bg-pink-50 dark:bg-pink-900/20 text-pink-700 dark:text-pink-300' },
-    slate: { bg: 'bg-slate-400', border: 'border-slate-500', text: 'text-white', light: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
-};
-
-const COLOR_OPTIONS = ['blue', 'emerald', 'violet', 'orange', 'rose', 'amber', 'cyan', 'indigo', 'teal', 'pink'];
-
-// ─── Status badge styles ──────────────────────────────────────────────────────
-const STATUS_STYLES: Record<AssemblyStatus, string> = {
-    'Sem Previsão': 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400',
-    'Previsto': 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700',
-    'Agendado': 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700',
-    'Concluído': 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300',
-};
-
-// ─── Gantt config ─────────────────────────────────────────────────────────────
-const GANTT_WEEKS = 6; // visible window width
-const VISIBILITY_MULTIPLIER = 1.2; // 20% more days = 20% narrower columns per day
-
-// ─── Non-working day helpers ──────────────────────────────────────────────────
-// Note: Will be defined inside component to access companySettings
-
-// Abbreviated weekday names (dom, seg, ter, qua, qui, sex, sab)
-const WEEKDAY_ABBR = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
-
-const NON_WORKING_HEADER_STYLE: React.CSSProperties = {
-    backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(100,116,139,0.35) 4px, rgba(100,116,139,0.35) 5px)'
-};
-
-const NON_WORKING_GRID_STYLE: React.CSSProperties = {
-    backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(100,116,139,0.32) 4px, rgba(100,116,139,0.32) 5px)'
-};
-
-// ─── Helper ───────────────────────────────────────────────────────────────────
-const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
-
-// ─── Pure helper functions (outside component for stability) ─────────────────
-const getDeadlineChipPure = (assemblyDeadline: string | undefined, holidays?: Array<{ date: string; name: string; type: 'fixed' | 'movable'; year?: number }>) => {
-    if (!assemblyDeadline) return null;
-    const days = getBusinessDaysDifference(new Date(), new Date(assemblyDeadline), holidays);
-    const dateStr = format(new Date(assemblyDeadline), 'dd/MM/yyyy');
-    if (days > 15) {
-        return { cls: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold', icon: 'event', label: `📅 Data Limite: ${dateStr} (+${days} d.ú.)`, pulse: false };
-    }
-    if (days >= 0 && days <= 15) {
-        return { cls: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 font-bold', icon: 'warning', label: `⚠ Data Limite: ${dateStr} (+${days} d.ú.)`, pulse: false };
-    }
-    return { cls: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 font-bold animate-pulse', icon: 'alarm', label: `🚨 URGENTE — Prazo vencido há ${Math.abs(days)} d.ú.`, pulse: true };
-};
-
-const getStageBadgePure = (phase: string, workflowConfig: Record<string, WorkflowStep>) => {
-    const step = workflowConfig[phase];
-    if (!step) return null;
-    const stage = step.stage;
-    if (stage === 5) return { icon: 'precision_manufacturing', cls: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400', label: 'Fabricação' };
-    if (stage === 6) return { icon: 'local_shipping', cls: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300', label: 'Logística' };
-    if (stage === 7) return { icon: 'construction', cls: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300', label: 'Montagem Ativa' };
-    if (stage === 8) return { icon: 'build_circle', cls: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300', label: 'Pós-Montagem' };
-    return null;
-};
-
-// ─── QueueBatchCard ───────────────────────────────────────────────────────────
-interface QueueBatchCardProps {
-    batch: Batch;
-    project: Project;
-    assemblyTeams: AssemblyTeam[];
-    workflowConfig: Record<string, WorkflowStep>;
-    holidays?: Array<{ date: string; name: string; type: 'fixed' | 'movable'; year?: number }>;
-    canEdit: boolean;
-    onOpenScheduleModal: (batch: Batch) => void;
-}
-
-const QueueBatchCard = React.memo(({ batch, project, assemblyTeams, workflowConfig, holidays, canEdit, onOpenScheduleModal }: QueueBatchCardProps) => {
-    const scheduleStatus = (batch.assemblySchedule?.status || 'Sem Previsão') as AssemblyStatus;
-    const team = assemblyTeams.find(t => t.id === batch.assemblySchedule?.teamId);
-    const deadlineChip = getDeadlineChipPure(batch.assemblyDeadline, holidays);
-    const stageBadge = getStageBadgePure(batch.phase, workflowConfig);
-    const step = workflowConfig[batch.phase];
-    const envCount = batch.environmentIds?.length || project.environments.length;
-    const defaultDays = envCount * 3;
-    const estimatedDays = batch.assemblySchedule?.estimatedDays ?? defaultDays;
-    const isCustomEstimate = batch.assemblySchedule?.estimatedDays !== undefined && batch.assemblySchedule.estimatedDays !== defaultDays;
-
-    return (
-        <div className="bg-white dark:bg-[#1e2936] rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-            {/* Status bar */}
-            <div className={`px-2.5 py-1 flex items-center justify-between ${STATUS_STYLES[scheduleStatus]}`}>
-                <span className="text-[10px] font-bold uppercase tracking-wide">{scheduleStatus}</span>
-                {team && (
-                    <div className="flex items-center gap-1">
-                        <div className={`w-2 h-2 rounded-full ${TEAM_COLOR_MAP[team.color]?.bg || 'bg-slate-400'}`} />
-                        <span className="text-[10px] font-bold">{team.name}</span>
-                    </div>
-                )}
-            </div>
-
-            <div className="p-2">
-                <div className="font-bold text-slate-800 dark:text-white text-sm truncate">{project.client.name}</div>
-                <div className="text-[10px] text-slate-400 mb-1.5">
-                    {batch.name || 'Lote'} · {envCount} amb{envCount !== 1 ? 's' : ''}
-                </div>
-
-                {stageBadge && (
-                    <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold mb-1.5 ${stageBadge.cls}`}>
-                        <span className="material-symbols-outlined text-[11px]">{stageBadge.icon}</span>
-                        {step?.label || stageBadge.label}
-                    </div>
-                )}
-
-                {deadlineChip && (
-                    <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] mb-1.5 ${deadlineChip.cls}`}>
-                        <span className="material-symbols-outlined text-[11px]">{deadlineChip.icon}</span>
-                        {deadlineChip.label}
-                    </div>
-                )}
-
-                <div className={`text-[10px] mb-1.5 flex items-center gap-1 ${isCustomEstimate ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}>
-                    <span className="material-symbols-outlined text-[12px]">timer</span>
-                    {isCustomEstimate
-                        ? `${estimatedDays} d.ú. (ajustado)`
-                        : `${envCount}×3 = ${defaultDays} d.ú.`
-                    }
-                </div>
-
-                {batch.assemblySchedule?.scheduledDate && (
-                    <div className="text-[10px] text-slate-500 mb-1.5 flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[12px]">event</span>
-                        {format(new Date(batch.assemblySchedule.scheduledDate), "dd/MM/yy", { locale: ptBR })}
-                    </div>
-                )}
-                {!batch.assemblySchedule?.scheduledDate && batch.assemblySchedule?.forecastDate && (
-                    <div className="text-[10px] text-amber-600 mb-1.5 flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[12px]">event_available</span>
-                        Prev: {format(new Date(batch.assemblySchedule.forecastDate), "dd/MM/yy", { locale: ptBR })}
-                    </div>
-                )}
-
-                {canEdit && (
-                    <button
-                        onClick={() => onOpenScheduleModal(batch)}
-                        className="w-full mt-1 py-1 rounded-lg text-[10px] font-bold bg-primary text-white hover:bg-primary/90 transition-colors flex items-center justify-center gap-1"
-                    >
-                        <span className="material-symbols-outlined text-[13px]">
-                            {scheduleStatus === 'Sem Previsão' ? 'calendar_add_on' : 'edit_calendar'}
-                        </span>
-                        {scheduleStatus === 'Sem Previsão' ? 'Agendar' : 'Editar'}
-                    </button>
-                )}
-            </div>
-        </div>
-    );
-});
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 const AssemblyScheduler: React.FC = () => {
@@ -245,33 +88,15 @@ const AssemblyScheduler: React.FC = () => {
     // ── Schedule modal state ───────────────────────────────────────────────────
     const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
     const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
-    const [scheduleForm, setScheduleForm] = useState<Partial<AssemblySchedule>>({});
     const [isSavingSchedule, setIsSavingSchedule] = useState(false);
 
     // ── Assistance Schedule modal state ─────────────────────────────────────────
     const [selectedAssistance, setSelectedAssistance] = useState<AssistanceTicket | null>(null);
     const [isAssistanceScheduleModalOpen, setIsAssistanceScheduleModalOpen] = useState(false);
-    const [assistanceScheduleForm, setAssistanceScheduleForm] = useState<{
-        schedulingStatus?: AssemblyStatus;
-        forecastDate?: string;
-        scheduledDate?: string;
-        estimatedDays?: number;
-        teamId?: string;
-        schedulingNotes?: string;
-    }>({});
     const [isSavingAssistanceSchedule, setIsSavingAssistanceSchedule] = useState(false);
 
     // ── Teams modal state ──────────────────────────────────────────────────────
     const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
-    const [localTeams, setLocalTeams] = useState<AssemblyTeam[]>([]);
-    const [editingTeam, setEditingTeam] = useState<AssemblyTeam | null>(null);
-    const [teamForm, setTeamForm] = useState({
-        name: '',
-        color: 'blue',
-        memberInput: '',
-        members: [] as string[],
-        serviceTypes: ['assembly'] as ('assembly' | 'assistance')[]
-    });
     const [isSavingTeams, setIsSavingTeams] = useState(false);
 
     // ── Mobile tab ─────────────────────────────────────────────────────────────
@@ -531,38 +356,21 @@ const AssemblyScheduler: React.FC = () => {
 
     // ── Open schedule modal ────────────────────────────────────────────────────
     const handleOpenScheduleModal = (batch: Batch) => {
-        const project = projects.find(p => p.id === batch.projectId);
-        const defaultDays = (project?.environments?.length || 1) * 3;
-        setScheduleForm({
-            ...(batch.assemblySchedule || { status: 'Sem Previsão' }),
-            estimatedDays: batch.assemblySchedule?.estimatedDays ?? defaultDays
-        });
         setSelectedBatch(batch);
         setIsScheduleModalOpen(true);
     };
 
-    const handleSaveSchedule = () => {
+    const handleSaveSchedule = (scheduleData: AssemblySchedule) => {
         if (!selectedBatch) return;
         setIsSavingSchedule(true);
 
-        // Build schedule object without undefined properties
         const schedule: AssemblySchedule = {
-            status: scheduleForm.status || 'Sem Previsão',
-            forecastDate: scheduleForm.forecastDate,
-            scheduledDate: scheduleForm.scheduledDate,
-            estimatedDays: scheduleForm.estimatedDays,
-            notes: scheduleForm.notes,
+            ...scheduleData,
+            teamName: scheduleData.teamId ? assemblyTeams.find(t => t.id === scheduleData.teamId)?.name : undefined
         };
-
-        // Only add teamId and teamName if they have values
-        if (scheduleForm.teamId) {
-            schedule.teamId = scheduleForm.teamId;
-            schedule.teamName = assemblyTeams.find(t => t.id === scheduleForm.teamId)?.name;
-        }
 
         updateBatchAssemblySchedule(selectedBatch.id, schedule);
 
-        // Send WhatsApp notification when assembly is scheduled
         if (schedule.scheduledDate && schedule.status === 'Agendado') {
             const project = projects.find(p => p.id === selectedBatch.projectId);
             if (project && project.client.phone && companySettings.whatsappClientTemplates) {
@@ -605,39 +413,36 @@ const AssemblyScheduler: React.FC = () => {
 
     // ── Assistance Schedule modal handlers ──────────────────────────────────────
     const handleOpenAssistanceScheduleModal = (ticket: AssistanceTicket) => {
-        const derivedStatus: AssemblyStatus = ticket.schedulingStatus
-            || (ticket.scheduledDate ? 'Agendado' : ticket.forecastDate ? 'Previsto' : 'Sem Previsão');
-        setAssistanceScheduleForm({
-            schedulingStatus: derivedStatus,
-            forecastDate: ticket.forecastDate,
-            scheduledDate: ticket.scheduledDate,
-            estimatedDays: ticket.estimatedDays ?? ASSISTANCE_SLA_DAYS,
-            teamId: ticket.teamId,
-            schedulingNotes: ticket.schedulingNotes
-        });
         setSelectedAssistance(ticket);
         setIsAssistanceScheduleModalOpen(true);
     };
 
-    const handleSaveAssistanceSchedule = async () => {
+    const handleSaveAssistanceSchedule = async (data: {
+        schedulingStatus?: AssemblyStatus;
+        forecastDate?: string;
+        scheduledDate?: string;
+        estimatedDays?: number;
+        teamId?: string;
+        schedulingNotes?: string;
+    }) => {
         if (!selectedAssistance) return;
         setIsSavingAssistanceSchedule(true);
 
-        const status = assistanceScheduleForm.schedulingStatus || 'Sem Previsão';
-        const forecastDate = status === 'Sem Previsão' ? undefined : assistanceScheduleForm.forecastDate;
-        const scheduledDate = (status === 'Agendado' || status === 'Concluído') ? assistanceScheduleForm.scheduledDate : undefined;
+        const status = data.schedulingStatus || 'Sem Previsão';
+        const forecastDate = status === 'Sem Previsão' ? undefined : data.forecastDate;
+        const scheduledDate = (status === 'Agendado' || status === 'Concluído') ? data.scheduledDate : undefined;
 
         const updatedTicket: AssistanceTicket = {
             ...selectedAssistance,
             schedulingStatus: status,
             forecastDate,
             scheduledDate,
-            estimatedDays: assistanceScheduleForm.estimatedDays,
-            teamId: assistanceScheduleForm.teamId,
-            teamName: assistanceScheduleForm.teamId
-                ? assemblyTeams.find(t => t.id === assistanceScheduleForm.teamId)?.name
+            estimatedDays: data.estimatedDays,
+            teamId: data.teamId,
+            teamName: data.teamId
+                ? assemblyTeams.find(t => t.id === data.teamId)?.name
                 : undefined,
-            schedulingNotes: assistanceScheduleForm.schedulingNotes,
+            schedulingNotes: data.schedulingNotes,
         };
 
         await updateAssistanceTicket(updatedTicket);
@@ -670,73 +475,12 @@ const AssemblyScheduler: React.FC = () => {
 
     // ── Teams modal handlers ───────────────────────────────────────────────────
     const handleOpenTeamModal = () => {
-        setLocalTeams([...assemblyTeams]);
-        setEditingTeam(null);
-        setTeamForm({ name: '', color: 'blue', memberInput: '', members: [], serviceTypes: ['assembly'] });
         setIsTeamModalOpen(true);
     };
 
-    const handleEditTeam = (team: AssemblyTeam) => {
-        setEditingTeam(team);
-        setTeamForm({
-            name: team.name,
-            color: team.color,
-            memberInput: '',
-            members: [...team.members],
-            serviceTypes: team.serviceTypes || ['assembly']
-        });
-    };
-
-    const handleDeleteTeam = (teamId: string) => {
-        const hasActiveBatches = batches.some(b => b.assemblySchedule?.teamId === teamId);
-        if (hasActiveBatches) {
-            if (!window.confirm('Esta equipe possui montagens agendadas. Ao excluir, os lotes vinculados ficarão sem equipe. Deseja continuar?')) return;
-        }
-        setLocalTeams(prev => prev.filter(t => t.id !== teamId));
-        if (editingTeam?.id === teamId) {
-            setEditingTeam(null);
-            setTeamForm({ name: '', color: 'blue', memberInput: '', members: [], serviceTypes: ['assembly'] });
-        }
-    };
-
-    const handleAddMember = () => {
-        const trimmed = teamForm.memberInput.trim();
-        if (!trimmed) return;
-        setTeamForm(prev => ({ ...prev, members: [...prev.members, trimmed], memberInput: '' }));
-    };
-
-    const handleRemoveMember = (idx: number) => {
-        setTeamForm(prev => ({ ...prev, members: prev.members.filter((_, i) => i !== idx) }));
-    };
-
-    const handleSaveTeamForm = () => {
-        if (!teamForm.name.trim()) return;
-        if (teamForm.serviceTypes.length === 0) {
-            showToast('Selecione pelo menos um tipo de serviço (Montagem ou Assistência)', 'error');
-            return;
-        }
-        if (editingTeam) {
-            setLocalTeams(prev => prev.map(t => t.id === editingTeam.id
-                ? { ...t, name: teamForm.name, color: teamForm.color, members: teamForm.members, serviceTypes: teamForm.serviceTypes }
-                : t
-            ));
-        } else {
-            const newTeam: AssemblyTeam = {
-                id: `team-${Date.now()}`,
-                name: teamForm.name,
-                color: teamForm.color,
-                members: teamForm.members,
-                serviceTypes: teamForm.serviceTypes
-            };
-            setLocalTeams(prev => [...prev, newTeam]);
-        }
-        setEditingTeam(null);
-        setTeamForm({ name: '', color: 'blue', memberInput: '', members: [], serviceTypes: ['assembly'] });
-    };
-
-    const handleSaveTeams = async () => {
+    const handleSaveTeams = async (teams: AssemblyTeam[]) => {
         setIsSavingTeams(true);
-        await saveAssemblyTeams(localTeams);
+        await saveAssemblyTeams(teams);
         setIsSavingTeams(false);
         setIsTeamModalOpen(false);
     };
@@ -1303,564 +1047,42 @@ const AssemblyScheduler: React.FC = () => {
             </div>
 
             {/* ─────────────────────────────────────────────────────────────────── */}
-            {/* Schedule Modal                                                      */}
+            {/* Modals                                                              */}
             {/* ─────────────────────────────────────────────────────────────────── */}
-            {isScheduleModalOpen && selectedBatch && (() => {
-                const project = projects.find(p => p.id === selectedBatch.projectId);
-                const envCount = selectedBatch.environmentIds?.length || project?.environments.length || 1;
-                const defaultDays = envCount * 3;
-                const deadlineChip = getDeadlineChip(selectedBatch.assemblyDeadline);
-                const isPostAssemblyBatch = workflowConfig[selectedBatch.phase]?.stage === 8;
-                const canEditCurrentBatch = isPostAssemblyBatch ? canEditPostAssembly : canEdit;
+            <AssemblyScheduleModal
+                isOpen={isScheduleModalOpen}
+                onClose={() => setIsScheduleModalOpen(false)}
+                selectedBatch={selectedBatch}
+                projects={projects}
+                workflowConfig={workflowConfig}
+                canEditCurrentBatch={selectedBatch && workflowConfig[selectedBatch.phase]?.stage === 8 ? canEditPostAssembly : canEdit}
+                assemblyTeams={assemblyTeams}
+                holidays={companySettings?.holidays}
+                onSave={handleSaveSchedule}
+                onCancel={handleCancelSchedule}
+                isSaving={isSavingSchedule}
+            />
 
-                return (
-                    <div
-                        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fade-in"
-                        onClick={() => setIsScheduleModalOpen(false)}
-                    >
-                        <div
-                            className="bg-white dark:bg-[#1e2936] w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-scale-up flex flex-col max-h-[90dvh]"
-                            onClick={e => e.stopPropagation()}
-                        >
-                            {/* Header */}
-                            <div className="p-5 border-b border-slate-100 dark:border-slate-700 flex justify-between items-start shrink-0">
-                                <div>
-                                    <div className="flex items-center gap-2 mb-0.5">
-                                        <span className="material-symbols-outlined text-primary text-xl">{isPostAssemblyBatch ? 'build_circle' : 'calendar_add_on'}</span>
-                                        <h3 className="text-lg font-bold text-slate-800 dark:text-white">{isPostAssemblyBatch ? 'Agendamento de Pós-Montagem' : 'Agendamento de Montagem'}</h3>
-                                    </div>
-                                    <p className="text-sm text-slate-500">{project?.client.name} · {selectedBatch.name}</p>
-                                </div>
-                                <button onClick={() => setIsScheduleModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
-                                    <span className="material-symbols-outlined">close</span>
-                                </button>
-                            </div>
+            <AssistanceScheduleModal
+                isOpen={isAssistanceScheduleModalOpen}
+                onClose={() => setIsAssistanceScheduleModalOpen(false)}
+                selectedAssistance={selectedAssistance}
+                projects={projects}
+                canEditAssistance={canEditAssistance}
+                assemblyTeams={assemblyTeams}
+                onSave={handleSaveAssistanceSchedule}
+                onCancel={handleCancelAssistanceSchedule}
+                isSaving={isSavingAssistanceSchedule}
+            />
 
-                            <div className="overflow-y-auto flex-1 custom-scrollbar p-5 space-y-4">
-                                {/* Deadline info */}
-                                {deadlineChip && (
-                                    <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${deadlineChip.cls}`}>
-                                        <span className="material-symbols-outlined text-sm">alarm</span>
-                                        <span className="font-bold">{deadlineChip.label}</span>
-                                    </div>
-                                )}
-
-                                {/* Team select */}
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Equipe</label>
-                                    <div className="flex flex-wrap gap-2">
-                                        <button
-                                            onClick={() => setScheduleForm(prev => ({ ...prev, teamId: undefined, teamName: undefined }))}
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${!scheduleForm.teamId ? 'bg-slate-800 text-white border-slate-800' : 'border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                                        >
-                                            Sem equipe
-                                        </button>
-                                        {assemblyTeams.map(team => {
-                                            const c = TEAM_COLOR_MAP[team.color] || TEAM_COLOR_MAP.slate;
-                                            const isSelected = scheduleForm.teamId === team.id;
-                                            return (
-                                                <button
-                                                    key={team.id}
-                                                    onClick={() => setScheduleForm(prev => ({ ...prev, teamId: team.id, teamName: team.name }))}
-                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${isSelected ? `${c.bg} ${c.text} border-transparent` : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                                                >
-                                                    <div className={`w-2 h-2 rounded-full ${isSelected ? 'bg-white/70' : c.bg}`} />
-                                                    {team.name}
-                                                </button>
-                                            );
-                                        })}
-                                        {assemblyTeams.length === 0 && (
-                                            <p className="text-xs text-slate-400 italic">Nenhuma equipe cadastrada. Clique em "Equipes" para adicionar.</p>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Status toggle */}
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Status</label>
-                                    <div className="flex gap-2">
-                                        {(['Sem Previsão', 'Previsto', 'Agendado', 'Concluído'] as AssemblyStatus[]).map(s => (
-                                            <button
-                                                key={s}
-                                                onClick={() => setScheduleForm(prev => ({ ...prev, status: s }))}
-                                                className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold border transition-colors ${scheduleForm.status === s ? 'bg-primary text-white border-primary' : 'border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                                            >
-                                                {s}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Forecast date */}
-                                {(scheduleForm.status === 'Previsto' || scheduleForm.status === 'Agendado') && (
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">
-                                            {scheduleForm.status === 'Agendado' ? 'Data Confirmada' : 'Data Prevista'}
-                                        </label>
-                                        <input
-                                            type="date"
-                                            value={scheduleForm.status === 'Agendado'
-                                                ? (scheduleForm.scheduledDate?.split('T')[0] || '')
-                                                : (scheduleForm.forecastDate?.split('T')[0] || '')}
-                                            onChange={e => {
-                                                const val = e.target.value;
-                                                if (scheduleForm.status === 'Agendado') {
-                                                    setScheduleForm(prev => ({ ...prev, scheduledDate: val, forecastDate: val }));
-                                                } else {
-                                                    setScheduleForm(prev => ({ ...prev, forecastDate: val }));
-                                                }
-                                            }}
-                                            className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-primary focus:border-primary outline-none"
-                                        />
-                                    </div>
-                                )}
-
-                                {/* Estimated days */}
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Duração Estimada (dias)</label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        value={scheduleForm.estimatedDays || ''}
-                                        onChange={e => setScheduleForm(prev => ({ ...prev, estimatedDays: Number(e.target.value) }))}
-                                        className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-primary focus:border-primary outline-none"
-                                    />
-                                    <p className="text-[10px] text-slate-400 mt-1">
-                                        💡 Estimativa automática: {envCount} amb × 3 d.ú. = <strong>{defaultDays} dias úteis</strong>
-                                    </p>
-                                </div>
-
-                                {/* Notes */}
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Observações</label>
-                                    <textarea
-                                        rows={2}
-                                        value={scheduleForm.notes || ''}
-                                        onChange={e => setScheduleForm(prev => ({ ...prev, notes: e.target.value }))}
-                                        placeholder="Informações adicionais..."
-                                        className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-primary focus:border-primary outline-none resize-none custom-scrollbar"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Footer */}
-                            <div className="p-5 border-t border-slate-100 dark:border-slate-700 flex justify-between gap-3 shrink-0">
-                                <div className="flex gap-2">
-                                    {canEditCurrentBatch && (selectedBatch?.assemblySchedule?.status === 'Previsto' || selectedBatch?.assemblySchedule?.status === 'Agendado') && (
-                                        <button
-                                            onClick={handleCancelSchedule}
-                                            disabled={isSavingSchedule}
-                                            className="px-5 py-2 bg-rose-600 text-white rounded-lg text-sm font-bold hover:bg-rose-700 transition-colors flex items-center gap-2 disabled:opacity-50"
-                                        >
-                                            <span className="material-symbols-outlined text-sm">cancel</span>
-                                            Cancelar Agendamento
-                                        </button>
-                                    )}
-                                </div>
-                                <div className="flex gap-2">
-                                    <button onClick={() => setIsScheduleModalOpen(false)} className="px-4 py-2 rounded-lg text-sm font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                                        Fechar
-                                    </button>
-                                    <button
-                                        onClick={handleSaveSchedule}
-                                        disabled={isSavingSchedule}
-                                        className="px-5 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50"
-                                    >
-                                        {isSavingSchedule ? (
-                                            <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
-                                        ) : (
-                                            <span className="material-symbols-outlined text-sm">save</span>
-                                        )}
-                                        Salvar
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                );
-            })()}
-
-            {/* ─────────────────────────────────────────────────────────────────── */}
-            {/* Assistance Schedule Modal                                             */}
-            {/* ─────────────────────────────────────────────────────────────────── */}
-            {isAssistanceScheduleModalOpen && selectedAssistance && (() => {
-                const project = projects.find(p => p.client.id === selectedAssistance.clientId);
-                return (
-                    <div
-                        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fade-in"
-                        onClick={() => setIsAssistanceScheduleModalOpen(false)}
-                    >
-                        <div
-                            className="bg-white dark:bg-[#1e2936] w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-scale-up flex flex-col max-h-[90dvh]"
-                            onClick={e => e.stopPropagation()}
-                        >
-                            {/* Header */}
-                            <div className="p-5 border-b border-slate-100 dark:border-slate-700 flex justify-between items-start shrink-0">
-                                <div>
-                                    <div className="flex items-center gap-2 mb-0.5">
-                                        <span className="material-symbols-outlined text-primary text-xl">calendar_add_on</span>
-                                        <h3 className="text-lg font-bold text-slate-800 dark:text-white">Agendar Assistência</h3>
-                                    </div>
-                                    <p className="text-sm text-slate-500">{project?.client.name} · {selectedAssistance.code || selectedAssistance.id}</p>
-                                </div>
-                                <button onClick={() => setIsAssistanceScheduleModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
-                                    <span className="material-symbols-outlined">close</span>
-                                </button>
-                            </div>
-
-                            <div className="overflow-y-auto flex-1 custom-scrollbar p-5 space-y-4">
-                                {/* Team select */}
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Equipe</label>
-                                    <div className="flex flex-wrap gap-2">
-                                        <button
-                                            onClick={() => setAssistanceScheduleForm(prev => ({ ...prev, teamId: undefined, teamName: undefined }))}
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${!assistanceScheduleForm.teamId ? 'bg-slate-800 text-white border-slate-800' : 'border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                                        >
-                                            Sem equipe
-                                        </button>
-                                        {assemblyTeams
-                                            .filter(team => team.serviceTypes?.includes('assistance') !== false)
-                                            .map(team => {
-                                                const c = TEAM_COLOR_MAP[team.color] || TEAM_COLOR_MAP.slate;
-                                                const isSelected = assistanceScheduleForm.teamId === team.id;
-                                                return (
-                                                    <button
-                                                        key={team.id}
-                                                        onClick={() => setAssistanceScheduleForm(prev => ({ ...prev, teamId: team.id }))}
-                                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${isSelected ? `${c.bg} ${c.text} border-transparent` : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                                                    >
-                                                        <div className={`w-2 h-2 rounded-full ${isSelected ? 'bg-white/70' : c.bg}`} />
-                                                        {team.name}
-                                                    </button>
-                                                );
-                                            })}
-                                        {assemblyTeams.filter(t => t.serviceTypes?.includes('assistance') !== false).length === 0 && (
-                                            <p className="text-xs text-slate-400 italic">Nenhuma equipe cadastrada. Clique em "Equipes" para adicionar.</p>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Status toggle */}
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Status</label>
-                                    <div className="flex gap-2">
-                                        {(['Sem Previsão', 'Previsto', 'Agendado', 'Concluído'] as AssemblyStatus[]).map(s => (
-                                            <button
-                                                key={s}
-                                                onClick={() => setAssistanceScheduleForm(prev => ({ ...prev, schedulingStatus: s }))}
-                                                className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold border transition-colors ${assistanceScheduleForm.schedulingStatus === s ? 'bg-primary text-white border-primary' : 'border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                                            >
-                                                {s}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Conditional date input */}
-                                {(assistanceScheduleForm.schedulingStatus === 'Previsto' || assistanceScheduleForm.schedulingStatus === 'Agendado') && (
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">
-                                            {assistanceScheduleForm.schedulingStatus === 'Agendado' ? 'Data Confirmada' : 'Data Prevista'}
-                                        </label>
-                                        <input
-                                            type="date"
-                                            value={assistanceScheduleForm.schedulingStatus === 'Agendado'
-                                                ? (assistanceScheduleForm.scheduledDate?.split('T')[0] || '')
-                                                : (assistanceScheduleForm.forecastDate?.split('T')[0] || '')}
-                                            onChange={e => {
-                                                const val = e.target.value;
-                                                if (assistanceScheduleForm.schedulingStatus === 'Agendado') {
-                                                    setAssistanceScheduleForm(prev => ({ ...prev, scheduledDate: val, forecastDate: val }));
-                                                } else {
-                                                    setAssistanceScheduleForm(prev => ({ ...prev, forecastDate: val }));
-                                                }
-                                            }}
-                                            className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-primary focus:border-primary outline-none"
-                                        />
-                                    </div>
-                                )}
-
-                                {/* Estimated days */}
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Duração Estimada (dias)</label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        value={assistanceScheduleForm.estimatedDays || ''}
-                                        onChange={e => setAssistanceScheduleForm(prev => ({ ...prev, estimatedDays: Number(e.target.value) }))}
-                                        className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-primary focus:border-primary outline-none"
-                                    />
-                                    <p className="text-[10px] text-slate-400 mt-1">
-                                        💡 SLA padrão: <strong>{ASSISTANCE_SLA_DAYS} dias úteis</strong>
-                                    </p>
-                                </div>
-
-                                {/* Notes */}
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Observações</label>
-                                    <textarea
-                                        rows={2}
-                                        value={assistanceScheduleForm.schedulingNotes || ''}
-                                        onChange={e => setAssistanceScheduleForm(prev => ({ ...prev, schedulingNotes: e.target.value }))}
-                                        placeholder="Informações adicionais..."
-                                        className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-primary focus:border-primary outline-none resize-none custom-scrollbar"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Footer */}
-                            <div className="p-5 border-t border-slate-100 dark:border-slate-700 flex justify-between gap-3 shrink-0">
-                                <div className="flex gap-2">
-                                    {canEditAssistance && (assistanceScheduleForm.schedulingStatus === 'Previsto' || assistanceScheduleForm.schedulingStatus === 'Agendado') && (
-                                        <button
-                                            onClick={handleCancelAssistanceSchedule}
-                                            disabled={isSavingAssistanceSchedule}
-                                            className="px-5 py-2 bg-rose-600 text-white rounded-lg text-sm font-bold hover:bg-rose-700 transition-colors flex items-center gap-2 disabled:opacity-50"
-                                        >
-                                            <span className="material-symbols-outlined text-sm">cancel</span>
-                                            Cancelar Agendamento
-                                        </button>
-                                    )}
-                                </div>
-                                <div className="flex gap-2">
-                                    <button onClick={() => setIsAssistanceScheduleModalOpen(false)} className="px-4 py-2 rounded-lg text-sm font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                                        Fechar
-                                    </button>
-                                    <button
-                                        onClick={handleSaveAssistanceSchedule}
-                                        disabled={isSavingAssistanceSchedule}
-                                        className="px-5 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50"
-                                    >
-                                        {isSavingAssistanceSchedule ? (
-                                            <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
-                                        ) : (
-                                            <span className="material-symbols-outlined text-sm">save</span>
-                                        )}
-                                        Salvar
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                );
-            })()}
-
-            {/* ─────────────────────────────────────────────────────────────────── */}
-            {/* Teams Modal                                                          */}
-            {/* ─────────────────────────────────────────────────────────────────── */}
-            {isTeamModalOpen && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fade-in"
-                    onClick={() => setIsTeamModalOpen(false)}
-                >
-                    <div
-                        className="bg-white dark:bg-[#1e2936] w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-scale-up flex flex-col max-h-[90dvh]"
-                        onClick={e => e.stopPropagation()}
-                    >
-                        {/* Header */}
-                        <div className="p-5 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center shrink-0">
-                            <div className="flex items-center gap-2">
-                                <span className="material-symbols-outlined text-primary text-xl">groups</span>
-                                <h3 className="text-lg font-bold text-slate-800 dark:text-white">Equipes de Montagem</h3>
-                            </div>
-                            <button onClick={() => setIsTeamModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
-                                <span className="material-symbols-outlined">close</span>
-                            </button>
-                        </div>
-
-                        <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
-                            {/* Left: team list */}
-                            <div className="w-full md:w-56 shrink-0 border-b md:border-b-0 md:border-r border-slate-100 dark:border-slate-700 overflow-y-auto custom-scrollbar p-3 space-y-2 max-h-48 md:max-h-none">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Equipes cadastradas</p>
-                                {localTeams.length === 0 && (
-                                    <p className="text-xs text-slate-400 italic text-center py-4">Nenhuma equipe ainda</p>
-                                )}
-                                {localTeams.map(team => {
-                                    const c = TEAM_COLOR_MAP[team.color] || TEAM_COLOR_MAP.slate;
-                                    return (
-                                        <div key={team.id} className={`rounded-xl p-2.5 border transition-colors ${editingTeam?.id === team.id ? 'bg-primary/5 border-primary/30' : 'border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <div className={`w-3 h-3 rounded-full shrink-0 ${c.bg}`} />
-                                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate flex-1">{team.name}</span>
-                                            </div>
-                                            {team.members.length > 0 && (
-                                                <p className="text-[10px] text-slate-400 truncate pl-5">{team.members.join(', ')}</p>
-                                            )}
-                                            {team.serviceTypes && team.serviceTypes.length > 0 && (
-                                                <div className="flex gap-1 mt-1 pl-5 flex-wrap">
-                                                    {team.serviceTypes.includes('assembly') && (
-                                                        <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-bold">Montagem</span>
-                                                    )}
-                                                    {team.serviceTypes.includes('assistance') && (
-                                                        <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-bold">Assistência</span>
-                                                    )}
-                                                </div>
-                                            )}
-                                            <div className="flex gap-1 mt-1.5">
-                                                <button onClick={() => handleEditTeam(team)} className="flex-1 py-0.5 text-[10px] rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-primary/10 hover:text-primary transition-colors font-bold">
-                                                    Editar
-                                                </button>
-                                                <button onClick={() => handleDeleteTeam(team.id)} className="flex-1 py-0.5 text-[10px] rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:text-rose-500 transition-colors font-bold">
-                                                    Excluir
-                                                </button>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-
-                            {/* Right: create/edit form */}
-                            <div className="flex-1 p-5 overflow-y-auto custom-scrollbar space-y-4">
-                                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-200">
-                                    {editingTeam ? `Editando: ${editingTeam.name}` : 'Nova Equipe'}
-                                </h4>
-
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Nome da equipe</label>
-                                    <input
-                                        type="text"
-                                        value={teamForm.name}
-                                        onChange={e => setTeamForm(prev => ({ ...prev, name: e.target.value }))}
-                                        placeholder="Ex: Equipe Alpha"
-                                        className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-primary focus:border-primary outline-none"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-2">Cor</label>
-                                    <div className="flex flex-wrap gap-2">
-                                        {COLOR_OPTIONS.map(color => {
-                                            const c = TEAM_COLOR_MAP[color];
-                                            return (
-                                                <button
-                                                    key={color}
-                                                    onClick={() => setTeamForm(prev => ({ ...prev, color }))}
-                                                    className={`w-7 h-7 rounded-full ${c.bg} flex items-center justify-center transition-transform ${teamForm.color === color ? 'ring-2 ring-offset-2 ring-primary scale-110' : 'hover:scale-110'}`}
-                                                >
-                                                    {teamForm.color === color && (
-                                                        <span className="material-symbols-outlined text-white text-sm">check</span>
-                                                    )}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-2">Tipos de Serviço</label>
-                                    <div className="space-y-2">
-                                        <label className="flex items-center gap-3 p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
-                                            <input
-                                                type="checkbox"
-                                                checked={teamForm.serviceTypes.includes('assembly')}
-                                                onChange={e => {
-                                                    setTeamForm(prev => ({
-                                                        ...prev,
-                                                        serviceTypes: (e.target.checked
-                                                            ? [...prev.serviceTypes, 'assembly'].filter((v, i, a) => a.indexOf(v) === i)
-                                                            : prev.serviceTypes.filter(t => t !== 'assembly')
-                                                        ) as ('assembly' | 'assistance')[]
-                                                    }));
-                                                }}
-                                                className="w-4 h-4 rounded cursor-pointer accent-primary"
-                                            />
-                                            <div className="flex-1">
-                                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Montagem</span>
-                                                <p className="text-[10px] text-slate-400">Agendamentos de montagem de móveis</p>
-                                            </div>
-                                        </label>
-                                        <label className="flex items-center gap-3 p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
-                                            <input
-                                                type="checkbox"
-                                                checked={teamForm.serviceTypes.includes('assistance')}
-                                                onChange={e => {
-                                                    setTeamForm(prev => ({
-                                                        ...prev,
-                                                        serviceTypes: (e.target.checked
-                                                            ? [...prev.serviceTypes, 'assistance'].filter((v, i, a) => a.indexOf(v) === i)
-                                                            : prev.serviceTypes.filter(t => t !== 'assistance')
-                                                        ) as ('assembly' | 'assistance')[]
-                                                    }));
-                                                }}
-                                                className="w-4 h-4 rounded cursor-pointer accent-primary"
-                                            />
-                                            <div className="flex-1">
-                                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Assistência Técnica</span>
-                                                <p className="text-[10px] text-slate-400">Chamados e visitas técnicas de assistência</p>
-                                            </div>
-                                        </label>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Membros</label>
-                                    <div className="flex gap-2 mb-2">
-                                        <input
-                                            type="text"
-                                            value={teamForm.memberInput}
-                                            onChange={e => setTeamForm(prev => ({ ...prev, memberInput: e.target.value }))}
-                                            onKeyDown={e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); handleAddMember(); } }}
-                                            placeholder="Nome do membro (Enter para adicionar)"
-                                            className="flex-1 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-primary focus:border-primary outline-none"
-                                        />
-                                        <button onClick={handleAddMember} className="px-3 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary/90 transition-colors">
-                                            <span className="material-symbols-outlined text-sm">add</span>
-                                        </button>
-                                    </div>
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {teamForm.members.map((m, i) => (
-                                            <span key={i} className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs rounded-full px-2.5 py-1 font-medium">
-                                                {m}
-                                                <button onClick={() => handleRemoveMember(i)} className="text-slate-400 hover:text-rose-500 transition-colors">
-                                                    <span className="material-symbols-outlined text-[14px]">close</span>
-                                                </button>
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-2 pt-2">
-                                    {editingTeam && (
-                                        <button
-                                            onClick={() => { setEditingTeam(null); setTeamForm({ name: '', color: 'blue', memberInput: '', members: [], serviceTypes: ['assembly'] }); }}
-                                            className="px-4 py-2 rounded-lg text-sm font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                                        >
-                                            Cancelar
-                                        </button>
-                                    )}
-                                    <button
-                                        onClick={handleSaveTeamForm}
-                                        disabled={!teamForm.name.trim()}
-                                        className="flex-1 py-2 bg-slate-800 dark:bg-slate-700 text-white rounded-lg text-sm font-bold hover:bg-slate-700 dark:hover:bg-slate-600 transition-colors disabled:opacity-40"
-                                    >
-                                        {editingTeam ? 'Atualizar Equipe' : 'Adicionar Equipe'}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Footer: Save all teams */}
-                        <div className="p-5 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 shrink-0 bg-slate-50 dark:bg-[#1a2632]">
-                            <button onClick={() => setIsTeamModalOpen(false)} className="px-4 py-2 rounded-lg text-sm font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handleSaveTeams}
-                                disabled={isSavingTeams}
-                                className="px-5 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50"
-                            >
-                                {isSavingTeams ? (
-                                    <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
-                                ) : (
-                                    <span className="material-symbols-outlined text-sm">save</span>
-                                )}
-                                Salvar Equipes
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <AssemblyTeamModal
+                isOpen={isTeamModalOpen}
+                onClose={() => setIsTeamModalOpen(false)}
+                initialTeams={assemblyTeams}
+                batches={batches}
+                onSaveTeams={handleSaveTeams}
+                isSaving={isSavingTeams}
+            />
         </div>
     );
 };
